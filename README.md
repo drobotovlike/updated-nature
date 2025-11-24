@@ -96,9 +96,34 @@ ature-app/
 
 The project is configured for Vercel deployment. Connect your GitHub repository to Vercel and deploy automatically.
 
-Make sure to set environment variables in Vercel Dashboard:
-- `VITE_CLERK_PUBLISHABLE_KEY`
-- `GEMINI_API_KEY` (for serverless function)
+### Required Environment Variables in Vercel
+
+**IMPORTANT**: You must set these environment variables in Vercel for the app to work:
+
+1. Go to [Vercel Dashboard](https://vercel.com/dashboard) → Your Project
+2. Navigate to **Settings** → **Environment Variables**
+3. Add the following variables:
+
+#### `VITE_CLERK_PUBLISHABLE_KEY` (Required)
+- **Name**: `VITE_CLERK_PUBLISHABLE_KEY`
+- **Value**: Your Clerk publishable key (starts with `pk_test_` or `pk_live_`)
+- **Environment**: Select all (Production, Preview, Development)
+- Get your key from [Clerk Dashboard](https://dashboard.clerk.com/last-active?path=api-keys)
+
+#### `GEMINI_API_KEY` (Required for AI features)
+- **Name**: `GEMINI_API_KEY`
+- **Value**: Your Google Gemini API key
+- **Environment**: Select all (Production, Preview, Development)
+- Get your key from [Google AI Studio](https://aistudio.google.com/apikey)
+
+4. Click **Save** and **Redeploy** your application
+
+### Troubleshooting Deployment
+
+**Error: "useAuth can only be used within <ClerkProvider />"**
+- This means `VITE_CLERK_PUBLISHABLE_KEY` is not set in Vercel
+- Follow the steps above to add the environment variable
+- Make sure to redeploy after adding the variable
 
 ## License
 

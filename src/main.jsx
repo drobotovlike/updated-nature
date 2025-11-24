@@ -134,25 +134,32 @@ try {
     console.error('2. Add: VITE_CLERK_PUBLISHABLE_KEY = your_key_here')
     console.error('3. Redeploy your application')
     console.error('')
-  }
-  
-  // ALWAYS wrap with ClerkProvider (as per Clerk documentation)
-  // According to https://clerk.com/docs/nextjs/reference/components/clerk-provider
-  // ClerkProvider must wrap the app for hooks to work
-  // If key is missing, we use a placeholder - ClerkProvider will show errors but hooks will work
-  const clerkKey = PUBLISHABLE_KEY || 'pk_test_placeholder_set_vite_clerk_publishable_key'
-  
-  root.render(
-    <StrictMode>
-      <ErrorBoundary>
-        <ClerkProvider publishableKey={clerkKey}>
+    
+    // Show error page without ClerkProvider (error page doesn't use Clerk hooks)
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
           <BrowserRouter>
-            {!isValidKey ? <MissingClerkKeyError /> : <App />}
+            <MissingClerkKeyError />
           </BrowserRouter>
-        </ClerkProvider>
-      </ErrorBoundary>
-    </StrictMode>
-  )
+        </ErrorBoundary>
+      </StrictMode>
+    )
+  } else {
+    // Render app with ClerkProvider when key is valid
+    // ClerkProvider must wrap the app for hooks like useAuth() to work
+    root.render(
+      <StrictMode>
+        <ErrorBoundary>
+          <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+            <BrowserRouter>
+              <App />
+            </BrowserRouter>
+          </ClerkProvider>
+        </ErrorBoundary>
+      </StrictMode>
+    )
+  }
 } catch (error) {
   console.error('Failed to render app:', error)
   const rootEl = document.getElementById('root')

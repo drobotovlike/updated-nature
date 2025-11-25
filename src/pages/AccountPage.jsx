@@ -189,7 +189,7 @@ export default function AccountPage() {
                   href="https://dashboard.clerk.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+                  className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
                 >
                   Manage Account in Clerk
                 </a>
@@ -212,7 +212,7 @@ export default function AccountPage() {
                       : '$29/month • Next billing date: April 15, 2024'}
                   </p>
                 </div>
-                <button className="px-4 py-2 bg-white border border-stone-200 rounded-lg text-sm font-semibold hover:bg-stone-50 transition-colors">
+                <button className="px-4 py-2 bg-white border border-stone-200 rounded-full text-sm font-semibold hover:bg-stone-50 transition-colors">
                   Change Plan
                 </button>
               </div>
@@ -223,7 +223,7 @@ export default function AccountPage() {
                   <p className="text-sm text-stone-500">Expires 12/25</p>
                 </div>
               </div>
-              <button className="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors">
+              <button className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors">
                 Update Payment Method
               </button>
             </div>
@@ -236,7 +236,7 @@ export default function AccountPage() {
               <h3 className="text-xl font-semibold text-stone-900">My Projects</h3>
               <button
                 onClick={() => navigate('/studio')}
-                className="px-4 py-2 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+                className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
               >
                 New Project
               </button>
@@ -263,7 +263,7 @@ export default function AccountPage() {
                 <p className="text-sm text-stone-500 mb-6">Create and save your first project in Studio</p>
                 <button
                   onClick={() => navigate('/studio')}
-                  className="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+                  className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
                 >
                   Go to Studio
                 </button>
@@ -307,7 +307,7 @@ export default function AccountPage() {
                     <div className="flex gap-2">
                       <button
                         onClick={() => navigate('/studio')}
-                        className="flex-1 px-4 py-2 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+                        className="flex-1 px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
                       >
                         Open
                       </button>
@@ -315,7 +315,7 @@ export default function AccountPage() {
                         <a
                           href={project.workflow.result.url}
                           download
-                          className="px-4 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm font-medium hover:bg-stone-100 transition-colors"
+                          className="px-4 py-2 bg-stone-50 border border-stone-200 rounded-full text-sm font-medium hover:bg-stone-100 transition-colors"
                         >
                           Download
                         </a>

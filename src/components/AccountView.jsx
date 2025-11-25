@@ -151,7 +151,7 @@ export default function AccountView() {
                   href="https://dashboard.clerk.com"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors"
+                  className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
                 >
                   Manage Account in Clerk
                 </a>
@@ -179,7 +179,7 @@ export default function AccountView() {
                     </p>
                   </div>
                   {userPlan !== 'Enterprise' && (
-                    <button className="px-4 py-2 bg-white border border-stone-200 rounded-lg text-sm font-semibold hover:bg-stone-50 transition-colors">
+                    <button className="px-4 py-2 bg-white border border-stone-200 rounded-full text-sm font-semibold hover:bg-stone-50 transition-colors">
                       {userPlan === 'Free' ? 'Upgrade Plan' : 'Change Plan'}
                     </button>
                   )}
@@ -193,7 +193,7 @@ export default function AccountView() {
                         <p className="text-sm text-stone-500">Expires 12/25</p>
                       </div>
                     </div>
-                    <button className="px-6 py-3 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors">
+                    <button className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors">
                       Update Payment Method
                     </button>
                   </>
@@ -250,7 +250,7 @@ export default function AccountView() {
                       Current Plan
                     </div>
                   ) : (
-                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-lg text-sm font-semibold hover:bg-stone-200 transition-colors">
+                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors"
                       Select Plan
                     </button>
                   )}
@@ -320,7 +320,7 @@ export default function AccountView() {
                       Current Plan
                     </div>
                   ) : (
-                    <button className="px-4 py-2 bg-stone-900 text-white rounded-lg text-sm font-semibold hover:bg-stone-800 transition-colors">
+                    <button className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors">
                       {userPlan === 'Free' ? 'Upgrade to Pro' : 'Switch to Pro'}
                     </button>
                   )}
@@ -382,7 +382,7 @@ export default function AccountView() {
                       Current Plan
                     </div>
                   ) : (
-                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-lg text-sm font-semibold hover:bg-stone-200 transition-colors">
+                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors"
                       Contact Sales
                     </button>
                   )}

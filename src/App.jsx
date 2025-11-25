@@ -302,7 +302,7 @@ function HomePage() {
                   <div className="flex-1 h-px bg-stone-200"></div>
                   <button 
                     onClick={() => navigate('/dashboard')}
-                    className="px-4 py-2 bg-stone-900 text-white rounded-lg text-xs font-bold tracking-wide hover:bg-stone-800 transition-colors"
+                    className="px-4 py-2 bg-stone-900 text-white rounded-full text-xs font-bold tracking-wide hover:bg-stone-800 transition-colors"
                   >
                     Generate
                   </button>
@@ -1211,7 +1211,7 @@ function StudioPage() {
                                     setUseAIDesigner(true)
                                     setDescription('')
                                   }}
-                                  className={`flex-1 px-4 py-3.5 rounded-lg text-sm font-semibold transition-all ${
+                                  className={`flex-1 px-4 py-3.5 rounded-full text-sm font-semibold transition-all ${
                                     useAIDesigner
                                       ? 'bg-stone-900 text-stone-50 shadow-lg'
                                       : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200'
@@ -1223,7 +1223,7 @@ function StudioPage() {
                                 <button
                                   type="button"
                                   onClick={() => setUseAIDesigner(false)}
-                                  className={`flex-1 px-4 py-3.5 rounded-lg text-sm font-semibold transition-all ${
+                                  className={`flex-1 px-4 py-3.5 rounded-full text-sm font-semibold transition-all ${
                                     !useAIDesigner
                                       ? 'bg-stone-900 text-stone-50 shadow-lg'
                                       : 'bg-stone-100 text-stone-700 hover:bg-stone-200 border border-stone-200'
@@ -1257,7 +1257,7 @@ function StudioPage() {
                               type="button"
                               onClick={handleSeeResult}
                               disabled={!previewUrl || !roomPreviewUrl || isProcessing || (!useAIDesigner && !description.trim())}
-                              className={`w-full px-6 py-4 rounded-lg text-sm font-bold tracking-wider uppercase transition-all ${
+                              className={`w-full px-6 py-4 rounded-full text-sm font-bold tracking-wider uppercase transition-all ${
                                 !previewUrl || !roomPreviewUrl || isProcessing || (!useAIDesigner && !description.trim())
                                   ? 'bg-stone-200 text-stone-400 cursor-not-allowed'
                                   : 'bg-stone-900 text-stone-50 hover:bg-stone-800 shadow-lg hover:shadow-xl hover:scale-[1.02]'

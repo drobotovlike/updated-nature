@@ -838,13 +838,13 @@ export default function DashboardPage() {
                   setShowCreateSpaceModal(false)
                   setNewSpaceName('')
                 }}
-                className="flex-1 px-4 py-3 rounded-lg border border-stone-200 bg-white text-stone-700 text-sm font-semibold hover:bg-stone-50 transition-colors"
+                className="flex-1 px-4 py-3 rounded-full border border-stone-200 bg-white text-stone-700 text-sm font-semibold hover:bg-stone-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateSpace}
-                className="flex-1 px-4 py-3 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 transition-colors"
+                className="flex-1 px-4 py-3 rounded-full bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 transition-colors"
               >
                 Create
               </button>
@@ -880,13 +880,13 @@ export default function DashboardPage() {
                   setShowCreateProjectModal(false)
                   setNewProjectName('')
                 }}
-                className="flex-1 px-4 py-3 rounded-lg border border-stone-200 bg-white text-stone-700 text-sm font-semibold hover:bg-stone-50 transition-colors"
+                className="flex-1 px-4 py-3 rounded-full border border-stone-200 bg-white text-stone-700 text-sm font-semibold hover:bg-stone-50 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateProject}
-                className="flex-1 px-4 py-3 rounded-lg bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 transition-colors"
+                className="flex-1 px-4 py-3 rounded-full bg-stone-900 text-white text-sm font-semibold hover:bg-stone-800 transition-colors"
               >
                 Create
               </button>

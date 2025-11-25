@@ -474,7 +474,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                     <button
                       onClick={() => callGeminiAPI(prompt || 'Create a beautiful interior design with proper lighting and realistic details.')}
                       disabled={isProcessing}
-                      className="w-full px-4 py-2.5 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2.5 bg-stone-900 text-white rounded-full text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isProcessing ? (
                         <>
@@ -499,7 +499,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                       <button
                         onClick={() => handlePresetAction('upscale')}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 p-2 rounded-full border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600 flex-shrink-0">
                           <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3" />
@@ -510,7 +510,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                       <button
                         onClick={() => handlePresetAction('add-item')}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 p-2 rounded-full border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600 flex-shrink-0">
                           <path d="M5 12h14" />
@@ -522,7 +522,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                       <button
                         onClick={() => handlePresetAction('change-lights')}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 p-2 rounded-full border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600 flex-shrink-0">
                           <path d="M9 2v3M15 2v3M12 18v3M4 12H2M6.314 6.314l-2.121 2.121M17.686 6.314l2.121 2.121M6.314 17.686l-2.121 2.121M17.686 17.686l2.121 2.121M22 12h-2M12 6a6 6 0 0 0 0 12 6 6 0 0 0 0-12Z" />
@@ -533,7 +533,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                       <button
                         onClick={() => handlePresetAction('erase-object')}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 p-2 rounded-full border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600 flex-shrink-0">
                           <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.2 5.2c1 1 1 2.5 0 3.4L13 21" />
@@ -546,7 +546,7 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
                       <button
                         onClick={() => handlePresetAction('change-object')}
                         disabled={isProcessing}
-                        className="flex items-center gap-2 p-2 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-2 p-2 rounded-full border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group text-left disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600 flex-shrink-0">
                           <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />

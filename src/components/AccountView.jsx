@@ -119,7 +119,16 @@ export default function AccountView() {
 
       // Update name if there are changes
       if (Object.keys(updates).length > 0) {
-        await user.update(updates)
+        try {
+          await user.update(updates)
+        } catch (nameError) {
+          // Check if error is about first/last name not being enabled
+          if (nameError.message?.includes('first_name') || nameError.message?.includes('firstName')) {
+            setSaveError('First and Last Name fields are not enabled in Clerk Dashboard. Please enable them in User & Authentication → Attributes, or contact support.')
+            return
+          }
+          throw nameError // Re-throw if it's a different error
+        }
       }
 
       // Update email if changed (this requires verification)

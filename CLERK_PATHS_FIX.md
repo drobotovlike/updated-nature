@@ -49,18 +49,16 @@ Clerk is redirecting to `accounts.ature.ru` (Account Portal) instead of keeping 
 - ✅ Hash routing works properly
 - ✅ Better user experience
 
-## Alternative: Keep Account Portal but Fix Redirects
+## Alternative: Disable Account Portal (Recommended)
 
-If you want to keep using the Account Portal, you need to:
+Since you have custom sign-in/sign-up pages, you should **disable the Account Portal**:
 
-1. **Update redirect URLs in Clerk Dashboard:**
-   - Go to **Paths** → **Redirect URLs**
-   - Add your application domain URLs:
-     - `https://ature.ru/dashboard` (after sign-in)
-     - `https://ature.ru/dashboard` (after sign-up)
-     - `https://ature.ru` (after sign-out)
+1. Go to Clerk Dashboard → **Paths** → **Account Portal** (or look for Account Portal settings)
+2. Look for a toggle/switch to disable it
+3. Or change the domain from `accounts.ature.ru` to your application domain
+4. See `CLERK_ACCOUNT_PORTAL_FIX.md` for detailed instructions
 
-2. **But this still causes redirects** - users will be sent to `accounts.ature.ru` and then redirected back.
+**Why disable it?** The Account Portal is Clerk's hosted solution. If you're using your own pages, the Account Portal will cause unwanted redirects to `accounts.ature.ru`.
 
 ## Recommended: Use Application Domain
 

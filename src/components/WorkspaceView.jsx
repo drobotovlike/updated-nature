@@ -20,35 +20,38 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
 
   // Load project data
   useEffect(() => {
-    if (projectId && userId) {
-      if (!project) {
-        setProject({ 
-          id: projectId, 
-          name: 'New Project', 
-          workflow: {},
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
-      }
-      
-      try {
-        const projectData = getProject(userId, projectId)
-        if (projectData) {
-          setProject(projectData)
-          
-          // Restore workflow state if exists
-          if (projectData.workflow) {
-            setRoomPreviewUrl(projectData.workflow.roomFile?.url || '')
-            setAssetPreviewUrl(projectData.workflow.assetFile?.url || '')
-            setResultUrl(projectData.workflow.result?.url || '')
-            setPrompt(projectData.workflow.prompt || '')
-            setShowEditingMenu(!!projectData.workflow.assetFile?.url)
-          }
+    async function loadProject() {
+      if (projectId && userId) {
+        if (!project) {
+          setProject({ 
+            id: projectId, 
+            name: 'New Project', 
+            workflow: {},
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          })
         }
-      } catch (error) {
-        console.error('Error loading project:', error)
+        
+        try {
+          const projectData = await getProject(userId, projectId)
+          if (projectData) {
+            setProject(projectData)
+            
+            // Restore workflow state if exists
+            if (projectData.workflow) {
+              setRoomPreviewUrl(projectData.workflow.roomFile?.url || '')
+              setAssetPreviewUrl(projectData.workflow.assetFile?.url || '')
+              setResultUrl(projectData.workflow.result?.url || projectData.workflow.resultUrl || '')
+              setPrompt(projectData.workflow.prompt || '')
+              setShowEditingMenu(!!projectData.workflow.assetFile?.url)
+            }
+          }
+        } catch (error) {
+          console.error('Error loading project:', error)
+        }
       }
     }
+    loadProject()
   }, [projectId, userId])
 
   const fileToBase64 = (file) => {
@@ -225,10 +228,11 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
           url: resultUrl,
           prompt: prompt,
         } : null,
+        resultUrl: resultUrl,
         prompt: prompt,
       }
 
-      updateProject(userId, projectId, { workflow: workflowData })
+      await updateProject(userId, projectId, { workflow: workflowData })
       if (onSave) onSave()
     } catch (error) {
       console.error('Error saving workflow:', error)

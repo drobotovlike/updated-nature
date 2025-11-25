@@ -32,10 +32,13 @@ export default function AccountView() {
   const userPlan = 'Free'
 
   useEffect(() => {
-    if (userId && activeTab === 'projects') {
-      const projects = getProjects(userId)
-      setSavedProjects(projects)
+    async function loadProjects() {
+      if (userId && activeTab === 'projects') {
+        const projects = await getProjects(userId)
+        setSavedProjects(projects)
+      }
     }
+    loadProjects()
   }, [userId, activeTab])
 
   const tabs = [
@@ -44,11 +47,12 @@ export default function AccountView() {
     { id: 'projects', label: 'Projects' },
   ]
 
-  const handleDeleteProject = (projectId) => {
+  const handleDeleteProject = async (projectId) => {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
-        deleteProject(userId, projectId)
-        setSavedProjects(getProjects(userId))
+        await deleteProject(userId, projectId)
+        const projects = await getProjects(userId)
+        setSavedProjects(projects)
       } catch (error) {
         console.error('Error deleting project:', error)
         alert('Failed to delete project')

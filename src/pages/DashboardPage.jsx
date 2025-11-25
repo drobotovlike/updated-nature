@@ -30,31 +30,34 @@ export default function DashboardPage() {
 
   // Load spaces and projects on mount
   useEffect(() => {
-    if (userId && isSignedIn) {
-      // Clean up trash on every load - each item is checked individually
-      // Items are deleted only when their own 1-week period has passed
-      cleanupTrash(userId)
-      
-      const userSpaces = getSpaces(userId)
-      const trashed = getTrashedSpaces(userId)
-      const trashedProjs = getTrashedProjects(userId)
-      setSpaces(userSpaces)
-      setTrashedSpaces(trashed)
-      setTrashedProjects(trashedProjs)
-      
-      // Auto-select first space if none selected and spaces exist
-      if (!selectedSpaceId && userSpaces.length > 0) {
-        const firstSpaceId = userSpaces[0].id
-        setSelectedSpaceId(firstSpaceId)
-        // Load projects for the first space
-        const projects = getProjects(userId, firstSpaceId)
-        setSavedProjects(projects)
-      } else {
-        // Load projects for selected space (or all projects if no space selected)
-        const projects = getProjects(userId, selectedSpaceId)
-        setSavedProjects(projects)
+    async function loadData() {
+      if (userId && isSignedIn) {
+        // Clean up trash on every load - each item is checked individually
+        // Items are deleted only when their own 1-week period has passed
+        cleanupTrash(userId)
+        
+        const userSpaces = await getSpaces(userId)
+        const trashed = getTrashedSpaces(userId)
+        const trashedProjs = getTrashedProjects(userId)
+        setSpaces(userSpaces)
+        setTrashedSpaces(trashed)
+        setTrashedProjects(trashedProjs)
+        
+        // Auto-select first space if none selected and spaces exist
+        if (!selectedSpaceId && userSpaces.length > 0) {
+          const firstSpaceId = userSpaces[0].id
+          setSelectedSpaceId(firstSpaceId)
+          // Load projects for the first space
+          const projects = await getProjects(userId, firstSpaceId)
+          setSavedProjects(projects)
+        } else {
+          // Load projects for selected space (or all projects if no space selected)
+          const projects = await getProjects(userId, selectedSpaceId)
+          setSavedProjects(projects)
+        }
       }
     }
+    loadData()
   }, [userId, isSignedIn, selectedSpaceId])
   
   // Auto-cleanup trash every 5 minutes to check individual items
@@ -75,22 +78,22 @@ export default function DashboardPage() {
 
   const userName = user?.fullName || user?.firstName || 'User'
 
-  const handleCreateSpace = () => {
+  const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) {
       alert('Please enter a space name')
       return
     }
     
     try {
-      const newSpace = createSpace(userId, newSpaceName.trim())
-      const updatedSpaces = getSpaces(userId)
+      const newSpace = await createSpace(userId, newSpaceName.trim())
+      const updatedSpaces = await getSpaces(userId)
       setSpaces(updatedSpaces)
       setNewSpaceName('')
       setShowCreateSpaceModal(false)
       // Auto-select the newly created space
       setSelectedSpaceId(newSpace.id)
       // Load projects for the new space (will be empty)
-      const projects = getProjects(userId, newSpace.id)
+      const projects = await getProjects(userId, newSpace.id)
       setSavedProjects(projects)
     } catch (error) {
       console.error('Error creating space:', error)
@@ -98,14 +101,14 @@ export default function DashboardPage() {
     }
   }
 
-  const handleDeleteSpace = (spaceId, spaceName) => {
+  const handleDeleteSpace = async (spaceId, spaceName) => {
     if (!window.confirm(`Are you sure you want to delete "${spaceName}"? It will be moved to trash and can be restored within 1 week.`)) {
       return
     }
     
     try {
-      deleteSpace(userId, spaceId)
-      const updatedSpaces = getSpaces(userId)
+      await deleteSpace(userId, spaceId)
+      const updatedSpaces = await getSpaces(userId)
       const trashed = getTrashedSpaces(userId)
       const trashedProjs = getTrashedProjects(userId)
       setSpaces(updatedSpaces)
@@ -117,12 +120,12 @@ export default function DashboardPage() {
           const newSelectedSpaceId = updatedSpaces[0].id
           setSelectedSpaceId(newSelectedSpaceId)
           // Load projects for the newly selected space
-          const projects = getProjects(userId, newSelectedSpaceId)
+          const projects = await getProjects(userId, newSelectedSpaceId)
           setSavedProjects(projects)
         } else {
           setSelectedSpaceId(null)
           // Load all projects if no spaces
-          const allProjects = getProjects(userId, null)
+          const allProjects = await getProjects(userId, null)
           setSavedProjects(allProjects)
         }
       }
@@ -132,10 +135,10 @@ export default function DashboardPage() {
     }
   }
 
-  const handleRestoreSpace = (spaceId) => {
+  const handleRestoreSpace = async (spaceId) => {
     try {
       restoreSpace(userId, spaceId)
-      const userSpaces = getSpaces(userId)
+      const userSpaces = await getSpaces(userId)
       const trashed = getTrashedSpaces(userId)
       setSpaces(userSpaces)
       setTrashedSpaces(trashed)
@@ -164,10 +167,10 @@ export default function DashboardPage() {
     }
   }
 
-  const handleRestoreProject = (projectId) => {
+  const handleRestoreProject = async (projectId) => {
     try {
       restoreProject(userId, projectId)
-      const projects = getProjects(userId, null)
+      const projects = await getProjects(userId, null)
       const trashedProjs = getTrashedProjects(userId)
       setSavedProjects(projects)
       setTrashedProjects(trashedProjs)
@@ -210,7 +213,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
     if (!newProjectName.trim()) {
       alert('Please enter a project name')
       return
@@ -218,7 +221,7 @@ export default function DashboardPage() {
     
     try {
       // Create a new project with empty workflow
-      const project = saveProject(userId, newProjectName.trim(), {
+      const project = await saveProject(userId, newProjectName.trim(), {
         mode: '',
         furnitureFile: null,
         roomFile: null,
@@ -235,11 +238,11 @@ export default function DashboardPage() {
       setCurrentView('workspace')
       
       // Refresh projects list for the selected space
-      const projects = getProjects(userId, selectedSpaceId)
+      const projects = await getProjects(userId, selectedSpaceId)
       setSavedProjects(projects)
       
       // Refresh spaces to update project counts in sidebar
-      const userSpaces = getSpaces(userId)
+      const userSpaces = await getSpaces(userId)
       setSpaces(userSpaces)
     } catch (error) {
       console.error('Error creating project:', error)
@@ -271,11 +274,11 @@ export default function DashboardPage() {
             <span className="text-sm font-medium">Home</span>
           </Link>
           <button
-            onClick={() => {
+            onClick={async () => {
               // Show all projects (regardless of space) when "My Projects" is clicked
               setSelectedSpaceId(null) // Clear space selection
               setCurrentView('projects')
-              const allProjects = getProjects(userId, null) // null = all projects
+              const allProjects = await getProjects(userId, null) // null = all projects
               setSavedProjects(allProjects)
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
@@ -339,9 +342,7 @@ export default function DashboardPage() {
           </div>
           <div className="space-y-0.5">
             {/* Show all projects directly */}
-            {(() => {
-              const allProjects = getProjects(userId, null) // Get all projects
-              return allProjects.map((project) => (
+            {savedProjects.map((project) => (
                 <div
                   key={project.id}
                   className={`group flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
@@ -373,22 +374,24 @@ export default function DashboardPage() {
                     onClick={(e) => {
                       e.stopPropagation()
                       if (window.confirm(`Are you sure you want to delete "${project.name}"?`)) {
-                        try {
-                          deleteProject(userId, project.id)
-                          // Refresh projects list
-                          const projects = getProjects(userId, null)
-                          const trashedProjs = getTrashedProjects(userId)
-                          setSavedProjects(projects)
-                          setTrashedProjects(trashedProjs)
-                          // If deleted project was selected, clear selection
-                          if (selectedProjectId === project.id) {
-                            setSelectedProjectId(null)
-                            setCurrentView('projects')
+                        (async () => {
+                          try {
+                            await deleteProject(userId, project.id)
+                            // Refresh projects list
+                            const projects = await getProjects(userId, null)
+                            const trashedProjs = getTrashedProjects(userId)
+                            setSavedProjects(projects)
+                            setTrashedProjects(trashedProjs)
+                            // If deleted project was selected, clear selection
+                            if (selectedProjectId === project.id) {
+                              setSelectedProjectId(null)
+                              setCurrentView('projects')
+                            }
+                          } catch (error) {
+                            console.error('Error deleting project:', error)
+                            alert('Failed to delete project')
                           }
-                        } catch (error) {
-                          console.error('Error deleting project:', error)
-                          alert('Failed to delete project')
-                        }
+                        })()
                       }
                     }}
                     className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-600 transition-all p-1"
@@ -624,12 +627,12 @@ export default function DashboardPage() {
                   setCurrentView('projects')
                   setSelectedProjectId(null)
                 }}
-                onSave={() => {
+                onSave={async () => {
                   // Refresh projects list after save
-                  const projects = getProjects(userId, selectedSpaceId)
+                  const projects = await getProjects(userId, selectedSpaceId)
                   setSavedProjects(projects)
                   // Refresh spaces to update project counts in sidebar
-                  const userSpaces = getSpaces(userId)
+                  const userSpaces = await getSpaces(userId)
                   setSpaces(userSpaces)
                 }}
               />

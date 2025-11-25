@@ -1,47 +1,116 @@
 // Project Management Utility
-// Stores projects in localStorage with user-specific access
+// Hybrid: Uses cloud storage (Supabase) with localStorage fallback
+
+import * as cloudManager from './cloudProjectManager'
 
 const STORAGE_KEY = 'ature_projects'
 const SPACES_KEY = 'ature_spaces'
 const TRASH_KEY = 'ature_trash'
 export const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
 
-export function saveProject(userId, projectName, workflowData, spaceId = null) {
+// Check if we should use cloud (online) or localStorage (offline)
+async function useCloud() {
+  try {
+    // Simple online check
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+      return false
+    }
+    // Try a lightweight request to see if API is available
+    return true // Assume online, will fallback on error
+  } catch {
+    return false
+  }
+}
+
+export async function saveProject(userId, projectName, workflowData, spaceId = null) {
   if (!userId) {
     throw new Error('User must be authenticated to save projects')
   }
 
-  const projects = getProjects(userId)
-  const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        // Prepare workflow data for cloud upload
+        const cloudWorkflow = {
+          mode: workflowData.mode || '',
+          furnitureFile: workflowData.furnitureFile instanceof File 
+            ? workflowData.furnitureFile 
+            : workflowData.furnitureFile 
+              ? { name: workflowData.furnitureFileName || '', url: workflowData.furniturePreviewUrl || '' }
+              : null,
+          roomFile: workflowData.roomFile instanceof File
+            ? workflowData.roomFile
+            : workflowData.roomFile
+              ? { name: workflowData.roomFileName || '', url: workflowData.roomPreviewUrl || '' }
+              : null,
+          model3d: workflowData.model3dUrl ? { url: workflowData.model3dUrl } : null,
+          result: workflowData.resultUrl ? {
+            url: workflowData.resultUrl,
+            description: workflowData.description || '',
+            useAIDesigner: workflowData.useAIDesigner || false,
+          } : null,
+          resultUrl: workflowData.resultUrl || null,
+          description: workflowData.description || '',
+          useAIDesigner: workflowData.useAIDesigner || false,
+        }
+
+        const project = await cloudManager.saveProjectToCloud(userId, projectName, cloudWorkflow, spaceId)
+        
+        // Also save to localStorage as backup
+        saveProjectToLocalStorage(userId, project)
+        
+        return project
+      } catch (cloudError) {
+        console.warn('Cloud save failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return saveProjectToLocalStorage(userId, projectName, workflowData, spaceId)
+}
+
+function saveProjectToLocalStorage(userId, projectNameOrProject, workflowData = null, spaceId = null) {
+  const projects = getProjectsFromLocalStorage(userId)
   
-  const project = {
+  let project
+  if (typeof projectNameOrProject === 'string') {
+    // Creating new project
+    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    project = {
     id: projectId,
-    name: projectName,
+      name: projectNameOrProject,
     userId,
-    spaceId, // Link project to a space/folder
+      spaceId,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     workflow: {
-      mode: workflowData.mode || '',
-      furnitureFile: workflowData.furnitureFile ? {
+        mode: workflowData?.mode || '',
+        furnitureFile: workflowData?.furnitureFile ? {
         name: workflowData.furnitureFileName || '',
         url: workflowData.furniturePreviewUrl || '',
         base64: workflowData.furnitureBase64 || null,
       } : null,
-      roomFile: workflowData.roomFile ? {
+        roomFile: workflowData?.roomFile ? {
         name: workflowData.roomFileName || '',
         url: workflowData.roomPreviewUrl || '',
         base64: workflowData.roomBase64 || null,
       } : null,
-      model3d: workflowData.model3dUrl ? {
-        url: workflowData.model3dUrl,
-      } : null,
-      result: workflowData.resultUrl ? {
+        model3d: workflowData?.model3dUrl ? { url: workflowData.model3dUrl } : null,
+        result: workflowData?.resultUrl ? {
         url: workflowData.resultUrl,
         description: workflowData.description || '',
         useAIDesigner: workflowData.useAIDesigner || false,
       } : null,
     },
+    }
+  } else {
+    // Project object passed (from cloud)
+    project = projectNameOrProject
   }
 
   projects.push(project)
@@ -50,7 +119,7 @@ export function saveProject(userId, projectName, workflowData, spaceId = null) {
   return project
 }
 
-export function getProjects(userId, spaceId = null) {
+function getProjectsFromLocalStorage(userId, spaceId = null) {
   if (!userId) return []
   
   try {
@@ -58,30 +127,93 @@ export function getProjects(userId, spaceId = null) {
     if (!stored) return []
     
     const allProjects = JSON.parse(stored)
-    // Filter projects by userId for security and exclude deleted projects
     let projects = allProjects.filter(p => p.userId === userId && !p.deleted)
     
-    // Filter by spaceId if provided
     if (spaceId) {
       projects = projects.filter(p => p.spaceId === spaceId)
     }
     
     return projects
   } catch (error) {
-    console.error('Error reading projects:', error)
+    console.error('Error reading projects from localStorage:', error)
     return []
   }
 }
 
-export function getProject(userId, projectId) {
-  const projects = getProjects(userId)
+export async function getProjects(userId, spaceId = null) {
+  if (!userId) return []
+  
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        const cloudProjects = await cloudManager.getProjectsFromCloud(userId, spaceId)
+        
+        // Sync cloud projects to localStorage
+        if (cloudProjects.length > 0) {
+          const existing = getProjectsFromLocalStorage(userId, spaceId)
+          const cloudIds = new Set(cloudProjects.map(p => p.id))
+          
+          // Merge: keep cloud projects, add any local-only projects
+          const localOnly = existing.filter(p => !cloudIds.has(p.id))
+          const merged = [...cloudProjects, ...localOnly]
+          
+          // Update localStorage
+          const allProjects = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+          const otherUsersProjects = allProjects.filter(p => p.userId !== userId)
+          const updated = [...otherUsersProjects, ...merged]
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+          
+          return merged
+        }
+        
+        return cloudProjects
+      } catch (cloudError) {
+        console.warn('Cloud fetch failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return getProjectsFromLocalStorage(userId, spaceId)
+}
+
+export async function getProject(userId, projectId) {
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        const project = await cloudManager.getProjectFromCloud(userId, projectId)
+        // Also cache in localStorage
+        const projects = getProjectsFromLocalStorage(userId)
+        const index = projects.findIndex(p => p.id === projectId)
+        if (index >= 0) {
+          projects[index] = project
+        } else {
+          projects.push(project)
+        }
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
+        return project
+      } catch (cloudError) {
+        console.warn('Cloud fetch failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  const projects = await getProjects(userId)
   const project = projects.find(p => p.id === projectId)
   
   if (!project) {
     throw new Error('Project not found')
   }
   
-  // Double-check user access
   if (project.userId !== userId) {
     throw new Error('Access denied: This project belongs to another user')
   }
@@ -89,8 +221,30 @@ export function getProject(userId, projectId) {
   return project
 }
 
-export function updateProject(userId, projectId, updates) {
-  const projects = getProjects(userId)
+export async function updateProject(userId, projectId, updates) {
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        const updated = await cloudManager.updateProjectInCloud(userId, projectId, updates)
+        // Also update localStorage
+        updateProjectInLocalStorage(userId, projectId, updates)
+        return updated
+      } catch (cloudError) {
+        console.warn('Cloud update failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return updateProjectInLocalStorage(userId, projectId, updates)
+}
+
+function updateProjectInLocalStorage(userId, projectId, updates) {
+  const projects = getProjectsFromLocalStorage(userId)
   const index = projects.findIndex(p => p.id === projectId)
   
   if (index === -1) {
@@ -107,15 +261,42 @@ export function updateProject(userId, projectId, updates) {
     updatedAt: new Date().toISOString(),
   }
   
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
+  const allProjects = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+  const otherUsersProjects = allProjects.filter(p => p.userId !== userId)
+  const updated = [...otherUsersProjects, ...projects]
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
+  
   return projects[index]
 }
 
-export function deleteProject(userId, projectId) {
+export async function deleteProject(userId, projectId) {
   if (!userId) {
     throw new Error('User must be authenticated to delete projects')
   }
   
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        await cloudManager.deleteProjectFromCloud(userId, projectId)
+        // Also update localStorage
+        deleteProjectInLocalStorage(userId, projectId)
+        cleanupTrash(userId)
+        return await getProjects(userId)
+      } catch (cloudError) {
+        console.warn('Cloud delete failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return deleteProjectInLocalStorage(userId, projectId)
+}
+
+async function deleteProjectInLocalStorage(userId, projectId) {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (!stored) {
@@ -129,7 +310,6 @@ export function deleteProject(userId, projectId) {
       throw new Error('Project not found')
     }
     
-    // Soft delete: mark as deleted and add timestamp
     allProjects[index] = {
       ...allProjects[index],
       deleted: true,
@@ -137,11 +317,9 @@ export function deleteProject(userId, projectId) {
     }
     
     localStorage.setItem(STORAGE_KEY, JSON.stringify(allProjects))
-    
-    // Clean up old trashed projects (auto-delete after 1 week)
     cleanupTrash(userId)
     
-    return getProjects(userId)
+    return await getProjects(userId)
   } catch (error) {
     console.error('Error deleting project:', error)
     throw error
@@ -187,50 +365,139 @@ export function addFileToProject(userId, projectId, fileData) {
 }
 
 // Space/Folder Management Functions
-export function createSpace(userId, spaceName) {
+export async function createSpace(userId, spaceName) {
   if (!userId) {
     throw new Error('User must be authenticated to create spaces')
   }
 
-  const spaces = getSpaces(userId)
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        const space = await cloudManager.createSpaceInCloud(userId, spaceName)
+        // Also save to localStorage
+        createSpaceInLocalStorage(userId, space)
+        return space
+      } catch (cloudError) {
+        console.warn('Cloud create failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
   const spaceId = `space_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  
   const space = {
     id: spaceId,
     name: spaceName,
     userId,
     createdAt: new Date().toISOString(),
   }
+  createSpaceInLocalStorage(userId, space)
+  return space
+  }
 
+function createSpaceInLocalStorage(userId, space) {
+  const spaces = getSpacesFromLocalStorage(userId)
   spaces.push(space)
-  localStorage.setItem(SPACES_KEY, JSON.stringify(spaces))
-  
+  const allSpaces = JSON.parse(localStorage.getItem(SPACES_KEY) || '[]')
+  const otherUsersSpaces = allSpaces.filter(s => s.userId !== userId)
+  const updated = [...otherUsersSpaces, ...spaces]
+  localStorage.setItem(SPACES_KEY, JSON.stringify(updated))
   return space
 }
 
-export function getSpaces(userId) {
+export async function getSpaces(userId) {
   if (!userId) return []
   
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        const cloudSpaces = await cloudManager.getSpacesFromCloud(userId)
+        
+        // Sync to localStorage
+        if (cloudSpaces.length > 0) {
+          const existing = getSpacesFromLocalStorage(userId)
+          const cloudIds = new Set(cloudSpaces.map(s => s.id))
+          const localOnly = existing.filter(s => !cloudIds.has(s.id))
+          const merged = [...cloudSpaces, ...localOnly]
+          
+          const allSpaces = JSON.parse(localStorage.getItem(SPACES_KEY) || '[]')
+          const otherUsersSpaces = allSpaces.filter(s => s.userId !== userId)
+          const updated = [...otherUsersSpaces, ...merged]
+          localStorage.setItem(SPACES_KEY, JSON.stringify(updated))
+          
+          return merged
+        }
+        
+        return cloudSpaces
+      } catch (cloudError) {
+        console.warn('Cloud fetch failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return getSpacesFromLocalStorage(userId)
+}
+
+function getSpacesFromLocalStorage(userId) {
   try {
     const stored = localStorage.getItem(SPACES_KEY)
     if (!stored) return []
     
     const allSpaces = JSON.parse(stored)
-    // Filter spaces by userId and exclude deleted ones
     return allSpaces.filter(s => s.userId === userId && !s.deleted)
   } catch (error) {
-    console.error('Error reading spaces:', error)
+    console.error('Error reading spaces from localStorage:', error)
     return []
   }
 }
 
-export function deleteSpace(userId, spaceId) {
+export async function deleteSpace(userId, spaceId) {
   if (!userId) {
     throw new Error('User must be authenticated to delete spaces')
   }
 
-  // Move space to trash instead of permanently deleting
-  const spaces = getSpaces(userId)
+  try {
+    // Try cloud first
+    if (await useCloud()) {
+      try {
+        await cloudManager.deleteSpaceFromCloud(userId, spaceId)
+        // Also update localStorage
+        deleteSpaceInLocalStorage(userId, spaceId)
+        
+        // Remove spaceId from projects
+        const projects = await getProjects(userId)
+        for (const project of projects) {
+          if (project.spaceId === spaceId) {
+            await updateProject(userId, project.id, { spaceId: null })
+          }
+        }
+        
+        const spaces = await getSpaces(userId)
+        return spaces.filter(s => s.id !== spaceId)
+      } catch (cloudError) {
+        console.warn('Cloud delete failed, using localStorage:', cloudError)
+        // Fall through to localStorage
+      }
+    }
+  } catch (error) {
+    console.warn('Cloud check failed, using localStorage:', error)
+  }
+
+  // Fallback to localStorage
+  return deleteSpaceInLocalStorage(userId, spaceId)
+}
+
+async function deleteSpaceInLocalStorage(userId, spaceId) {
+  const spaces = await getSpaces(userId)
   const space = spaces.find(s => s.id === spaceId)
   
   if (!space) {
@@ -241,14 +508,12 @@ export function deleteSpace(userId, spaceId) {
     throw new Error('Access denied: This space belongs to another user')
   }
   
-  // Mark space as deleted with timestamp
   const updatedSpace = {
     ...space,
     deleted: true,
     deletedAt: new Date().toISOString(),
   }
   
-  // Update storage - mark as deleted instead of removing
   try {
     const stored = localStorage.getItem(SPACES_KEY)
     if (stored) {
@@ -260,19 +525,17 @@ export function deleteSpace(userId, spaceId) {
       }
     }
     
-    // Also remove spaceId from all projects in this space
-    const projects = getProjects(userId)
-    projects.forEach(project => {
+    const projects = await getProjects(userId)
+    for (const project of projects) {
       if (project.spaceId === spaceId) {
-        updateProject(userId, project.id, { spaceId: null })
+        await updateProject(userId, project.id, { spaceId: null })
       }
-    })
+    }
   } catch (error) {
     console.error('Error moving space to trash:', error)
     throw error
   }
   
-  // Clean up old trashed spaces (auto-delete after 1 week)
   cleanupTrash(userId)
   
   return spaces.filter(s => s.id !== spaceId)

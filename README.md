@@ -94,7 +94,7 @@ ature-app/
 
 ## Deployment
 
-The project is configured for Vercel deployment. Connect your GitHub repository to Vercel and deploy automatically.
+The project is configured for Vercel deployment with Supabase cloud storage for cross-device sync.
 
 ### Required Environment Variables in Vercel
 
@@ -104,26 +104,57 @@ The project is configured for Vercel deployment. Connect your GitHub repository 
 2. Navigate to **Settings** → **Environment Variables**
 3. Add the following variables:
 
-#### `VITE_CLERK_PUBLISHABLE_KEY` (Required)
+#### Clerk Authentication
 - **Name**: `VITE_CLERK_PUBLISHABLE_KEY`
 - **Value**: Your Clerk publishable key (starts with `pk_test_` or `pk_live_`)
 - **Environment**: Select all (Production, Preview, Development)
-- Get your key from [Clerk Dashboard](https://dashboard.clerk.com/last-active?path=api-keys)
+- Get from [Clerk Dashboard](https://dashboard.clerk.com/last-active?path=api-keys)
 
-#### `GEMINI_API_KEY` (Required for AI features)
+#### Supabase (Cloud Storage)
+- **Name**: `VITE_SUPABASE_URL`
+- **Value**: `https://ifvqkmpyknfezpxscnef.supabase.co`
+- **Environment**: Select all
+
+- **Name**: `VITE_SUPABASE_ANON_KEY`
+- **Value**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmdnFrbXB5a25mZXpweHNjbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzk5NjksImV4cCI6MjA3OTYxNTk2OX0._0c2EwgFodZOdBRj2ejlZBhdclMt_OOlAG0XprNNsFg`
+- **Environment**: Select all
+
+- **Name**: `SUPABASE_URL`
+- **Value**: `https://ifvqkmpyknfezpxscnef.supabase.co`
+- **Environment**: Select all
+
+- **Name**: `SUPABASE_ANON_KEY`
+- **Value**: `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmdnFrbXB5a25mZXpweHNjbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzk5NjksImV4cCI6MjA3OTYxNTk2OX0._0c2EwgFodZOdBRj2ejlZBhdclMt_OOlAG0XprNNsFg`
+- **Environment**: Select all
+
+#### Gemini AI (Required for AI features)
 - **Name**: `GEMINI_API_KEY`
 - **Value**: Your Google Gemini API key
 - **Environment**: Select all (Production, Preview, Development)
-- Get your key from [Google AI Studio](https://aistudio.google.com/apikey)
+- Get from [Google AI Studio](https://aistudio.google.com/apikey)
 
 4. Click **Save** and **Redeploy** your application
+
+### Database Setup
+
+**Before deploying, you must set up the database:**
+
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard/project/ifvqkmpyknfezpxscnef)
+2. Run the SQL in `database-schema.sql` (see `SUPABASE_SETUP.md` for details)
+3. Create a storage bucket named `ature-files` (see `QUICK_SETUP.md`)
+
+See `QUICK_SETUP.md` for detailed setup instructions.
 
 ### Troubleshooting Deployment
 
 **Error: "useAuth can only be used within <ClerkProvider />"**
-- This means `VITE_CLERK_PUBLISHABLE_KEY` is not set in Vercel
-- Follow the steps above to add the environment variable
-- Make sure to redeploy after adding the variable
+- `VITE_CLERK_PUBLISHABLE_KEY` is not set in Vercel
+- Add the environment variable and redeploy
+
+**Projects not syncing across devices?**
+- Verify Supabase environment variables are set
+- Check that database schema was run
+- Verify storage bucket `ature-files` exists
 
 ## License
 

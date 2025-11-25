@@ -648,10 +648,13 @@ function StudioPage() {
 
   // Load saved projects
   useEffect(() => {
-    if (userId) {
-      const projects = getProjects(userId)
-      setSavedProjects(projects)
+    async function loadProjects() {
+      if (userId) {
+        const projects = await getProjects(userId)
+        setSavedProjects(projects)
+      }
     }
+    loadProjects()
   }, [userId])
 
   // Save project handler
@@ -698,7 +701,7 @@ function StudioPage() {
         useAIDesigner,
       }
 
-      const project = saveProject(userId, projectName.trim(), workflowData, selectedSpaceId || null)
+      const project = await saveProject(userId, projectName.trim(), workflowData, selectedSpaceId || null)
       
       // If there's a result, add it to project files
       if (resultUrl) {
@@ -710,7 +713,8 @@ function StudioPage() {
       }
 
       // Refresh projects list
-      setSavedProjects(getProjects(userId))
+      const projects = await getProjects(userId)
+      setSavedProjects(projects)
       setShowSaveModal(false)
       setProjectName('')
       setSelectedSpaceId(null)
@@ -843,12 +847,13 @@ function StudioPage() {
             Save Project
           </button>
           <button
-            onClick={() => {
+            onClick={async () => {
               if (!isSignedIn) {
                 setError('Please sign in to view projects')
                 return
               }
-              setSavedProjects(getProjects(userId))
+              const projects = await getProjects(userId)
+              setSavedProjects(projects)
               setShowProjectsModal(true)
             }}
             className="hidden md:flex px-4 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
@@ -910,13 +915,14 @@ function StudioPage() {
             </button>
             <button
               className="px-4 py-3 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors text-left"
-              onClick={() => {
+              onClick={async () => {
                 setMobileMenuOpen(false)
                 if (!isSignedIn) {
                   setError('Please sign in to view projects')
                   return
                 }
-                setSavedProjects(getProjects(userId))
+                const projects = await getProjects(userId)
+                setSavedProjects(projects)
                 setShowProjectsModal(true)
               }}
             >

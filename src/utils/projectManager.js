@@ -327,19 +327,38 @@ async function deleteProjectInLocalStorage(userId, projectId) {
   }
 }
 
-export function deleteAllProjects(userId) {
+export async function deleteAllProjects(userId) {
   if (!userId) {
     throw new Error('User must be authenticated to delete projects')
   }
   
   try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const allProjects = JSON.parse(stored)
-      // Keep only projects that don't belong to this user
-      const updatedAll = allProjects.filter(p => p.userId !== userId)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAll))
+    // Get all projects for this user
+    const allProjects = await getProjects(userId, null)
+    
+    // Delete each project (this handles both cloud and localStorage)
+    for (const project of allProjects) {
+      try {
+        await deleteProject(userId, project.id)
+      } catch (error) {
+        console.warn(`Failed to delete project ${project.id}:`, error)
+        // Continue deleting other projects even if one fails
+      }
     }
+    
+    // Also clear localStorage as a backup
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY)
+      if (stored) {
+        const allProjectsLocal = JSON.parse(stored)
+        // Keep only projects that don't belong to this user
+        const updatedAll = allProjectsLocal.filter(p => p.userId !== userId)
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedAll))
+      }
+    } catch (localError) {
+      console.warn('Error clearing localStorage:', localError)
+    }
+    
     return []
   } catch (error) {
     console.error('Error deleting all projects:', error)

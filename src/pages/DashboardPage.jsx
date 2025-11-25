@@ -215,7 +215,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleDeleteAllProjects = () => {
+  const handleDeleteAllProjects = async () => {
     if (!window.confirm('Are you sure you want to delete ALL projects? This action cannot be undone. Spaces will be preserved.')) {
       return
     }
@@ -225,11 +225,12 @@ export default function DashboardPage() {
     }
     
     try {
-      deleteAllProjects(userId)
+      await deleteAllProjects(userId)
       updateProjectLists([])
+      alert('All projects deleted successfully')
     } catch (error) {
       console.error('Error deleting all projects:', error)
-      alert('Failed to delete all projects')
+      alert('Failed to delete all projects. Some projects may still exist.')
     }
   }
 

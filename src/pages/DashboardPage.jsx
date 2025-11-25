@@ -286,7 +286,7 @@ export default function DashboardPage() {
               setSelectedSpaceId(null) // Show all projects on home
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              currentView === 'projects'
+              currentView === 'projects' && selectedProjectId === null && selectedSpaceId === null
                 ? 'bg-stone-100 text-stone-900'
                 : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
             }`}
@@ -300,16 +300,14 @@ export default function DashboardPage() {
           <button
             onClick={async () => {
               // Show all projects (regardless of space) when "My Projects" is clicked
+              setSelectedProjectId(null) // Clear project selection
+              setEditingCreation(null)
               setSelectedSpaceId(null) // Clear space selection
               setCurrentView('projects')
               const allProjects = await getProjects(userId, null) // null = all projects
               setSavedProjects(allProjects)
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              selectedSpaceId === null && currentView === 'projects'
-                ? 'bg-stone-100 text-stone-900'
-                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
-            }`}
+            className="w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <rect width="7" height="7" x="3" y="3" rx="1" />
@@ -447,8 +445,10 @@ export default function DashboardPage() {
                 setTrashedProjects(trashedProjs)
               }
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600 ${
-              showTrash ? 'bg-stone-100 text-stone-900' : ''
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+              showTrash
+                ? 'bg-stone-100 text-stone-900'
+                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">

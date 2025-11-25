@@ -12,13 +12,14 @@ export default function DashboardPage() {
   const { signOut } = useClerk()
   const navigate = useNavigate()
   
-  // View state: 'projects' | 'workspace' | 'account' | 'project-view'
+  // View state: 'projects' | 'workspace' | 'account' | 'project-view' | 'my-projects'
   const [currentView, setCurrentView] = useState('projects')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [editingCreation, setEditingCreation] = useState(null)
   
-  const [savedProjects, setSavedProjects] = useState([]) // All projects for sidebar
+  const [savedProjects, setSavedProjects] = useState([]) // All projects
   const [recentProjects, setRecentProjects] = useState([]) // Last 4 projects for home page
+  const [sidebarProjects, setSidebarProjects] = useState([]) // Last 10 projects for sidebar
   const [spaces, setSpaces] = useState([])
   const [trashedSpaces, setTrashedSpaces] = useState([])
   const [trashedProjects, setTrashedProjects] = useState([])
@@ -76,9 +77,9 @@ export default function DashboardPage() {
     }
   }, [userId, isSignedIn])
 
-  // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace or account view)
+  // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace, account, or my-projects view)
   useEffect(() => {
-    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'project-view' && currentView !== 'projects') {
+    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'my-projects' && currentView !== 'project-view' && currentView !== 'projects') {
       console.log('🛡️ Safeguard: Switching to project-view for project:', selectedProjectId, 'Current view was:', currentView)
       setCurrentView('project-view')
       setEditingCreation(null)
@@ -87,16 +88,17 @@ export default function DashboardPage() {
 
   const userName = user?.fullName || user?.firstName || 'User'
 
-  // Helper function to update both project lists
+  // Helper function to update all project lists
   const updateProjectLists = (allProjects) => {
     setSavedProjects(allProjects)
-    // Sort by updated_at (most recent first) and take last 4 for home page
+    // Sort by updated_at (most recent first)
     const sortedProjects = [...allProjects].sort((a, b) => {
       const dateA = new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0)
       const dateB = new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0)
       return dateB - dateA // Most recent first
     })
-    setRecentProjects(sortedProjects.slice(0, 4))
+    setRecentProjects(sortedProjects.slice(0, 4)) // Last 4 for home page
+    setSidebarProjects(sortedProjects.slice(0, 10)) // Last 10 for sidebar
   }
 
   const handleCreateSpace = async () => {
@@ -311,15 +313,19 @@ export default function DashboardPage() {
           </button>
           <button
             onClick={async () => {
-              // Show all projects (regardless of space) when "My Projects" is clicked
+              // Navigate to My Projects page when "My Projects" is clicked
               setSelectedProjectId(null) // Clear project selection
               setEditingCreation(null)
               setSelectedSpaceId(null) // Clear space selection
-              setCurrentView('projects')
+              setCurrentView('my-projects')
               const allProjects = await getProjects(userId, null) // null = all projects
               updateProjectLists(allProjects)
             }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+              currentView === 'my-projects'
+                ? 'bg-stone-100 text-stone-900'
+                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
+            }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <rect width="7" height="7" x="3" y="3" rx="1" />
@@ -375,8 +381,8 @@ export default function DashboardPage() {
             </button>
           </div>
           <div className="space-y-0.5">
-            {/* Show all projects directly */}
-            {savedProjects.map((project) => (
+            {/* Show last 10 projects in sidebar */}
+            {sidebarProjects.map((project) => (
                 <div
                   key={project.id}
                   className={`group flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
@@ -442,6 +448,19 @@ export default function DashboardPage() {
                 </div>
               ))}
           </div>
+          {/* See All Projects Link */}
+          {savedProjects.length > 10 && (
+            <button
+              onClick={() => {
+                setCurrentView('my-projects')
+                setSelectedProjectId(null)
+                setEditingCreation(null)
+              }}
+              className="w-full px-3 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors mt-2"
+            >
+              See all projects ({savedProjects.length})
+            </button>
+          )}
         </nav>
 
         {/* Bottom Actions */}
@@ -643,7 +662,7 @@ export default function DashboardPage() {
                 New project
               </button>
             )}
-            {(currentView === 'workspace' || currentView === 'account' || currentView === 'project-view') && (
+            {(currentView === 'workspace' || currentView === 'account' || currentView === 'project-view' || currentView === 'my-projects') && (
               <button
                 onClick={() => setCurrentView('projects')}
                 className="bg-stone-100 hover:bg-stone-200 text-stone-900 px-5 py-2.5 rounded-full text-sm font-semibold transition-colors"
@@ -802,19 +821,33 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-semibold text-stone-900 tracking-tight font-serif-ature">Your recent projects</h2>
                 <p className="text-base text-stone-500 mt-1">Projects you've been working on</p>
               </div>
-              {recentProjects.length > 0 && (
-                <button
-                  onClick={handleDeleteAllProjects}
-                  className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
-                  title="Delete All Projects"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  </svg>
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {savedProjects.length > 4 && (
+                  <button
+                    onClick={() => {
+                      setCurrentView('my-projects')
+                      setSelectedProjectId(null)
+                      setEditingCreation(null)
+                    }}
+                    className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full transition-colors"
+                  >
+                    View all projects ({savedProjects.length})
+                  </button>
+                )}
+                {recentProjects.length > 0 && (
+                  <button
+                    onClick={handleDeleteAllProjects}
+                    className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                    title="Delete All Projects"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                  </button>
+                )}
+              </div>
             </div>
 
             {recentProjects.length > 0 ? (
@@ -866,6 +899,102 @@ export default function DashboardPage() {
               </div>
             ) : null}
           </section>
+            </div>
+          ) : currentView === 'my-projects' ? (
+            <div className="px-8 pb-12 pt-8">
+              <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h1 className="text-3xl font-semibold text-stone-900 tracking-tight font-serif-ature">My Projects</h1>
+                      <p className="text-base text-stone-500 mt-2">All your projects ({savedProjects.length})</p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCurrentView('projects')
+                        setSelectedProjectId(null)
+                        setEditingCreation(null)
+                      }}
+                      className="px-4 py-2 text-sm font-medium text-stone-700 hover:text-stone-900 hover:bg-stone-100 rounded-full transition-colors flex items-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6L6 18" />
+                        <path d="M6 6l12 12" />
+                      </svg>
+                      Back to Home
+                    </button>
+                  </div>
+                </div>
+
+                {/* Projects Grid */}
+                {savedProjects.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-6">
+                    {savedProjects.map((project) => (
+                      <div
+                        key={project.id}
+                        onClick={() => {
+                          setCurrentView('project-view')
+                          setEditingCreation(null)
+                          setSelectedProjectId(project.id)
+                        }}
+                        className="group cursor-pointer"
+                      >
+                        <div className="aspect-[4/3] bg-white rounded-xl overflow-hidden border border-stone-200 relative shadow-sm group-hover:shadow-md transition-all">
+                          {project.workflow?.result?.url ? (
+                            <img
+                              src={project.workflow.result.url}
+                              alt={project.name}
+                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-stone-100 flex items-center justify-center">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="9" cy="9" r="2" />
+                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-start gap-3">
+                          <div className="bg-stone-100 p-1.5 rounded text-stone-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect width="7" height="7" x="3" y="3" rx="1" />
+                              <rect width="7" height="7" x="14" y="3" rx="1" />
+                              <rect width="7" height="7" x="14" y="14" rx="1" />
+                              <rect width="7" height="7" x="3" y="14" rx="1" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Project</p>
+                            <h3 className="text-lg font-semibold text-stone-900 leading-tight">{project.name}</h3>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-16 text-center">
+                    <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+                        <rect width="7" height="7" x="3" y="3" rx="1" />
+                        <rect width="7" height="7" x="14" y="3" rx="1" />
+                        <rect width="7" height="7" x="14" y="14" rx="1" />
+                        <rect width="7" height="7" x="3" y="14" rx="1" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-semibold text-stone-900 mb-2">No projects yet</h3>
+                    <p className="text-sm text-stone-500 mb-6">Create your first project to get started</p>
+                    <button
+                      onClick={() => setShowCreateProjectModal(true)}
+                      className="px-6 py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-full text-sm font-semibold transition-colors shadow-lg"
+                    >
+                      Create Project
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           ) : currentView === 'account' ? (
             <div className="px-8 pb-12 pt-8">

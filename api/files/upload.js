@@ -42,11 +42,13 @@ export default async function handler(req, res) {
 
     // Upload to Supabase Storage
     // First, ensure the bucket exists (you need to create 'ature-files' bucket in Supabase Dashboard)
+    // Make sure the bucket is PUBLIC or has proper RLS policies (see storage-policies.sql)
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('ature-files')
       .upload(uniqueFileName, fileBuffer, {
         contentType: fileType || 'image/jpeg',
         upsert: false,
+        cacheControl: '3600',
       })
 
     if (uploadError) {
@@ -55,7 +57,15 @@ export default async function handler(req, res) {
       if (uploadError.message.includes('Bucket not found')) {
         return res.status(500).json({ 
           error: 'Storage bucket not configured',
-          message: 'Please create a bucket named "ature-files" in Supabase Storage'
+          message: 'Please create a bucket named "ature-files" in Supabase Storage and make it public'
+        })
+      }
+      // If RLS policy error, provide helpful message
+      if (uploadError.message.includes('row-level security') || uploadError.message.includes('RLS')) {
+        return res.status(500).json({ 
+          error: 'Storage bucket RLS policy error',
+          message: 'The storage bucket has RLS enabled. Please either: 1) Make the bucket public in Supabase Storage UI, or 2) Run the storage-policies.sql script in Supabase SQL Editor',
+          details: uploadError.message
         })
       }
       throw uploadError

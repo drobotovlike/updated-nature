@@ -1,31 +1,34 @@
--- Supabase Storage Bucket Policies
+-- Supabase Storage Bucket Policies for 'ature-files' bucket
 -- Run this in your Supabase SQL Editor
 -- Make sure the 'ature-files' bucket exists first (create it in Storage UI)
 
--- Option 1: Disable RLS on storage (simplest - works with service role key)
--- This allows the service role key to upload files without RLS blocking
-ALTER TABLE storage.objects DISABLE ROW LEVEL SECURITY;
+-- Drop existing policies if they exist
+DROP POLICY IF EXISTS "Allow authenticated uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow authenticated reads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public reads" ON storage.objects;
+DROP POLICY IF EXISTS "Allow public uploads" ON storage.objects;
 
--- Option 2: If you prefer to keep RLS enabled, use these policies instead:
--- (Comment out the ALTER TABLE line above and uncomment the policies below)
+-- Allow anyone to upload files (since we're using service role key in API)
+CREATE POLICY "Allow public uploads"
+ON storage.objects FOR INSERT
+TO public
+WITH CHECK (bucket_id = 'ature-files');
 
--- DROP POLICY IF EXISTS "Allow service role uploads" ON storage.objects;
--- CREATE POLICY "Allow service role uploads"
--- ON storage.objects FOR INSERT
--- TO service_role
--- WITH CHECK (bucket_id = 'ature-files');
+-- Allow anyone to read files (public bucket)
+CREATE POLICY "Allow public reads"
+ON storage.objects FOR SELECT
+TO public
+USING (bucket_id = 'ature-files');
 
--- DROP POLICY IF EXISTS "Allow service role reads" ON storage.objects;
--- CREATE POLICY "Allow service role reads"
--- ON storage.objects FOR SELECT
--- TO service_role
--- USING (bucket_id = 'ature-files');
+-- Allow authenticated users to upload (backup)
+CREATE POLICY "Allow authenticated uploads"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'ature-files');
 
--- DROP POLICY IF EXISTS "Allow public reads" ON storage.objects;
--- CREATE POLICY "Allow public reads"
--- ON storage.objects FOR SELECT
--- TO public
--- USING (bucket_id = 'ature-files');
-
--- Note: After running this, make sure SUPABASE_SERVICE_ROLE_KEY is set in Vercel environment variables
+-- Allow authenticated users to read (backup)
+CREATE POLICY "Allow authenticated reads"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'ature-files');
 

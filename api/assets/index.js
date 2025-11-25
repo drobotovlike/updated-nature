@@ -53,11 +53,12 @@ export default async function handler(req, res) {
     switch (method) {
       case 'GET':
         if (assetId) {
-          // Get single asset
+          // Get single asset (only if user owns it)
           const { data: asset, error: assetError } = await supabase
             .from('assets')
             .select('*')
             .eq('id', assetId)
+            .eq('user_id', userId) // Only return if user owns it
             .single()
 
           if (assetError) {
@@ -69,10 +70,11 @@ export default async function handler(req, res) {
 
           return res.status(200).json(asset)
         } else {
-          // Get all assets (shared library - all users)
+          // Get user's private assets only
           const { data: assets, error: assetsError } = await supabase
             .from('assets')
             .select('*')
+            .eq('user_id', userId) // Filter by user_id - assets are private
             .order('created_at', { ascending: false })
 
           if (assetsError) throw assetsError
@@ -81,7 +83,7 @@ export default async function handler(req, res) {
         }
 
       case 'POST':
-        // Add asset to shared library
+        // Add asset to user's private library
         const { name, url, type = 'image', description } = req.body
 
         if (!name || !url) {

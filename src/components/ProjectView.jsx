@@ -28,7 +28,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
     loadProject()
   }, [projectId, userId])
 
-  // Load shared assets from asset library
+  // Load user's private assets from asset library
   const loadAssets = async () => {
     if (userId) {
       setLoadingAssets(true)
@@ -124,9 +124,9 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
     }
   }
 
-  // Use shared assets from asset library (all users' assets)
+  // Get user's private assets from asset library
   const getProjectAssets = () => {
-    // Return shared assets from the asset library
+    // Return user's private assets from the asset library
     return sharedAssets.map(asset => ({
       id: asset.id,
       name: asset.name,
@@ -355,7 +355,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
                 <div className="bg-stone-50 rounded-xl p-6 border border-stone-200">
                   <h3 className="text-sm font-semibold text-stone-700 mb-2">Asset Library</h3>
                   <p className="text-2xl font-bold text-stone-900">{assets.length}</p>
-                  <p className="text-xs text-stone-500 mt-1">Shared assets from all users</p>
+                  <p className="text-xs text-stone-500 mt-1">Your private assets</p>
                 </div>
                 <div className="bg-stone-50 rounded-xl p-6 border border-stone-200">
                   <h3 className="text-sm font-semibold text-stone-700 mb-2">Generated Creations</h3>
@@ -433,7 +433,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
               <div>
                 <h2 className="text-lg font-semibold text-stone-900">Asset Library</h2>
                 <p className="text-sm text-stone-500 mt-1">
-                  Shared assets from all users • Saved to cloud for access from any device
+                  Your private assets • Saved to cloud for access from any device
                 </p>
               </div>
               <button

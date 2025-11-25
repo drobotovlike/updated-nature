@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS project_files (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Assets table (shared asset library - all users can see all assets)
+-- Assets table (private asset library - each user only sees their own assets)
 CREATE TABLE IF NOT EXISTS assets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL,

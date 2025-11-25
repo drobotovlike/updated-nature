@@ -244,12 +244,17 @@ export default function DashboardPage() {
       
       // Set as selected project and switch to project view
       // IMPORTANT: Set view BEFORE setting project ID to avoid any race conditions
-      setCurrentView('project-view')
-      setEditingCreation(null) // Clear any editing state
-      setSelectedProjectId(project.id)
+      // Use a small timeout to ensure state updates are processed
       setShowCreateProjectModal(false)
       setNewProjectName('')
+      setEditingCreation(null) // Clear any editing state
       
+      // Use setTimeout to ensure state updates happen in the right order
+      setTimeout(() => {
+        setCurrentView('project-view')
+        setSelectedProjectId(project.id)
+        console.log('✅ Project created, view set to project-view for project:', project.id)
+      }, 0)
       
       // Refresh projects list for the selected space
       const projects = await getProjects(userId, selectedSpaceId)

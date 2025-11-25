@@ -250,7 +250,7 @@ export default function AccountView() {
                       Current Plan
                     </div>
                   ) : (
-                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors"
+                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors">
                       Select Plan
                     </button>
                   )}
@@ -382,7 +382,7 @@ export default function AccountView() {
                       Current Plan
                     </div>
                   ) : (
-                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors"
+                    <button className="px-4 py-2 bg-stone-100 text-stone-900 rounded-full text-sm font-semibold hover:bg-stone-200 transition-colors">
                       Contact Sales
                     </button>
                   )}

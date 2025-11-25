@@ -78,6 +78,15 @@ export default function DashboardPage() {
     }
   }, [userId, isSignedIn])
 
+  // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace or account view)
+  useEffect(() => {
+    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'project-view') {
+      console.log('Safeguard: Switching to project-view for project:', selectedProjectId)
+      setCurrentView('project-view')
+      setEditingCreation(null)
+    }
+  }, [selectedProjectId, userId, currentView])
+
   const userName = user?.fullName || user?.firstName || 'User'
 
   const handleCreateSpace = async () => {
@@ -625,6 +634,7 @@ export default function DashboardPage() {
 
         {/* Scrollable Content - Dynamic based on view */}
         <div className="flex-1 overflow-y-auto">
+          {/* Show ProjectView when view is explicitly 'project-view' and we have a selected project */}
           {currentView === 'project-view' && selectedProjectId && userId ? (
             <div className="h-full">
               <ProjectView

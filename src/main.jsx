@@ -2,6 +2,7 @@ import React, { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ClerkProvider } from '@clerk/clerk-react'
+import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.jsx'
 
@@ -154,6 +155,7 @@ try {
           <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
             <BrowserRouter>
               <App />
+              <Analytics />
             </BrowserRouter>
           </ClerkProvider>
         </ErrorBoundary>

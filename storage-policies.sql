@@ -1,4 +1,13 @@
--- Supabase Storage Bucket Policies for 'ature-files' bucket
+CREATE POLICY "Allow authenticated uploads"
+ON storage.objects FOR INSERT
+TO authenticated
+WITH CHECK (bucket_id = 'ature-files');
+
+-- Policy 4: Allow authenticated users to read (backup)
+CREATE POLICY "Allow authenticated reads"
+ON storage.objects FOR SELECT
+TO authenticated
+USING (bucket_id = 'ature-files');-- Supabase Storage Bucket Policies for 'ature-files' bucket
 -- Run this in your Supabase SQL Editor AFTER creating the bucket in Storage UI
 -- 
 -- IMPORTANT: First create the bucket in Storage UI:
@@ -32,16 +41,7 @@ USING (bucket_id = 'ature-files');
 
 -- Policy 3: Allow authenticated users to upload (backup)
 -- This is a backup policy in case public uploads don't work
-CREATE POLICY "Allow authenticated uploads"
-ON storage.objects FOR INSERT
-TO authenticated
-WITH CHECK (bucket_id = 'ature-files');
 
--- Policy 4: Allow authenticated users to read (backup)
-CREATE POLICY "Allow authenticated reads"
-ON storage.objects FOR SELECT
-TO authenticated
-USING (bucket_id = 'ature-files');
 
 -- Verify the bucket exists (this will error if bucket doesn't exist, which is helpful)
 DO $$

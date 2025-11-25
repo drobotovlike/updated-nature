@@ -26,35 +26,40 @@ You'll see a section for DNS records. Click **Add Record** and add each CNAME re
 #### Record 1: Frontend API
 1. Click **Add Record**
 2. **Type**: Select **CNAME**
-3. **Name**: `clerk`
+3. **Name**: `clerk.ature.ru` (or just `clerk` - try both if one doesn't work)
 4. **Value**: `frontend-api.clerk.services`
 5. Click **Save**
+
+**Note**: If you get "Invalid name parameter", try:
+- Just `clerk` (without the domain)
+- Or `clerk.ature.ru` (full subdomain)
+- Vercel may auto-append the domain, so try the shorter version first
 
 #### Record 2: Account Portal
 1. Click **Add Record**
 2. **Type**: Select **CNAME**
-3. **Name**: `accounts`
+3. **Name**: `accounts` (or `accounts.ature.ru` if the short version doesn't work)
 4. **Value**: `accounts.clerk.services`
 5. Click **Save**
 
 #### Record 3: Email (Optional - for custom email domain)
 1. Click **Add Record**
 2. **Type**: Select **CNAME**
-3. **Name**: `clkmail`
+3. **Name**: `clkmail` (or `clkmail.ature.ru`)
 4. **Value**: `mail.vyw2qdogt5cd.clerk.services`
 5. Click **Save**
 
 #### Record 4: Email DKIM 1 (Optional)
 1. Click **Add Record**
 2. **Type**: Select **CNAME**
-3. **Name**: `clk._domainkey`
+3. **Name**: `clk._domainkey` (or `clk._domainkey.ature.ru`)
 4. **Value**: `dkim1.vyw2qdogt5cd.clerk.services`
 5. Click **Save**
 
 #### Record 5: Email DKIM 2 (Optional)
 1. Click **Add Record**
 2. **Type**: Select **CNAME**
-3. **Name**: `clk2._domainkey`
+3. **Name**: `clk2._domainkey` (or `clk2._domainkey.ature.ru`)
 4. **Value**: `dkim2.vyw2qdogt5cd.clerk.services`
 5. Click **Save**
 
@@ -95,6 +100,30 @@ After adding all records, you should see:
 
 ## Troubleshooting
 
+### "Invalid name parameter" Error
+
+**This is the most common issue!** Vercel's DNS format can be tricky:
+
+**Solution 1: Use just the subdomain (recommended)**
+- For `clerk.ature.ru`, enter just: `clerk`
+- For `accounts.ature.ru`, enter just: `accounts`
+- Vercel will automatically append your domain
+
+**Solution 2: If that doesn't work, try full subdomain**
+- Enter: `clerk.ature.ru` (full subdomain)
+- Enter: `accounts.ature.ru` (full subdomain)
+
+**Solution 3: Check Vercel's format**
+- Some Vercel setups require: `@` for root domain
+- Or they might auto-detect - try leaving it blank if there's an option
+- Check existing records in Vercel to see the format they use
+
+**Solution 4: Use a different DNS provider**
+- If Vercel DNS is causing issues, you can:
+  - Point your domain's nameservers to another DNS provider (Cloudflare, etc.)
+  - Add CNAME records there instead
+  - Then point the domain back to Vercel for hosting
+
 ### Domain Not Showing in Vercel
 - Make sure the domain is added to your Vercel project
 - Go to **Settings** → **Domains** → **Add Domain**
@@ -104,6 +133,7 @@ After adding all records, you should see:
 - Check that you have proper permissions on the Vercel project
 - Try refreshing the page
 - Check browser console for errors
+- Make sure you're using the correct format (see "Invalid name parameter" above)
 
 ### Still Showing Unverified in Clerk
 - Wait 30-60 minutes for DNS propagation

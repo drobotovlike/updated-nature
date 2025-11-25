@@ -1,7 +1,7 @@
 # Email Verification Fix - White Screen After CAPTCHA
 
 ## Problem
-After entering email and completing CAPTCHA verification, a white/blank window opens and nothing happens.
+After entering email and completing CAPTCHA verification, a white/blank window opens and nothing happens. OR: User completes email verification but gets redirected to dashboard before completing all sign-up steps (like setting password).
 
 ## Root Cause
 This is typically caused by **incorrect redirect URLs** in Clerk Dashboard. The email verification link redirects to a URL that doesn't exist or isn't configured properly.
@@ -40,13 +40,14 @@ This is typically caused by **incorrect redirect URLs** in Clerk Dashboard. The 
 4. Check **Redirect URLs** for email verification:
    - Should match your production domain: `https://ature.ru/dashboard`
 
-### Step 4: Update SignUp Component (Optional Fix)
+### Step 4: Sign-Up Flow Configuration
 
-If redirects are still not working, we can add explicit redirect handling in the code. The current `SignUp` component has:
-- `redirectUrl="/dashboard"` ✅
-- `afterSignUpUrl="/dashboard"` ✅
+The `SignUp` component is configured to:
+- **Let Clerk handle all sign-up steps** (email verification, password setup, etc.)
+- **Only redirect to dashboard AFTER sign-up is completely finished** via `afterSignUpUrl="/dashboard"`
+- **NOT redirect during intermediate steps** (removed `redirectUrl` to allow Clerk to show next steps)
 
-These should work, but we can also add `fallbackRedirectUrl` as a backup.
+This ensures users complete all required sign-up steps before being redirected to the dashboard.
 
 ### Step 5: Test the Flow
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { getProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
+import Folder from './Folder'
 
 export default function ProjectView({ projectId, onEdit, onBack }) {
   const { userId } = useAuth()
@@ -259,6 +260,47 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
               </div>
             ) : (
               <>
+            {/* Folders Section */}
+            <div>
+              <h2 className="text-lg font-semibold text-stone-900 mb-4">Folders</h2>
+              <div className="grid grid-cols-3 gap-6 mb-8">
+                <Folder
+                  name="Designs"
+                  color="#9333ea"
+                  itemCount={creations.length}
+                  lastUpdated={creations.length > 0 ? creations[0]?.createdAt : null}
+                  onNameChange={(newName) => {
+                    console.log('Folder name changed to:', newName)
+                    // You can save this to your database/state here
+                  }}
+                  onColorChange={(newColor) => {
+                    console.log('Folder color changed to:', newColor)
+                    // You can save this to your database/state here
+                  }}
+                  onClick={() => {
+                    setActiveTab('creations')
+                  }}
+                />
+                <Folder
+                  name="Assets"
+                  color="#3b82f6"
+                  itemCount={assets.length}
+                  lastUpdated={assets.length > 0 ? assets[0]?.createdAt : null}
+                  onNameChange={(newName) => {
+                    console.log('Folder name changed to:', newName)
+                    // You can save this to your database/state here
+                  }}
+                  onColorChange={(newColor) => {
+                    console.log('Folder color changed to:', newColor)
+                    // You can save this to your database/state here
+                  }}
+                  onClick={() => {
+                    setActiveTab('assets')
+                  }}
+                />
+              </div>
+            </div>
+
             <div>
               <h2 className="text-lg font-semibold text-stone-900 mb-4">Project Overview</h2>
               <div className="grid grid-cols-2 gap-6">

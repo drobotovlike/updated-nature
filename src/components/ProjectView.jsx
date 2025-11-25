@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
-import { getProject, getProjects } from '../utils/projectManager'
+import { getProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
+import { uploadFileToCloud } from '../utils/cloudProjectManager'
 
 export default function ProjectView({ projectId, onEdit, onBack }) {
   const { userId } = useAuth()
   const [project, setProject] = useState(null)
   const [activeTab, setActiveTab] = useState('overview') // 'overview', 'assets', 'creations'
   const [hoveredCreation, setHoveredCreation] = useState(null)
+  const [sharedAssets, setSharedAssets] = useState([])
+  const [loadingAssets, setLoadingAssets] = useState(true)
+  const [uploadingAsset, setUploadingAsset] = useState(false)
+  const assetUploadInputRef = useRef(null)
 
   useEffect(() => {
     async function loadProject() {
@@ -22,41 +27,65 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
     loadProject()
   }, [projectId, userId])
 
-  // Extract assets (uploaded files) from project workflow
-  const getAssets = () => {
-    if (!project?.workflow) return []
-    const assets = []
-    
-    if (project.workflow.roomFile?.url) {
-      assets.push({
-        id: 'room-file',
-        name: project.workflow.roomFile.name || 'Room Image',
-        url: project.workflow.roomFile.url,
-        type: 'image',
-        createdAt: project.createdAt,
-      })
+  // Load shared assets from asset library
+  const loadAssets = async () => {
+    if (userId) {
+      setLoadingAssets(true)
+      try {
+        const assets = await getAssets(userId)
+        setSharedAssets(assets)
+      } catch (error) {
+        console.error('Error loading assets:', error)
+      } finally {
+        setLoadingAssets(false)
+      }
     }
-    
-    if (project.workflow.furnitureFile?.url) {
-      assets.push({
-        id: 'furniture-file',
-        name: project.workflow.furnitureFile.name || 'Furniture Image',
-        url: project.workflow.furnitureFile.url,
-        type: 'image',
-        createdAt: project.createdAt,
-      })
+  }
+
+  useEffect(() => {
+    loadAssets()
+  }, [userId])
+
+  // Handle asset upload
+  const handleAssetUpload = async (file) => {
+    if (!file || !userId) return
+
+    setUploadingAsset(true)
+    try {
+      // Upload file to server
+      const uploadResult = await uploadFileToCloud(file, userId)
+      const permanentUrl = uploadResult.url
+
+      // Add to shared asset library
+      await addAssetToLibrary(
+        userId,
+        file.name,
+        permanentUrl,
+        'image',
+        `Uploaded from project: ${project?.name || 'Asset Library'}`
+      )
+
+      // Refresh assets list
+      await loadAssets()
+    } catch (error) {
+      console.error('Error uploading asset:', error)
+      alert('Failed to upload asset. Please try again.')
+    } finally {
+      setUploadingAsset(false)
     }
-    
-    // Get all files from project_files table if available
-    if (project.workflow.files && Array.isArray(project.workflow.files)) {
-      project.workflow.files.forEach(file => {
-        if (file.type === 'image' && file.url) {
-          assets.push(file)
-        }
-      })
-    }
-    
-    return assets
+  }
+
+  // Use shared assets from asset library (all users' assets)
+  const getProjectAssets = () => {
+    // Return shared assets from the asset library
+    return sharedAssets.map(asset => ({
+      id: asset.id,
+      name: asset.name,
+      url: asset.url,
+      type: asset.type || 'image',
+      description: asset.description,
+      createdAt: asset.created_at || asset.createdAt,
+    }))
   }
 
   // Extract creations (generated images) from project
@@ -118,7 +147,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
     }
   }
 
-  const assets = getAssets()
+  const assets = getProjectAssets()
   const creations = getCreations()
 
   if (!project) {
@@ -184,7 +213,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
                 : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
             }`}
           >
-            My Assets ({assets.length})
+            Asset Library ({assets.length})
           </button>
           <button
             onClick={() => setActiveTab('creations')}
@@ -203,13 +232,40 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
       <div className="flex-1 overflow-y-auto p-8">
         {activeTab === 'overview' && (
           <div className="space-y-8">
+            {/* Empty state for new projects */}
+            {assets.length === 0 && creations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="w-20 h-20 rounded-2xl bg-stone-100 flex items-center justify-center mb-6">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                </div>
+                <h2 className="text-xl font-semibold text-stone-900 mb-2">Ready to create something amazing?</h2>
+                <p className="text-stone-500 mb-6 max-w-md">
+                  This project is empty. Click "Start Creating" above to upload images and generate your first design.
+                </p>
+                <button
+                  onClick={() => {
+                    if (onEdit) {
+                      onEdit(null)
+                    }
+                  }}
+                  className="px-6 py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-full text-sm font-semibold transition-colors shadow-lg"
+                >
+                  Start Creating
+                </button>
+              </div>
+            ) : (
+              <>
             <div>
               <h2 className="text-lg font-semibold text-stone-900 mb-4">Project Overview</h2>
               <div className="grid grid-cols-2 gap-6">
                 <div className="bg-stone-50 rounded-xl p-6 border border-stone-200">
-                  <h3 className="text-sm font-semibold text-stone-700 mb-2">Uploaded Assets</h3>
+                  <h3 className="text-sm font-semibold text-stone-700 mb-2">Asset Library</h3>
                   <p className="text-2xl font-bold text-stone-900">{assets.length}</p>
-                  <p className="text-xs text-stone-500 mt-1">Images you've uploaded</p>
+                  <p className="text-xs text-stone-500 mt-1">Shared assets from all users</p>
                 </div>
                 <div className="bg-stone-50 rounded-xl p-6 border border-stone-200">
                   <h3 className="text-sm font-semibold text-stone-700 mb-2">Generated Creations</h3>
@@ -223,7 +279,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
               <div>
                 <h2 className="text-lg font-semibold text-stone-900 mb-4">Recent Assets</h2>
                 <div className="grid grid-cols-4 gap-4">
-                  {assets.slice(0, 4).map((asset) => (
+                  {assets.slice(0, 8).map((asset) => (
                     <div
                       key={asset.id}
                       className="aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group cursor-pointer hover:border-stone-300 transition-colors"
@@ -276,23 +332,69 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
                 </div>
               </div>
             )}
+              </>
+            )}
           </div>
         )}
 
         {activeTab === 'assets' && (
           <div>
-            <h2 className="text-lg font-semibold text-stone-900 mb-6">My Assets</h2>
-            {assets.length === 0 ? (
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-lg font-semibold text-stone-900">Asset Library</h2>
+                <p className="text-sm text-stone-500 mt-1">Shared assets from all users</p>
+              </div>
+              <button
+                onClick={() => assetUploadInputRef.current?.click()}
+                disabled={uploadingAsset}
+                className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-full text-sm font-semibold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                {uploadingAsset ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Upload Asset</span>
+                  </>
+                )}
+              </button>
+            </div>
+            <input
+              ref={assetUploadInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  handleAssetUpload(file)
+                }
+                // Reset input so same file can be selected again
+                e.target.value = ''
+              }}
+            />
+            {loadingAssets ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin"></div>
+              </div>
+            ) : assets.length === 0 ? (
               <div className="text-center py-12">
-                <p className="text-stone-500">No assets uploaded yet</p>
-                <p className="text-sm text-stone-400 mt-2">Upload images to get started</p>
+                <p className="text-stone-500">No assets in library yet</p>
+                <p className="text-sm text-stone-400 mt-2">Assets uploaded by users will appear here</p>
               </div>
             ) : (
               <div className="grid grid-cols-4 gap-4">
                 {assets.map((asset) => (
                   <div
                     key={asset.id}
-                    className="aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group cursor-pointer hover:border-stone-300 transition-colors"
+                    className="aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group cursor-pointer hover:border-stone-300 transition-colors relative"
                   >
                     <img
                       src={asset.url}
@@ -301,6 +403,9 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
                     />
                     <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity">
                       <p className="text-xs truncate">{asset.name}</p>
+                      {asset.description && (
+                        <p className="text-[10px] text-stone-300 truncate mt-0.5">{asset.description}</p>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -312,6 +417,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
         {activeTab === 'creations' && (
           <div>
             <h2 className="text-lg font-semibold text-stone-900 mb-6">My Creations</h2>
+            <p className="text-sm text-stone-500 mb-6">Generated designs for this project</p>
             {creations.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-stone-500">No creations yet</p>

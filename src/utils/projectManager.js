@@ -6,6 +6,7 @@ import * as cloudManager from './cloudProjectManager'
 const STORAGE_KEY = 'ature_projects'
 const SPACES_KEY = 'ature_spaces'
 const TRASH_KEY = 'ature_trash'
+const ASSETS_API = '/api/assets'
 export const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000 // 7 days in milliseconds
 
 // Check if we should use cloud (online) or localStorage (offline)
@@ -788,5 +789,65 @@ export function updateSpace(userId, spaceId, updates) {
   
   localStorage.setItem(SPACES_KEY, JSON.stringify(spaces))
   return spaces[index]
+}
+
+// Asset Library Functions (Shared across all users)
+export async function getAssets(userId) {
+  if (!userId) {
+    return []
+  }
+
+  try {
+    const response = await fetch(ASSETS_API, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userId}`,
+      },
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to fetch assets' }))
+      throw new Error(error.error || 'Failed to fetch assets')
+    }
+
+    const data = await response.json()
+    return data.assets || []
+  } catch (error) {
+    console.error('Error fetching assets:', error)
+    return []
+  }
+}
+
+export async function addAssetToLibrary(userId, name, url, type = 'image', description = null) {
+  if (!userId) {
+    throw new Error('User must be authenticated to add assets')
+  }
+
+  try {
+    const response = await fetch(ASSETS_API, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userId}`,
+      },
+      body: JSON.stringify({
+        name,
+        url,
+        type,
+        description,
+      }),
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to add asset' }))
+      throw new Error(error.error || 'Failed to add asset')
+    }
+
+    return await response.json()
+  } catch (error) {
+    console.error('Error adding asset:', error)
+    throw error
+  }
 }
 

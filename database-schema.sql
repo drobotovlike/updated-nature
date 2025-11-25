@@ -39,6 +39,17 @@ CREATE TABLE IF NOT EXISTS project_files (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Assets table (shared asset library - all users can see all assets)
+CREATE TABLE IF NOT EXISTS assets (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  url TEXT NOT NULL,
+  type TEXT DEFAULT 'image',
+  description TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Create indexes for better query performance
 CREATE INDEX IF NOT EXISTS idx_projects_user_id ON projects(user_id);
 CREATE INDEX IF NOT EXISTS idx_projects_space_id ON projects(space_id);
@@ -47,6 +58,8 @@ CREATE INDEX IF NOT EXISTS idx_spaces_user_id ON spaces(user_id);
 CREATE INDEX IF NOT EXISTS idx_spaces_deleted ON spaces(deleted);
 CREATE INDEX IF NOT EXISTS idx_project_files_project_id ON project_files(project_id);
 CREATE INDEX IF NOT EXISTS idx_project_files_user_id ON project_files(user_id);
+CREATE INDEX IF NOT EXISTS idx_assets_user_id ON assets(user_id);
+CREATE INDEX IF NOT EXISTS idx_assets_created_at ON assets(created_at);
 
 -- Create updated_at trigger function
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -58,9 +71,12 @@ END;
 $$ language 'plpgsql';
 
 -- Add triggers to update updated_at automatically
+-- Drop existing triggers if they exist, then create them
+DROP TRIGGER IF EXISTS update_projects_updated_at ON projects;
 CREATE TRIGGER update_projects_updated_at BEFORE UPDATE ON projects
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_spaces_updated_at ON spaces;
 CREATE TRIGGER update_spaces_updated_at BEFORE UPDATE ON spaces
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -72,22 +88,33 @@ CREATE TRIGGER update_spaces_updated_at BEFORE UPDATE ON spaces
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spaces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_files ENABLE ROW LEVEL SECURITY;
+ALTER TABLE assets ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations (security handled by API layer with Clerk user_id validation)
 -- This is safe because the API endpoints verify user_id before any operations
+-- Drop existing policies if they exist, then create them
 
+DROP POLICY IF EXISTS "Allow all operations on projects" ON projects;
 CREATE POLICY "Allow all operations on projects"
   ON projects FOR ALL
   USING (true)
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow all operations on spaces" ON spaces;
 CREATE POLICY "Allow all operations on spaces"
   ON spaces FOR ALL
   USING (true)
   WITH CHECK (true);
 
+DROP POLICY IF EXISTS "Allow all operations on project_files" ON project_files;
 CREATE POLICY "Allow all operations on project_files"
   ON project_files FOR ALL
+  USING (true)
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Allow all operations on assets" ON assets;
+CREATE POLICY "Allow all operations on assets"
+  ON assets FOR ALL
   USING (true)
   WITH CHECK (true);
 

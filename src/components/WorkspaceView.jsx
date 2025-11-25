@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
-import { getProject, updateProject } from '../utils/projectManager'
+import { getProject, updateProject, addAssetToLibrary } from '../utils/projectManager'
+import { uploadFileToCloud } from '../utils/cloudProjectManager'
 
 export default function WorkspaceView({ projectId, onBack, onSave, initialCreation = null }) {
   const { userId } = useAuth()
@@ -100,17 +101,40 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       }
       
       console.log('Uploading file:', file.name, file.type, file.size)
-      const url = URL.createObjectURL(file)
-      console.log('Created object URL:', url)
-      setRoomFile(file)
-      setRoomPreviewUrl(url)
-      setShowEditingMenu(true) // Show editing menu when room is uploaded
-      console.log('File uploaded successfully, preview URL set to:', url)
       
-      // Force a re-render check
-      setTimeout(() => {
-        console.log('Current roomPreviewUrl state:', url)
-      }, 100)
+      // Show temporary preview while uploading
+      const tempUrl = URL.createObjectURL(file)
+      setRoomFile(file)
+      setRoomPreviewUrl(tempUrl)
+      setShowEditingMenu(true)
+      
+      // Upload to server and add to asset library
+      try {
+        const uploadResult = await uploadFileToCloud(file, userId)
+        const permanentUrl = uploadResult.url
+        
+        // Update preview URL to permanent URL
+        setRoomPreviewUrl(permanentUrl)
+        
+        // Add to shared asset library
+        try {
+          await addAssetToLibrary(
+            userId,
+            file.name,
+            permanentUrl,
+            'image',
+            `Room image uploaded from project: ${project?.name || 'Untitled'}`
+          )
+          console.log('Asset added to library:', file.name)
+        } catch (assetError) {
+          console.warn('Failed to add asset to library:', assetError)
+          // Don't fail the upload if library add fails
+        }
+      } catch (uploadError) {
+        console.error('Error uploading file to server:', uploadError)
+        // Keep the blob URL for now, but show error
+        setError('File uploaded locally but failed to save to server. Please try again.')
+      }
     } catch (error) {
       console.error('Error uploading file:', error)
       setError('Failed to upload image. Please try again.')
@@ -118,10 +142,44 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
   }
 
   const handleAssetUpload = async (file) => {
-    const url = URL.createObjectURL(file)
-    setAssetFile(file)
-    setAssetPreviewUrl(url)
-    setShowEditingMenu(true)
+    try {
+      // Show temporary preview while uploading
+      const tempUrl = URL.createObjectURL(file)
+      setAssetFile(file)
+      setAssetPreviewUrl(tempUrl)
+      setShowEditingMenu(true)
+      
+      // Upload to server and add to asset library
+      try {
+        const uploadResult = await uploadFileToCloud(file, userId)
+        const permanentUrl = uploadResult.url
+        
+        // Update preview URL to permanent URL
+        setAssetPreviewUrl(permanentUrl)
+        
+        // Add to shared asset library
+        try {
+          await addAssetToLibrary(
+            userId,
+            file.name,
+            permanentUrl,
+            'image',
+            `Furniture asset uploaded from project: ${project?.name || 'Untitled'}`
+          )
+          console.log('Asset added to library:', file.name)
+        } catch (assetError) {
+          console.warn('Failed to add asset to library:', assetError)
+          // Don't fail the upload if library add fails
+        }
+      } catch (uploadError) {
+        console.error('Error uploading file to server:', uploadError)
+        // Keep the blob URL for now, but show error
+        setError('File uploaded locally but failed to save to server. Please try again.')
+      }
+    } catch (error) {
+      console.error('Error uploading asset:', error)
+      setError('Failed to upload asset. Please try again.')
+    }
   }
 
   const handleCameraCapture = () => {
@@ -199,6 +257,40 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       if (data.imageUrl) {
         console.log('Setting result URL, length:', data.imageUrl.length)
         setResultUrl(data.imageUrl)
+        
+        // Add generated result to asset library as a creation
+        try {
+          // If it's a base64 data URL, we need to upload it first
+          if (data.imageUrl.startsWith('data:')) {
+            const response = await fetch(data.imageUrl)
+            const blob = await response.blob()
+            const file = new File([blob], `generated-${Date.now()}.png`, { type: 'image/png' })
+            const uploadResult = await uploadFileToCloud(file, userId)
+            
+            // Add to asset library
+            await addAssetToLibrary(
+              userId,
+              `Generated: ${project?.name || 'Design'}`,
+              uploadResult.url,
+              'image',
+              prompt || 'AI-generated design'
+            )
+            setResultUrl(uploadResult.url) // Update to permanent URL
+          } else {
+            // Already a URL, add directly to library
+            await addAssetToLibrary(
+              userId,
+              `Generated: ${project?.name || 'Design'}`,
+              data.imageUrl,
+              'image',
+              prompt || 'AI-generated design'
+            )
+          }
+        } catch (assetError) {
+          console.warn('Failed to add generated image to library:', assetError)
+          // Don't fail the generation if library add fails
+        }
+        
         // Auto-save after generation
         await saveWorkflow()
       } else if (data.text) {

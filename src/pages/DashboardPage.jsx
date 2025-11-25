@@ -278,16 +278,25 @@ export default function DashboardPage() {
 
         {/* Main Nav */}
         <nav className="flex-1 overflow-y-auto px-3 space-y-1">
-          <Link
-            to="/dashboard"
-            className="flex items-center gap-3 px-3 py-2.5 bg-stone-100 text-stone-900 rounded-lg group transition-colors"
+          <button
+            onClick={() => {
+              setCurrentView('projects')
+              setSelectedProjectId(null)
+              setEditingCreation(null)
+              setSelectedSpaceId(null) // Show all projects on home
+            }}
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+              currentView === 'projects'
+                ? 'bg-stone-100 text-stone-900'
+                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
+            }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
               <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
             <span className="text-sm font-medium">Home</span>
-          </Link>
+          </button>
           <button
             onClick={async () => {
               // Show all projects (regardless of space) when "My Projects" is clicked

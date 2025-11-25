@@ -152,7 +152,11 @@ try {
     root.render(
       <StrictMode>
         <ErrorBoundary>
-          <ClerkProvider publishableKey={PUBLISHABLE_KEY}>
+          <ClerkProvider 
+            publishableKey={PUBLISHABLE_KEY}
+            afterSignInUrl="/dashboard"
+            afterSignUpUrl="/dashboard"
+          >
             <BrowserRouter>
               <App />
               <Analytics />

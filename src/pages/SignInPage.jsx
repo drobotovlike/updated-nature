@@ -63,7 +63,7 @@ export default function SignInPage() {
                   colorBackground: '#ffffff',
                   colorInputBackground: '#ffffff',
                   colorInputText: '#0c0a09',
-                  borderRadius: '0.5rem',
+                  borderRadius: '9999px',
                   fontFamily: "'Manrope', 'Helvetica', system-ui, sans-serif",
                   fontFamilyButtons: "'Manrope', 'Helvetica', system-ui, sans-serif",
                 },

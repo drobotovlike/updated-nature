@@ -57,20 +57,46 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
       const uploadResult = await uploadFileToCloud(file, userId)
       const permanentUrl = uploadResult.url
 
+      if (!permanentUrl) {
+        throw new Error('Upload succeeded but no URL returned from server')
+      }
+
       // Add to shared asset library
-      await addAssetToLibrary(
-        userId,
-        file.name,
-        permanentUrl,
-        'image',
-        `Uploaded from project: ${project?.name || 'Asset Library'}`
-      )
+      try {
+        await addAssetToLibrary(
+          userId,
+          file.name,
+          permanentUrl,
+          'image',
+          `Uploaded from project: ${project?.name || 'Asset Library'}`
+        )
+      } catch (assetError) {
+        console.warn('Failed to add asset to library:', assetError)
+        // Still show success if upload worked, even if library add failed
+        alert('File uploaded but failed to add to library. The file may not appear in the asset list.')
+      }
 
       // Refresh assets list
       await loadAssets()
     } catch (error) {
       console.error('Error uploading asset:', error)
-      alert('Failed to upload asset. Please try again.')
+      const errorMessage = error.message || 'Unknown error'
+      
+      // Provide more specific error message
+      let userMessage = 'Failed to upload asset. Please try again.'
+      if (errorMessage.includes('Bucket not found') || errorMessage.includes('Storage bucket')) {
+        userMessage = 'Storage bucket not configured. Please contact support.'
+      } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+        userMessage = 'Authentication failed. Please refresh the page and try again.'
+      } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+        userMessage = 'Network error. Please check your connection and try again.'
+      } else if (errorMessage.includes('no URL')) {
+        userMessage = 'Upload completed but server did not return a valid URL. Please try again.'
+      } else {
+        userMessage = `Upload failed: ${errorMessage}`
+      }
+      
+      alert(userMessage)
     } finally {
       setUploadingAsset(false)
     }

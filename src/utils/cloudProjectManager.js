@@ -75,13 +75,33 @@ export async function uploadFileToCloud(file, userId) {
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Upload failed' }))
-      throw new Error(error.error || 'Failed to upload file')
+      let errorMessage = 'Failed to upload file'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorData.message || errorMessage
+        if (errorData.details) {
+          errorMessage += `: ${errorData.details}`
+        }
+      } catch (parseError) {
+        // If response is not JSON, use status text
+        errorMessage = `Upload failed with status ${response.status}: ${response.statusText}`
+      }
+      throw new Error(errorMessage)
     }
 
-    return response.json()
+    const result = await response.json()
+    
+    if (!result.url) {
+      throw new Error('Upload succeeded but no URL was returned from server')
+    }
+    
+    return result
   } catch (error) {
     console.error('Error uploading file:', error)
+    // Re-throw with more context if it's a network error
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      throw new Error('Network error: Unable to reach server. Please check your connection.')
+    }
     throw error
   }
 }

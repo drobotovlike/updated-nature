@@ -113,6 +113,10 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         const uploadResult = await uploadFileToCloud(file, userId)
         const permanentUrl = uploadResult.url
         
+        if (!permanentUrl) {
+          throw new Error('Upload succeeded but no URL returned')
+        }
+        
         // Update preview URL to permanent URL
         setRoomPreviewUrl(permanentUrl)
         
@@ -132,8 +136,21 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         }
       } catch (uploadError) {
         console.error('Error uploading file to server:', uploadError)
-        // Keep the blob URL for now, but show error
-        setError('File uploaded locally but failed to save to server. Please try again.')
+        const errorMessage = uploadError.message || 'Unknown error'
+        // Provide more specific error message
+        if (errorMessage.includes('Bucket not found') || errorMessage.includes('Storage bucket')) {
+          setError('Storage bucket not configured. Please contact support.')
+        } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+          setError('Authentication failed. Please refresh the page and try again.')
+        } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+          setError('Network error. Please check your connection and try again.')
+        } else {
+          setError(`Upload failed: ${errorMessage}. Please try again.`)
+        }
+        // Revoke the blob URL since upload failed
+        URL.revokeObjectURL(tempUrl)
+        setRoomPreviewUrl('')
+        setRoomFile(null)
       }
     } catch (error) {
       console.error('Error uploading file:', error)
@@ -154,6 +171,10 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         const uploadResult = await uploadFileToCloud(file, userId)
         const permanentUrl = uploadResult.url
         
+        if (!permanentUrl) {
+          throw new Error('Upload succeeded but no URL returned')
+        }
+        
         // Update preview URL to permanent URL
         setAssetPreviewUrl(permanentUrl)
         
@@ -173,8 +194,21 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         }
       } catch (uploadError) {
         console.error('Error uploading file to server:', uploadError)
-        // Keep the blob URL for now, but show error
-        setError('File uploaded locally but failed to save to server. Please try again.')
+        const errorMessage = uploadError.message || 'Unknown error'
+        // Provide more specific error message
+        if (errorMessage.includes('Bucket not found') || errorMessage.includes('Storage bucket')) {
+          setError('Storage bucket not configured. Please contact support.')
+        } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+          setError('Authentication failed. Please refresh the page and try again.')
+        } else if (errorMessage.includes('Network') || errorMessage.includes('fetch')) {
+          setError('Network error. Please check your connection and try again.')
+        } else {
+          setError(`Upload failed: ${errorMessage}. Please try again.`)
+        }
+        // Revoke the blob URL since upload failed
+        URL.revokeObjectURL(tempUrl)
+        setAssetPreviewUrl('')
+        setAssetFile(null)
       }
     } catch (error) {
       console.error('Error uploading asset:', error)

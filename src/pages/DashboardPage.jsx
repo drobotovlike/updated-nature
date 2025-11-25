@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
-import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject, updateProject } from '../utils/projectManager'
+import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject } from '../utils/projectManager'
 import WorkspaceView from '../components/WorkspaceView'
 import AccountView from '../components/AccountView'
 import ProjectView from '../components/ProjectView'
-import Folder from '../components/Folder'
 
 export default function DashboardPage() {
   const { user } = useUser()
@@ -88,25 +87,6 @@ export default function DashboardPage() {
   }, [selectedProjectId, userId])
 
   const userName = user?.fullName || user?.firstName || 'User'
-
-  // Helper function to calculate item count for a project
-  const getProjectItemCount = (project) => {
-    let count = 0
-    
-    // Count creations (generated images)
-    if (project.workflow?.result?.url) count++
-    if (project.workflow?.resultUrl) count++
-    if (project.workflow?.files && Array.isArray(project.workflow.files)) {
-      count += project.workflow.files.filter(f => f.type === 'image' && f.url && f.generated).length
-    }
-    
-    return count
-  }
-
-  // Get project color from metadata or use default
-  const getProjectColor = (project) => {
-    return project.workflow?.folderColor || project.folderColor || project.metadata?.folderColor || '#9333ea'
-  }
 
   // Helper function to update all project lists
   const updateProjectLists = (allProjects) => {
@@ -950,59 +930,51 @@ export default function DashboardPage() {
 
                 {/* Projects Grid */}
                 {savedProjects.length > 0 ? (
-                  <div className="grid grid-cols-3 gap-6">
-                    {savedProjects.map((project) => {
-                      const itemCount = getProjectItemCount(project)
-                      const projectColor = getProjectColor(project)
-                      const lastUpdated = project.updatedAt || project.updated_at || project.createdAt || project.created_at
-                      
-                      return (
-                        <Folder
-                          key={project.id}
-                          name={project.name}
-                          color={projectColor}
-                          itemCount={itemCount}
-                          lastUpdated={lastUpdated}
-                          onNameChange={async (newName) => {
-                            if (newName && newName !== project.name && userId) {
-                              try {
-                                // Update project name
-                                await updateProject(userId, project.id, { name: newName })
-                                // Refresh projects list
-                                const allProjects = await getProjects(userId, null)
-                                updateProjectLists(allProjects)
-                              } catch (error) {
-                                console.error('Error updating project name:', error)
-                                alert('Failed to update project name')
-                              }
-                            }
-                          }}
-                          onColorChange={async (newColor) => {
-                            if (newColor !== projectColor && userId) {
-                              try {
-                                // Store color in project workflow metadata
-                                const updatedWorkflow = {
-                                  ...(project.workflow || {}),
-                                  folderColor: newColor
-                                }
-                                await updateProject(userId, project.id, { workflow: updatedWorkflow })
-                                // Refresh projects list
-                                const allProjects = await getProjects(userId, null)
-                                updateProjectLists(allProjects)
-                              } catch (error) {
-                                console.error('Error updating project color:', error)
-                                alert('Failed to update project color')
-                              }
-                            }
-                          }}
-                          onClick={() => {
-                            setCurrentView('project-view')
-                            setEditingCreation(null)
-                            setSelectedProjectId(project.id)
-                          }}
-                        />
-                      )
-                    })}
+                  <div className="grid grid-cols-4 gap-6">
+                    {savedProjects.map((project) => (
+                      <div
+                        key={project.id}
+                        onClick={() => {
+                          setCurrentView('project-view')
+                          setEditingCreation(null)
+                          setSelectedProjectId(project.id)
+                        }}
+                        className="group cursor-pointer"
+                      >
+                        <div className="aspect-[4/3] bg-white rounded-xl overflow-hidden border border-stone-200 relative shadow-sm group-hover:shadow-md transition-all">
+                          {project.workflow?.result?.url ? (
+                            <img
+                              src={project.workflow.result.url}
+                              alt={project.name}
+                              className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-stone-100 flex flex-col items-center justify-center p-4">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 mb-3">
+                                <rect x="3" y="3" width="18" height="18" rx="2" />
+                                <circle cx="9" cy="9" r="2" />
+                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                              </svg>
+                              <p className="text-sm font-semibold text-stone-700 text-center leading-tight line-clamp-2">{project.name}</p>
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3 flex items-start gap-3">
+                          <div className="bg-stone-100 p-1.5 rounded text-stone-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                              <rect width="7" height="7" x="3" y="3" rx="1" />
+                              <rect width="7" height="7" x="14" y="3" rx="1" />
+                              <rect width="7" height="7" x="14" y="14" rx="1" />
+                              <rect width="7" height="7" x="3" y="14" rx="1" />
+                            </svg>
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-xs font-semibold text-stone-500 uppercase tracking-wide">Project</p>
+                            <h3 className="text-lg font-semibold text-stone-900 leading-tight">{project.name}</h3>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <div className="flex flex-col items-center justify-center py-16 text-center">

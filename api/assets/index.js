@@ -8,7 +8,18 @@ if (!supabaseUrl || !supabaseServiceKey) {
 }
 
 // Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
+// IMPORTANT: SUPABASE_SERVICE_ROLE_KEY should be set in Vercel environment variables
+// If not set, it falls back to anon key which is subject to RLS policies
 const supabase = supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null
+
+// Log which key is being used (for debugging - remove in production)
+if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.log('✅ Using SUPABASE_SERVICE_ROLE_KEY (bypasses RLS)')
+} else if (process.env.SUPABASE_ANON_KEY) {
+  console.warn('⚠️ Using SUPABASE_ANON_KEY (subject to RLS) - set SUPABASE_SERVICE_ROLE_KEY in Vercel for better performance')
+} else {
+  console.error('❌ No Supabase key found!')
+}
 
 export default async function handler(req, res) {
   // Set CORS headers

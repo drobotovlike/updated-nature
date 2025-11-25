@@ -25,6 +25,11 @@ export default function SignUpPage() {
           {/* Card - Perfectly centered with consistent padding */}
           <div className="bg-white rounded-2xl shadow-lg border border-stone-200 p-10">
             <SignUp
+              routing="path"
+              path="/sign-up"
+              signInUrl="/sign-in"
+              redirectUrl="/dashboard"
+              afterSignUpUrl="/dashboard"
               appearance={{
                 baseTheme: undefined,
                 elements: {
@@ -68,11 +73,6 @@ export default function SignUpPage() {
                   fontFamilyButtons: "'Manrope', 'Helvetica', system-ui, sans-serif",
                 },
               }}
-              routing="path"
-              path="/sign-up"
-              signInUrl="/sign-in"
-              redirectUrl="/dashboard"
-              afterSignUpUrl="/dashboard"
             />
           </div>
           

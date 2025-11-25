@@ -235,6 +235,7 @@ export default function DashboardPage() {
       
       // Set as selected project and switch to project view
       setSelectedProjectId(project.id)
+      setEditingCreation(null) // Clear any editing state
       setShowCreateProjectModal(false)
       setNewProjectName('')
       setCurrentView('project-view')
@@ -357,6 +358,7 @@ export default function DashboardPage() {
                     onClick={() => {
                       setSelectedProjectId(project.id)
                       setCurrentView('project-view')
+                      setEditingCreation(null) // Clear any editing state
                       // Set the spaceId if the project has one
                       if (project.spaceId) {
                         setSelectedSpaceId(project.spaceId)
@@ -784,6 +786,7 @@ export default function DashboardPage() {
                     onClick={() => {
                       setSelectedProjectId(project.id)
                       setCurrentView('project-view')
+                      setEditingCreation(null) // Clear any editing state
                     }}
                     className="group cursor-pointer"
                   >

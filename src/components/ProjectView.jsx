@@ -47,13 +47,15 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
     loadAssets()
   }, [userId])
 
-  // Handle asset upload
+  // Handle asset upload - saves to cloud storage and database
   const handleAssetUpload = async (file) => {
     if (!file || !userId) return
 
     setUploadingAsset(true)
     try {
-      // Upload file to server
+      console.log('📤 Uploading asset to cloud storage...', file.name)
+      
+      // Step 1: Upload file to Supabase Storage (cloud)
       const uploadResult = await uploadFileToCloud(file, userId)
       const permanentUrl = uploadResult.url
 
@@ -61,7 +63,9 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
         throw new Error('Upload succeeded but no URL returned from server')
       }
 
-      // Add to shared asset library
+      console.log('✅ File uploaded to cloud storage:', permanentUrl)
+
+      // Step 2: Save asset metadata to Supabase database (cloud)
       try {
         await addAssetToLibrary(
           userId,
@@ -70,16 +74,23 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
           'image',
           `Uploaded from project: ${project?.name || 'Asset Library'}`
         )
+        console.log('✅ Asset saved to cloud database')
       } catch (assetError) {
-        console.warn('Failed to add asset to library:', assetError)
+        console.error('❌ Failed to add asset to library:', assetError)
         // Still show success if upload worked, even if library add failed
-        alert('File uploaded but failed to add to library. The file may not appear in the asset list.')
+        alert('File uploaded to cloud but failed to save metadata. The file may not appear in the asset list.')
+        setUploadingAsset(false)
+        return
       }
 
-      // Refresh assets list
+      // Step 3: Refresh assets list from cloud
       await loadAssets()
+      console.log('✅ Assets refreshed from cloud')
+      
+      // Show success message
+      // (You can add a toast notification here if you have one)
     } catch (error) {
-      console.error('Error uploading asset:', error)
+      console.error('❌ Error uploading asset:', error)
       const errorMessage = error.message || 'Unknown error'
       
       // Provide more specific error message
@@ -410,7 +421,9 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-lg font-semibold text-stone-900">Asset Library</h2>
-                <p className="text-sm text-stone-500 mt-1">Shared assets from all users</p>
+                <p className="text-sm text-stone-500 mt-1">
+                  Shared assets from all users • Saved to cloud for access from any device
+                </p>
               </div>
               <button
                 onClick={() => assetUploadInputRef.current?.click()}

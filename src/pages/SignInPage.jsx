@@ -13,7 +13,7 @@ export default function SignInPage() {
   return (
     <Layout>
       <div className="min-h-[calc(100vh-200px)] flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-full max-w-md mx-auto">
+        <div className="w-full max-w-md">
           {/* Header - Centered */}
           <div className="mb-12 text-center">
             <Link to="/" className="text-2xl font-bold tracking-tight text-stone-900 mb-3 inline-block">
@@ -23,28 +23,28 @@ export default function SignInPage() {
           </div>
           
           {/* Card - Perfectly centered with consistent padding */}
-          <div className="bg-white rounded-2xl shadow-lg border border-stone-200">
+          <div className="bg-white rounded-2xl shadow-lg border border-stone-200 p-10">
             <SignIn
               appearance={{
                 baseTheme: undefined,
                 elements: {
-                  rootBox: 'w-full',
+                  rootBox: 'w-full m-0 p-0',
                   card: 'shadow-none border-0 bg-transparent p-0 m-0',
-                  cardBox: 'shadow-none border-0 bg-transparent p-0 m-0',
-                  headerTitle: 'text-stone-900 font-serif-ature text-2xl font-semibold mb-2 text-center px-8 pt-10',
-                  headerSubtitle: 'text-stone-500 text-sm mb-8 text-center px-8',
-                  socialButtonsBlock: 'px-8 mb-8',
+                  cardBox: 'shadow-none border-0 bg-transparent p-0 m-0 w-full',
+                  headerTitle: 'text-stone-900 font-serif-ature text-2xl font-semibold mb-2 text-center p-0 m-0',
+                  headerSubtitle: 'text-stone-500 text-sm mb-8 text-center p-0 m-0',
+                  socialButtonsBlock: 'p-0 m-0 mb-8',
                   socialButtonsBlockButton: 'border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-900 transition-all rounded-lg font-medium w-full mb-3 last:mb-0',
                   socialButtonsBlockButtonText: 'text-stone-900 font-medium text-sm',
-                  dividerLine: 'bg-stone-200 mx-8 my-8',
+                  dividerLine: 'bg-stone-200 my-8',
                   dividerText: 'text-stone-500 text-xs px-4 bg-white',
-                  formField: 'px-8 mb-5',
+                  formField: 'p-0 m-0 mb-5',
                   formFieldLabel: 'text-stone-700 font-medium text-sm mb-2',
                   formFieldInput: 'border border-stone-200 focus:border-stone-900 focus:ring-2 focus:ring-stone-900/20 rounded-lg bg-white text-stone-900 placeholder:text-stone-400 h-12 px-4 text-sm w-full',
-                  formButtonPrimary: 'bg-stone-900 hover:bg-stone-800 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all w-full mx-8 mb-8 h-12 text-sm',
+                  formButtonPrimary: 'bg-stone-900 hover:bg-stone-800 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all w-full mb-8 h-12 text-sm',
                   formButtonReset: 'text-stone-600 hover:text-stone-900 text-sm',
                   footerActionLink: 'text-stone-900 hover:text-stone-700 font-semibold text-sm',
-                  footerAction: 'px-8 pb-10 text-center',
+                  footerAction: 'p-0 m-0 text-center',
                   formFieldErrorText: 'text-red-600 text-xs mt-1.5',
                   identityPreviewText: 'text-stone-900',
                   identityPreviewEditButton: 'text-stone-600 hover:text-stone-900',

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { getProject, updateProject } from '../utils/projectManager'
 
-export default function WorkspaceView({ projectId, onBack, onSave }) {
+export default function WorkspaceView({ projectId, onBack, onSave, initialCreation = null }) {
   const { userId } = useAuth()
   const [project, setProject] = useState(null)
   const [resultUrl, setResultUrl] = useState('')
@@ -53,6 +53,19 @@ export default function WorkspaceView({ projectId, onBack, onSave }) {
     }
     loadProject()
   }, [projectId, userId])
+
+  // Load initial creation if editing
+  useEffect(() => {
+    if (initialCreation && initialCreation.url) {
+      // Load the creation image as the result
+      setResultUrl(initialCreation.url)
+      if (initialCreation.description) {
+        setPrompt(initialCreation.description)
+      }
+      // Show editing menu
+      setShowEditingMenu(true)
+    }
+  }, [initialCreation])
 
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {

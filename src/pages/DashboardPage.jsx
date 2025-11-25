@@ -4,6 +4,7 @@ import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
 import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject } from '../utils/projectManager'
 import WorkspaceView from '../components/WorkspaceView'
 import AccountView from '../components/AccountView'
+import ProjectView from '../components/ProjectView'
 
 export default function DashboardPage() {
   const { user } = useUser()
@@ -11,9 +12,10 @@ export default function DashboardPage() {
   const { signOut } = useClerk()
   const navigate = useNavigate()
   
-  // View state: 'projects' | 'workspace' | 'account' | 'create-project'
+  // View state: 'projects' | 'workspace' | 'account' | 'project-view'
   const [currentView, setCurrentView] = useState('projects')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
+  const [editingCreation, setEditingCreation] = useState(null)
   
   const [savedProjects, setSavedProjects] = useState([])
   const [spaces, setSpaces] = useState([])
@@ -231,11 +233,11 @@ export default function DashboardPage() {
         useAIDesigner: false,
       }, selectedSpaceId)
       
-      // Set as selected project and switch to workspace view
+      // Set as selected project and switch to project view
       setSelectedProjectId(project.id)
       setShowCreateProjectModal(false)
       setNewProjectName('')
-      setCurrentView('workspace')
+      setCurrentView('project-view')
       
       // Refresh projects list for the selected space
       const projects = await getProjects(userId, selectedSpaceId)
@@ -354,7 +356,7 @@ export default function DashboardPage() {
                   <button
                     onClick={() => {
                       setSelectedProjectId(project.id)
-                      setCurrentView('workspace')
+                      setCurrentView('project-view')
                       // Set the spaceId if the project has one
                       if (project.spaceId) {
                         setSelectedSpaceId(project.spaceId)
@@ -597,7 +599,7 @@ export default function DashboardPage() {
                 className="pl-10 pr-4 py-2.5 bg-white rounded-lg border border-stone-200 text-base focus:outline-none focus:ring-2 focus:ring-stone-200 w-64 placeholder:text-stone-400 shadow-sm"
               />
             </div>
-            {currentView !== 'workspace' && currentView !== 'account' && (
+            {currentView !== 'workspace' && currentView !== 'account' && currentView !== 'project-view' && (
               <button
                 onClick={() => setShowCreateProjectModal(true)}
                 className="bg-stone-900 hover:bg-stone-800 text-white px-5 py-2.5 rounded-full text-sm font-semibold transition-colors shadow-lg shadow-stone-200"
@@ -605,7 +607,7 @@ export default function DashboardPage() {
                 New project
               </button>
             )}
-            {(currentView === 'workspace' || currentView === 'account') && (
+            {(currentView === 'workspace' || currentView === 'account' || currentView === 'project-view') && (
               <button
                 onClick={() => setCurrentView('projects')}
                 className="bg-stone-100 hover:bg-stone-200 text-stone-900 px-5 py-2.5 rounded-full text-sm font-semibold transition-colors"
@@ -618,13 +620,29 @@ export default function DashboardPage() {
 
         {/* Scrollable Content - Dynamic based on view */}
         <div className="flex-1 overflow-y-auto">
-          {currentView === 'workspace' && selectedProjectId && userId ? (
-            <div className="h-full px-8 pb-12 pt-8">
-              <WorkspaceView
+          {currentView === 'project-view' && selectedProjectId && userId ? (
+            <div className="h-full">
+              <ProjectView
                 projectId={selectedProjectId}
                 onBack={() => {
                   setCurrentView('projects')
                   setSelectedProjectId(null)
+                  setEditingCreation(null)
+                }}
+                onEdit={(creation) => {
+                  setEditingCreation(creation)
+                  setCurrentView('workspace')
+                }}
+              />
+            </div>
+          ) : currentView === 'workspace' && selectedProjectId && userId ? (
+            <div className="h-full px-8 pb-12 pt-8">
+              <WorkspaceView
+                projectId={selectedProjectId}
+                initialCreation={editingCreation}
+                onBack={() => {
+                  setCurrentView('project-view')
+                  setEditingCreation(null)
                 }}
                 onSave={async () => {
                   // Refresh projects list after save
@@ -633,6 +651,9 @@ export default function DashboardPage() {
                   // Refresh spaces to update project counts in sidebar
                   const userSpaces = await getSpaces(userId)
                   setSpaces(userSpaces)
+                  // Go back to project view
+                  setCurrentView('project-view')
+                  setEditingCreation(null)
                 }}
               />
             </div>
@@ -762,7 +783,7 @@ export default function DashboardPage() {
                     key={project.id}
                     onClick={() => {
                       setSelectedProjectId(project.id)
-                      setCurrentView('workspace')
+                      setCurrentView('project-view')
                     }}
                     className="group cursor-pointer"
                   >

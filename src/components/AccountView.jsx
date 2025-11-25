@@ -102,26 +102,52 @@ export default function AccountView() {
     setSaveSuccess(false)
 
     try {
-      // Update name if changed
-      if (firstName !== user.firstName || lastName !== user.lastName) {
-        await user.update({
-          firstName: firstName.trim() || undefined,
-          lastName: lastName.trim() || undefined,
-        })
+      // Build update object only with changed fields
+      const updates = {}
+      const trimmedFirstName = firstName.trim()
+      const trimmedLastName = lastName.trim()
+      
+      // Only add firstName if it changed and is not empty
+      if (trimmedFirstName !== (user.firstName || '')) {
+        updates.firstName = trimmedFirstName || null
+      }
+      
+      // Only add lastName if it changed and is not empty
+      if (trimmedLastName !== (user.lastName || '')) {
+        updates.lastName = trimmedLastName || null
+      }
+
+      // Update name if there are changes
+      if (Object.keys(updates).length > 0) {
+        await user.update(updates)
       }
 
       // Update email if changed (this requires verification)
-      if (email !== user.primaryEmailAddress?.emailAddress) {
-        await user.primaryEmailAddress?.createEmailAddress({ email: email.trim() })
-        // Note: Clerk will send a verification email
-        setSaveSuccess(true)
-        setIsEditingProfile(false)
-        alert('Email update requested. Please check your email for verification.')
-      } else {
+      const trimmedEmail = email.trim()
+      if (trimmedEmail && trimmedEmail !== user.primaryEmailAddress?.emailAddress) {
+        try {
+          await user.primaryEmailAddress?.createEmailAddress({ email: trimmedEmail })
+          // Note: Clerk will send a verification email
+          setSaveSuccess(true)
+          setIsEditingProfile(false)
+          alert('Email update requested. Please check your email for verification.')
+          return
+        } catch (emailError) {
+          console.error('Error updating email:', emailError)
+          setSaveError(emailError.message || 'Failed to update email. Please try again.')
+          return
+        }
+      }
+
+      // If we got here, name was updated (or nothing changed)
+      if (Object.keys(updates).length > 0) {
         setSaveSuccess(true)
         setIsEditingProfile(false)
         // Reset success message after 3 seconds
         setTimeout(() => setSaveSuccess(false), 3000)
+      } else {
+        // No changes made
+        setIsEditingProfile(false)
       }
     } catch (error) {
       console.error('Error updating profile:', error)

@@ -397,9 +397,21 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                       </svg>
                     </button>
                   </div>
-                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-200 bg-stone-50 relative group">
-                    <img src={roomPreviewUrl} alt="Room" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-200 bg-stone-50 relative group min-h-[200px]">
+                    <img 
+                      src={roomPreviewUrl} 
+                      alt="Room" 
+                      className="w-full h-full object-cover"
+                      style={{ display: 'block' }}
+                      onError={(e) => {
+                        console.error('Image failed to load:', roomPreviewUrl)
+                        e.target.style.display = 'none'
+                      }}
+                      onLoad={() => {
+                        console.log('Room image loaded successfully:', roomPreviewUrl)
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none"></div>
                   </div>
                 </div>
               ) : (
@@ -503,9 +515,21 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                       </svg>
                     </button>
                   </div>
-                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-200 bg-stone-50 relative group">
-                    <img src={assetPreviewUrl} alt="Asset" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
+                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-200 bg-stone-50 relative group min-h-[200px]">
+                    <img 
+                      src={assetPreviewUrl} 
+                      alt="Asset" 
+                      className="w-full h-full object-cover"
+                      style={{ display: 'block' }}
+                      onError={(e) => {
+                        console.error('Image failed to load:', assetPreviewUrl)
+                        e.target.style.display = 'none'
+                      }}
+                      onLoad={() => {
+                        console.log('Asset image loaded successfully:', assetPreviewUrl)
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors pointer-events-none"></div>
                   </div>
                 </div>
               ) : (

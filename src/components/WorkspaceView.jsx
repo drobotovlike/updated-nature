@@ -88,10 +88,16 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       
       console.log('Uploading file:', file.name, file.type, file.size)
       const url = URL.createObjectURL(file)
+      console.log('Created object URL:', url)
       setRoomFile(file)
       setRoomPreviewUrl(url)
       setShowEditingMenu(true) // Show editing menu when room is uploaded
-      console.log('File uploaded successfully, preview URL created')
+      console.log('File uploaded successfully, preview URL set to:', url)
+      
+      // Force a re-render check
+      setTimeout(() => {
+        console.log('Current roomPreviewUrl state:', url)
+      }, 100)
     } catch (error) {
       console.error('Error uploading file:', error)
       setError('Failed to upload image. Please try again.')

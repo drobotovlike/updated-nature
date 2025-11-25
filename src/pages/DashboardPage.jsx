@@ -17,7 +17,8 @@ export default function DashboardPage() {
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [editingCreation, setEditingCreation] = useState(null)
   
-  const [savedProjects, setSavedProjects] = useState([])
+  const [savedProjects, setSavedProjects] = useState([]) // All projects for sidebar
+  const [recentProjects, setRecentProjects] = useState([]) // Last 4 projects for home page
   const [spaces, setSpaces] = useState([])
   const [trashedSpaces, setTrashedSpaces] = useState([])
   const [trashedProjects, setTrashedProjects] = useState([])
@@ -45,17 +46,14 @@ export default function DashboardPage() {
         setTrashedSpaces(trashed)
         setTrashedProjects(trashedProjs)
         
+        // Load all projects for sidebar menu (regardless of space)
+        const allProjects = await getProjects(userId, null)
+        updateProjectLists(allProjects)
+        
         // Auto-select first space if none selected and spaces exist
         if (!selectedSpaceId && userSpaces.length > 0) {
           const firstSpaceId = userSpaces[0].id
           setSelectedSpaceId(firstSpaceId)
-          // Load projects for the first space
-          const projects = await getProjects(userId, firstSpaceId)
-          setSavedProjects(projects)
-        } else {
-          // Load projects for selected space (or all projects if no space selected)
-          const projects = await getProjects(userId, selectedSpaceId)
-          setSavedProjects(projects)
         }
       }
     }
@@ -89,6 +87,18 @@ export default function DashboardPage() {
 
   const userName = user?.fullName || user?.firstName || 'User'
 
+  // Helper function to update both project lists
+  const updateProjectLists = (allProjects) => {
+    setSavedProjects(allProjects)
+    // Sort by updated_at (most recent first) and take last 4 for home page
+    const sortedProjects = [...allProjects].sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0)
+      const dateB = new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0)
+      return dateB - dateA // Most recent first
+    })
+    setRecentProjects(sortedProjects.slice(0, 4))
+  }
+
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) {
       alert('Please enter a space name')
@@ -103,9 +113,9 @@ export default function DashboardPage() {
       setShowCreateSpaceModal(false)
       // Auto-select the newly created space
       setSelectedSpaceId(newSpace.id)
-      // Load projects for the new space (will be empty)
-      const projects = await getProjects(userId, newSpace.id)
-      setSavedProjects(projects)
+      // Load all projects (for sidebar) and update recent projects
+      const allProjects = await getProjects(userId, null)
+      updateProjectLists(allProjects)
     } catch (error) {
       console.error('Error creating space:', error)
       alert('Failed to create space')
@@ -130,15 +140,12 @@ export default function DashboardPage() {
         if (updatedSpaces.length > 0) {
           const newSelectedSpaceId = updatedSpaces[0].id
           setSelectedSpaceId(newSelectedSpaceId)
-          // Load projects for the newly selected space
-          const projects = await getProjects(userId, newSelectedSpaceId)
-          setSavedProjects(projects)
         } else {
           setSelectedSpaceId(null)
-          // Load all projects if no spaces
-          const allProjects = await getProjects(userId, null)
-          setSavedProjects(allProjects)
         }
+        // Always load all projects for sidebar (regardless of space)
+        const allProjects = await getProjects(userId, null)
+        updateProjectLists(allProjects)
       }
     } catch (error) {
       console.error('Error deleting space:', error)
@@ -181,9 +188,9 @@ export default function DashboardPage() {
   const handleRestoreProject = async (projectId) => {
     try {
       restoreProject(userId, projectId)
-      const projects = await getProjects(userId, null)
+      const allProjects = await getProjects(userId, null)
       const trashedProjs = getTrashedProjects(userId)
-      setSavedProjects(projects)
+      updateProjectLists(allProjects)
       setTrashedProjects(trashedProjs)
     } catch (error) {
       console.error('Error restoring project:', error)
@@ -217,7 +224,7 @@ export default function DashboardPage() {
     
     try {
       deleteAllProjects(userId)
-      setSavedProjects([])
+      updateProjectLists([])
     } catch (error) {
       console.error('Error deleting all projects:', error)
       alert('Failed to delete all projects')
@@ -252,9 +259,9 @@ export default function DashboardPage() {
       
       console.log('✅ Project created, view set to project-view for project:', project.id)
       
-      // Refresh projects list for the selected space
-      const projects = await getProjects(userId, selectedSpaceId)
-      setSavedProjects(projects)
+      // Refresh all projects (for sidebar) and update recent projects
+      const allProjects = await getProjects(userId, null)
+      updateProjectLists(allProjects)
       
       // Refresh spaces to update project counts in sidebar
       const userSpaces = await getSpaces(userId)
@@ -279,11 +286,16 @@ export default function DashboardPage() {
         {/* Main Nav */}
         <nav className="flex-1 overflow-y-auto px-3 space-y-1">
           <button
-            onClick={() => {
+            onClick={async () => {
               setCurrentView('projects')
               setSelectedProjectId(null)
               setEditingCreation(null)
               setSelectedSpaceId(null) // Show all projects on home
+              // Refresh recent projects when going to home
+              if (userId) {
+                const allProjects = await getProjects(userId, null)
+                updateProjectLists(allProjects)
+              }
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
               currentView === 'projects' && selectedProjectId === null && selectedSpaceId === null
@@ -305,7 +317,7 @@ export default function DashboardPage() {
               setSelectedSpaceId(null) // Clear space selection
               setCurrentView('projects')
               const allProjects = await getProjects(userId, null) // null = all projects
-              setSavedProjects(allProjects)
+              updateProjectLists(allProjects)
             }}
             className="w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
           >
@@ -402,9 +414,9 @@ export default function DashboardPage() {
                           try {
                             await deleteProject(userId, project.id)
                             // Refresh projects list
-                            const projects = await getProjects(userId, null)
+                            const allProjects = await getProjects(userId, null)
                             const trashedProjs = getTrashedProjects(userId)
-                            setSavedProjects(projects)
+                            updateProjectLists(allProjects)
                             setTrashedProjects(trashedProjs)
                             // If deleted project was selected, clear selection
                             if (selectedProjectId === project.id) {
@@ -674,9 +686,9 @@ export default function DashboardPage() {
                   setEditingCreation(null)
                 }}
                 onSave={async () => {
-                  // Refresh projects list after save
-                  const projects = await getProjects(userId, selectedSpaceId)
-                  setSavedProjects(projects)
+                  // Refresh all projects (for sidebar) and update recent projects
+                  const allProjects = await getProjects(userId, null)
+                  updateProjectLists(allProjects)
                   // Refresh spaces to update project counts in sidebar
                   const userSpaces = await getSpaces(userId)
                   setSpaces(userSpaces)
@@ -790,7 +802,7 @@ export default function DashboardPage() {
                 <h2 className="text-xl font-semibold text-stone-900 tracking-tight font-serif-ature">Your recent projects</h2>
                 <p className="text-base text-stone-500 mt-1">Projects you've been working on</p>
               </div>
-              {savedProjects.length > 0 && (
+              {recentProjects.length > 0 && (
                 <button
                   onClick={handleDeleteAllProjects}
                   className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
@@ -805,9 +817,9 @@ export default function DashboardPage() {
               )}
             </div>
 
-            {savedProjects.length > 0 ? (
+            {recentProjects.length > 0 ? (
               <div className="grid grid-cols-4 gap-6">
-                {savedProjects.map((project) => (
+                {recentProjects.map((project) => (
                   <div
                     key={project.id}
                     onClick={() => {

@@ -3,6 +3,8 @@
 ## Problem
 Clerk is redirecting to `accounts.ature.ru` (Account Portal) instead of keeping users on your application domain, causing page reloads and redirects.
 
+**IMPORTANT:** The Account Portal (`accounts.ature.ru`) is a separate hosted solution. If you're using custom sign-in/sign-up pages (which you are), you should disable the Account Portal or configure it to use your application domain.
+
 ## Solution: Change to Application Domain
 
 ### Step 1: Update Sign-In Path

@@ -462,13 +462,51 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
               )}
 
               {/* Asset Preview (Upper Right) - Only show if asset uploaded */}
-              {assetPreviewUrl && (
+              {/* Asset Preview - Always show if uploaded */}
+              {assetPreviewUrl ? (
                 <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-stone-400 tracking-wider uppercase">Uploaded Asset</label>
-                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-900 cursor-pointer relative group">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-stone-400 tracking-wider uppercase">Furniture Asset</label>
+                    <button
+                      onClick={() => {
+                        setAssetPreviewUrl('')
+                        setAssetFile(null)
+                      }}
+                      className="text-stone-400 hover:text-stone-600 text-xs"
+                      title="Remove"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </div>
+                  <div className="aspect-square rounded-lg overflow-hidden border-2 border-stone-200 bg-stone-50 relative group">
                     <img src={assetPreviewUrl} alt="Asset" className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/5 transition-colors"></div>
                   </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-stone-400 tracking-wider uppercase">Upload Furniture</label>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      if (assetInputRef.current) {
+                        assetInputRef.current.click()
+                      }
+                    }}
+                    className="w-full aspect-square flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400 group-hover:text-stone-600">
+                      <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                    <span className="text-xs text-stone-500 group-hover:text-stone-700">Upload Furniture</span>
+                  </button>
                 </div>
               )}
 

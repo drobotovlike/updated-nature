@@ -18,11 +18,39 @@ async function apiRequest(endpoint, options = {}, userId) {
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(error.error || `API error: ${response.status}`)
+    // Check if response is JSON before trying to parse
+    const contentType = response.headers.get('content-type')
+    let errorMessage = `API error: ${response.status} ${response.statusText}`
+    
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const error = await response.json()
+        errorMessage = error.error || error.message || errorMessage
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+      }
+    } else {
+      // If it's HTML or other content type, try to get text
+      try {
+        const text = await response.text()
+        console.error('Non-JSON error response:', text.substring(0, 200))
+      } catch (textError) {
+        console.error('Failed to read error response:', textError)
+      }
+    }
+    
+    throw new Error(errorMessage)
   }
 
-  return response.json()
+  // Check content type before parsing JSON
+  const contentType = response.headers.get('content-type')
+  if (contentType && contentType.includes('application/json')) {
+    return response.json()
+  } else {
+    // If response is not JSON, return text or throw error
+    const text = await response.text()
+    throw new Error(`Expected JSON but got ${contentType || 'unknown content type'}. Response: ${text.substring(0, 100)}`)
+  }
 }
 
 async function spacesApiRequest(endpoint, options = {}, userId) {
@@ -38,11 +66,39 @@ async function spacesApiRequest(endpoint, options = {}, userId) {
   })
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ error: 'Request failed' }))
-    throw new Error(error.error || `API error: ${response.status}`)
+    // Check if response is JSON before trying to parse
+    const contentType = response.headers.get('content-type')
+    let errorMessage = `API error: ${response.status} ${response.statusText}`
+    
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        const error = await response.json()
+        errorMessage = error.error || error.message || errorMessage
+      } catch (parseError) {
+        console.error('Failed to parse error response:', parseError)
+      }
+    } else {
+      // If it's HTML or other content type, try to get text
+      try {
+        const text = await response.text()
+        console.error('Non-JSON error response:', text.substring(0, 200))
+      } catch (textError) {
+        console.error('Failed to read error response:', textError)
+      }
+    }
+    
+    throw new Error(errorMessage)
   }
 
-  return response.json()
+  // Check content type before parsing JSON
+  const contentType = response.headers.get('content-type')
+  if (contentType && contentType.includes('application/json')) {
+    return response.json()
+  } else {
+    // If response is not JSON, return text or throw error
+    const text = await response.text()
+    throw new Error(`Expected JSON but got ${contentType || 'unknown content type'}. Response: ${text.substring(0, 100)}`)
+  }
 }
 
 // Upload file to cloud storage
@@ -172,9 +228,17 @@ export async function getProjectsFromCloud(userId, spaceId = null) {
   try {
     const endpoint = spaceId ? `?spaceId=${spaceId}` : ''
     const data = await apiRequest(endpoint, { method: 'GET' }, userId)
+    // Handle both { projects: [...] } and direct array responses
+    if (Array.isArray(data)) {
+      return data
+    }
     return data.projects || []
   } catch (error) {
     console.error('Error fetching projects from cloud:', error)
+    // If it's a 404 or empty response, return empty array instead of throwing
+    if (error.message.includes('404') || error.message.includes('Not Found')) {
+      return []
+    }
     throw error
   }
 }

@@ -30,6 +30,7 @@ export default function SignUpPage() {
               signInUrl="/sign-in"
               redirectUrl="/dashboard"
               afterSignUpUrl="/dashboard"
+              fallbackRedirectUrl="/dashboard"
               appearance={{
                 baseTheme: undefined,
                 elements: {

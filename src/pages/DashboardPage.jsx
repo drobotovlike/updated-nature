@@ -234,11 +234,13 @@ export default function DashboardPage() {
       }, selectedSpaceId)
       
       // Set as selected project and switch to project view
-      setSelectedProjectId(project.id)
+      // IMPORTANT: Set view BEFORE setting project ID to avoid any race conditions
+      setCurrentView('project-view')
       setEditingCreation(null) // Clear any editing state
+      setSelectedProjectId(project.id)
       setShowCreateProjectModal(false)
       setNewProjectName('')
-      setCurrentView('project-view')
+      
       
       // Refresh projects list for the selected space
       const projects = await getProjects(userId, selectedSpaceId)
@@ -356,9 +358,10 @@ export default function DashboardPage() {
                 >
                   <button
                     onClick={() => {
-                      setSelectedProjectId(project.id)
+                      // IMPORTANT: Set view first, then project ID
                       setCurrentView('project-view')
                       setEditingCreation(null) // Clear any editing state
+                      setSelectedProjectId(project.id)
                       // Set the spaceId if the project has one
                       if (project.spaceId) {
                         setSelectedSpaceId(project.spaceId)
@@ -784,9 +787,10 @@ export default function DashboardPage() {
                   <div
                     key={project.id}
                     onClick={() => {
-                      setSelectedProjectId(project.id)
+                      // IMPORTANT: Set view first, then project ID
                       setCurrentView('project-view')
                       setEditingCreation(null) // Clear any editing state
+                      setSelectedProjectId(project.id)
                     }}
                     className="group cursor-pointer"
                   >

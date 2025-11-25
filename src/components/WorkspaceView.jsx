@@ -67,6 +67,19 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
     }
   }, [initialCreation])
 
+  // Debug: Log state changes for troubleshooting
+  useEffect(() => {
+    if (roomPreviewUrl) {
+      console.log('Room preview URL set:', roomPreviewUrl)
+    }
+  }, [roomPreviewUrl])
+
+  useEffect(() => {
+    if (assetPreviewUrl) {
+      console.log('Asset preview URL set:', assetPreviewUrl)
+    }
+  }, [assetPreviewUrl])
+
   const fileToBase64 = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader()

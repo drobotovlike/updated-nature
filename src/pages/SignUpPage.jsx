@@ -1,9 +1,18 @@
 import { SignUp, useAuth } from '@clerk/clerk-react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { useEffect } from 'react'
 import Layout from '../components/Layout'
 
 export default function SignUpPage() {
-  const { isSignedIn } = useAuth()
+  const { isSignedIn, isLoaded } = useAuth()
+  const navigate = useNavigate()
+  
+  // Redirect to dashboard when signed in
+  useEffect(() => {
+    if (isLoaded && isSignedIn) {
+      navigate('/dashboard', { replace: true })
+    }
+  }, [isSignedIn, isLoaded, navigate])
   
   // If already signed in, redirect to dashboard
   if (isSignedIn) {
@@ -27,6 +36,7 @@ export default function SignUpPage() {
             <SignUp
               routing="hash"
               signInUrl="/sign-in"
+              afterSignUpUrl="/dashboard"
               appearance={{
                 baseTheme: undefined,
                 elements: {

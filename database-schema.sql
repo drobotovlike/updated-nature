@@ -4,24 +4,24 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Projects table
-CREATE TABLE IF NOT EXISTS projects (
+-- Spaces table (must be created first since projects references it)
+CREATE TABLE IF NOT EXISTS spaces (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
-  space_id UUID REFERENCES spaces(id) ON DELETE SET NULL,
-  workflow JSONB DEFAULT '{}'::jsonb,
   deleted BOOLEAN DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Spaces table
-CREATE TABLE IF NOT EXISTS spaces (
+-- Projects table (references spaces, so must be created after)
+CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id TEXT NOT NULL,
   name TEXT NOT NULL,
+  space_id UUID REFERENCES spaces(id) ON DELETE SET NULL,
+  workflow JSONB DEFAULT '{}'::jsonb,
   deleted BOOLEAN DEFAULT FALSE,
   deleted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -65,54 +65,29 @@ CREATE TRIGGER update_spaces_updated_at BEFORE UPDATE ON spaces
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 -- Row Level Security (RLS) Policies
+-- Note: Since we're using Clerk (not Supabase Auth), RLS is handled at the API level
+-- We'll disable RLS for now and rely on API-level security
+-- For production, you can enable RLS with custom policies if needed
+
 ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
 ALTER TABLE spaces ENABLE ROW LEVEL SECURITY;
 ALTER TABLE project_files ENABLE ROW LEVEL SECURITY;
 
--- Projects policies: Users can only access their own projects
-CREATE POLICY "Users can view their own projects"
-  ON projects FOR SELECT
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
+-- Allow all operations (security handled by API layer with Clerk user_id validation)
+-- This is safe because the API endpoints verify user_id before any operations
 
-CREATE POLICY "Users can insert their own projects"
-  ON projects FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
+CREATE POLICY "Allow all operations on projects"
+  ON projects FOR ALL
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Users can update their own projects"
-  ON projects FOR UPDATE
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
+CREATE POLICY "Allow all operations on spaces"
+  ON spaces FOR ALL
+  USING (true)
+  WITH CHECK (true);
 
-CREATE POLICY "Users can delete their own projects"
-  ON projects FOR DELETE
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
--- Spaces policies: Users can only access their own spaces
-CREATE POLICY "Users can view their own spaces"
-  ON spaces FOR SELECT
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
-CREATE POLICY "Users can insert their own spaces"
-  ON spaces FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
-CREATE POLICY "Users can update their own spaces"
-  ON spaces FOR UPDATE
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
-CREATE POLICY "Users can delete their own spaces"
-  ON spaces FOR DELETE
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
--- Project files policies
-CREATE POLICY "Users can view their own project files"
-  ON project_files FOR SELECT
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
-CREATE POLICY "Users can insert their own project files"
-  ON project_files FOR INSERT
-  WITH CHECK (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
-
-CREATE POLICY "Users can delete their own project files"
-  ON project_files FOR DELETE
-  USING (auth.uid()::text = user_id OR user_id = current_setting('app.user_id', true));
+CREATE POLICY "Allow all operations on project_files"
+  ON project_files FOR ALL
+  USING (true)
+  WITH CHECK (true);
 

@@ -25,8 +25,7 @@ export default function SignUpPage() {
           {/* Card - Perfectly centered with consistent padding */}
           <div className="bg-white rounded-2xl shadow-lg border border-stone-200 p-10">
             <SignUp
-              routing="path"
-              path="/sign-up"
+              routing="hash"
               signInUrl="/sign-in"
               appearance={{
                 baseTheme: undefined,

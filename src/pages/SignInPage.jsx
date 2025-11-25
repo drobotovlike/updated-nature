@@ -68,11 +68,8 @@ export default function SignInPage() {
                   fontFamilyButtons: "'Manrope', 'Helvetica', system-ui, sans-serif",
                 },
               }}
-              routing="path"
-              path="/sign-in"
+              routing="hash"
               signUpUrl="/sign-up"
-              redirectUrl="/dashboard"
-              afterSignInUrl="/dashboard"
             />
           </div>
           

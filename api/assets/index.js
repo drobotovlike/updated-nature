@@ -89,7 +89,18 @@ export default async function handler(req, res) {
           .select()
           .single()
 
-        if (insertError) throw insertError
+        if (insertError) {
+          console.error('Supabase insert error:', insertError)
+          // Provide more detailed error message
+          if (insertError.message.includes('row-level security') || insertError.message.includes('RLS')) {
+            return res.status(403).json({ 
+              error: 'RLS policy violation',
+              message: 'Row-level security policy blocked the insert. Please check RLS policies on assets table.',
+              details: insertError.message
+            })
+          }
+          throw insertError
+        }
 
         return res.status(201).json(newAsset)
 

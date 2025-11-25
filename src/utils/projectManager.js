@@ -859,8 +859,18 @@ export async function addAssetToLibrary(userId, name, url, type = 'image', descr
     })
 
     if (!response.ok) {
-      const error = await response.json().catch(() => ({ error: 'Failed to add asset' }))
-      throw new Error(error.error || 'Failed to add asset')
+      let errorMessage = 'Failed to add asset'
+      try {
+        const errorData = await response.json()
+        errorMessage = errorData.error || errorData.message || errorMessage
+        if (errorData.details) {
+          errorMessage += `: ${errorData.details}`
+        }
+        console.error('Assets API error response:', errorData)
+      } catch (parseError) {
+        errorMessage = `Failed to add asset: ${response.status} ${response.statusText}`
+      }
+      throw new Error(errorMessage)
     }
 
     return await response.json()

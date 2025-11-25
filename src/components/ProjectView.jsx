@@ -67,18 +67,29 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
 
       // Step 2: Save asset metadata to Supabase database (cloud)
       try {
-        await addAssetToLibrary(
+        const assetResult = await addAssetToLibrary(
           userId,
           file.name,
           permanentUrl,
           'image',
           `Uploaded from project: ${project?.name || 'Asset Library'}`
         )
-        console.log('✅ Asset saved to cloud database')
+        console.log('✅ Asset saved to cloud database:', assetResult)
       } catch (assetError) {
         console.error('❌ Failed to add asset to library:', assetError)
-        // Still show success if upload worked, even if library add failed
-        alert('File uploaded to cloud but failed to save metadata. The file may not appear in the asset list.')
+        const errorMessage = assetError.message || 'Unknown error'
+        
+        // Provide more specific error message
+        let userMessage = 'File uploaded to cloud but failed to save metadata.'
+        if (errorMessage.includes('row-level security') || errorMessage.includes('RLS')) {
+          userMessage = 'File uploaded but RLS policy blocked saving metadata. Please check Supabase RLS policies on assets table.'
+        } else if (errorMessage.includes('Unauthorized') || errorMessage.includes('401')) {
+          userMessage = 'File uploaded but authentication failed when saving metadata. Please refresh and try again.'
+        } else {
+          userMessage = `File uploaded but failed to save metadata: ${errorMessage}`
+        }
+        
+        alert(userMessage)
         setUploadingAsset(false)
         return
       }

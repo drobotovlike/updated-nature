@@ -80,12 +80,12 @@ export default function DashboardPage() {
 
   // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace or account view)
   useEffect(() => {
-    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'project-view') {
-      console.log('Safeguard: Switching to project-view for project:', selectedProjectId)
+    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'project-view' && currentView !== 'projects') {
+      console.log('🛡️ Safeguard: Switching to project-view for project:', selectedProjectId, 'Current view was:', currentView)
       setCurrentView('project-view')
       setEditingCreation(null)
     }
-  }, [selectedProjectId, userId, currentView])
+  }, [selectedProjectId, userId])
 
   const userName = user?.fullName || user?.firstName || 'User'
 
@@ -243,18 +243,14 @@ export default function DashboardPage() {
       }, selectedSpaceId)
       
       // Set as selected project and switch to project view
-      // IMPORTANT: Set view BEFORE setting project ID to avoid any race conditions
-      // Use a small timeout to ensure state updates are processed
+      // IMPORTANT: Set ALL state synchronously to avoid race conditions
       setShowCreateProjectModal(false)
       setNewProjectName('')
       setEditingCreation(null) // Clear any editing state
+      setCurrentView('project-view') // Set view FIRST
+      setSelectedProjectId(project.id) // Then set project ID
       
-      // Use setTimeout to ensure state updates happen in the right order
-      setTimeout(() => {
-        setCurrentView('project-view')
-        setSelectedProjectId(project.id)
-        console.log('✅ Project created, view set to project-view for project:', project.id)
-      }, 0)
+      console.log('✅ Project created, view set to project-view for project:', project.id)
       
       // Refresh projects list for the selected space
       const projects = await getProjects(userId, selectedSpaceId)
@@ -639,8 +635,12 @@ export default function DashboardPage() {
 
         {/* Scrollable Content - Dynamic based on view */}
         <div className="flex-1 overflow-y-auto">
-          {/* Show ProjectView when view is explicitly 'project-view' and we have a selected project */}
-          {currentView === 'project-view' && selectedProjectId && userId ? (
+          {/* PRIORITY ORDER: 
+              1. If we have a selected project and view is NOT workspace/account, show ProjectView
+              2. If view is explicitly workspace, show WorkspaceView
+              3. Otherwise show projects list or account view
+          */}
+          {selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' ? (
             <div className="h-full">
               <ProjectView
                 projectId={selectedProjectId}

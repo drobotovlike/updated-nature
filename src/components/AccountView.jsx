@@ -7,6 +7,15 @@ export default function AccountView() {
   const { user, isLoaded } = useUser()
   const { userId } = useAuth()
   const [savedProjects, setSavedProjects] = useState([])
+  
+  // Profile editing state
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
+  const [firstName, setFirstName] = useState('')
+  const [lastName, setLastName] = useState('')
+  const [email, setEmail] = useState('')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [saveSuccess, setSaveSuccess] = useState(false)
 
   if (!isLoaded) {
     return (
@@ -30,6 +39,15 @@ export default function AccountView() {
     year: 'numeric' 
   })
   const userPlan = 'Free'
+
+  // Initialize form fields when user data loads
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '')
+      setLastName(user.lastName || '')
+      setEmail(user.primaryEmailAddress?.emailAddress || '')
+    }
+  }, [user])
 
   useEffect(() => {
     async function loadProjects() {
@@ -57,6 +75,59 @@ export default function AccountView() {
         console.error('Error deleting project:', error)
         alert('Failed to delete project')
       }
+    }
+  }
+
+  const handleEditProfile = () => {
+    setIsEditingProfile(true)
+    setSaveError('')
+    setSaveSuccess(false)
+  }
+
+  const handleCancelEdit = () => {
+    setIsEditingProfile(false)
+    // Reset to original values
+    setFirstName(user?.firstName || '')
+    setLastName(user?.lastName || '')
+    setEmail(user?.primaryEmailAddress?.emailAddress || '')
+    setSaveError('')
+    setSaveSuccess(false)
+  }
+
+  const handleSaveProfile = async () => {
+    if (!user) return
+
+    setIsSaving(true)
+    setSaveError('')
+    setSaveSuccess(false)
+
+    try {
+      // Update name if changed
+      if (firstName !== user.firstName || lastName !== user.lastName) {
+        await user.update({
+          firstName: firstName.trim() || undefined,
+          lastName: lastName.trim() || undefined,
+        })
+      }
+
+      // Update email if changed (this requires verification)
+      if (email !== user.primaryEmailAddress?.emailAddress) {
+        await user.primaryEmailAddress?.createEmailAddress({ email: email.trim() })
+        // Note: Clerk will send a verification email
+        setSaveSuccess(true)
+        setIsEditingProfile(false)
+        alert('Email update requested. Please check your email for verification.')
+      } else {
+        setSaveSuccess(true)
+        setIsEditingProfile(false)
+        // Reset success message after 3 seconds
+        setTimeout(() => setSaveSuccess(false), 3000)
+      }
+    } catch (error) {
+      console.error('Error updating profile:', error)
+      setSaveError(error.message || 'Failed to update profile. Please try again.')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -120,43 +191,87 @@ export default function AccountView() {
       <div>
         {activeTab === 'profile' && (
           <div className="bg-white rounded-2xl border border-stone-200 p-8">
-            <h3 className="text-xl font-semibold text-stone-900 mb-6">Profile Information</h3>
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-semibold text-stone-900">Profile Information</h3>
+              {!isEditingProfile && (
+                <button
+                  onClick={handleEditProfile}
+                  className="px-4 py-2 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
+                >
+                  Edit Profile
+                </button>
+              )}
+            </div>
             <div className="space-y-6 max-w-2xl">
-              <div>
-                <label className="block text-sm font-medium text-stone-700 mb-2">Full Name</label>
-                <input
-                  type="text"
-                  defaultValue={userName}
-                  disabled
-                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:border-stone-900 transition-colors disabled:opacity-50"
-                />
-                <p className="mt-1 text-xs text-stone-500">Update your name in Clerk dashboard</p>
+              {saveSuccess && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <p className="text-sm text-green-700 font-medium">Profile updated successfully!</p>
+                </div>
+              )}
+              {saveError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-sm text-red-700 font-medium">{saveError}</p>
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-2">First Name</label>
+                  <input
+                    type="text"
+                    value={firstName}
+                    onChange={(e) => setFirstName(e.target.value)}
+                    disabled={!isEditingProfile}
+                    className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg focus:outline-none focus:border-stone-900 focus:ring-2 focus:ring-stone-900/20 transition-colors disabled:opacity-50 disabled:bg-stone-50"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-stone-700 mb-2">Last Name</label>
+                  <input
+                    type="text"
+                    value={lastName}
+                    onChange={(e) => setLastName(e.target.value)}
+                    disabled={!isEditingProfile}
+                    className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg focus:outline-none focus:border-stone-900 focus:ring-2 focus:ring-stone-900/20 transition-colors disabled:opacity-50 disabled:bg-stone-50"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-2">Email Address</label>
                 <input
                   type="email"
-                  defaultValue={userEmail}
-                  disabled
-                  className="w-full px-4 py-3 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:border-stone-900 transition-colors disabled:opacity-50"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  disabled={!isEditingProfile}
+                  className="w-full px-4 py-3 bg-white border border-stone-200 rounded-lg focus:outline-none focus:border-stone-900 focus:ring-2 focus:ring-stone-900/20 transition-colors disabled:opacity-50 disabled:bg-stone-50"
                 />
-                <p className="mt-1 text-xs text-stone-500">Update your email in Clerk dashboard</p>
+                {isEditingProfile && (
+                  <p className="mt-1 text-xs text-stone-500">
+                    Changing your email will require verification. A verification email will be sent to the new address.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-stone-700 mb-2">Member Since</label>
                 <p className="text-stone-600">{joinedDate}</p>
               </div>
-              <div className="flex items-center gap-3">
-                <a
-                  href="https://dashboard.clerk.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
-                >
-                  Manage Account in Clerk
-                </a>
-                <p className="text-xs text-stone-500">Use Clerk dashboard to update profile details</p>
-              </div>
+              {isEditingProfile && (
+                <div className="flex items-center gap-3 pt-4 border-t border-stone-200">
+                  <button
+                    onClick={handleSaveProfile}
+                    disabled={isSaving}
+                    className="px-6 py-3 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSaving ? 'Saving...' : 'Save Changes'}
+                  </button>
+                  <button
+                    onClick={handleCancelEdit}
+                    disabled={isSaving}
+                    className="px-6 py-3 bg-white border border-stone-200 text-stone-700 rounded-full text-sm font-semibold hover:bg-stone-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}

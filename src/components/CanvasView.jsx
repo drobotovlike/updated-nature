@@ -888,10 +888,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       if (!selectedItem) return
                       setIsGenerating(true)
                       try {
-                        const response = await fetch('/api/upscale', {
+                        const response = await fetch('/api/image-editing', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
+                            operation: 'upscale',
                             image_url: selectedItem.image_url,
                             scale: 2,
                           }),

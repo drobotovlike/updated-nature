@@ -3,6 +3,12 @@ import { useAuth } from '@clerk/clerk-react'
 import { getProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import Folder from './Folder'
+import ShareModal from './ShareModal'
+import ExportModal from './ExportModal'
+import ProjectMetadataForm from './ProjectMetadataForm'
+import VariationsView from './VariationsView'
+import VariationsComparisonView from './VariationsComparisonView'
+import AssetLibrary from './AssetLibrary'
 
 export default function ProjectView({ projectId, onEdit, onBack }) {
   const { userId } = useAuth()
@@ -13,6 +19,8 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
   const [loadingAssets, setLoadingAssets] = useState(true)
   const [uploadingAsset, setUploadingAsset] = useState(false)
   const assetUploadInputRef = useRef(null)
+  const [showShareModal, setShowShareModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   useEffect(() => {
     async function loadProject() {
@@ -222,6 +230,17 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
           </div>
           <div className="flex items-center gap-3">
             <button
+              onClick={() => setShowShareModal(true)}
+              className="px-4 py-2.5 border border-stone-200 hover:bg-stone-50 text-stone-700 rounded-full text-sm font-semibold transition-colors flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                <polyline points="16 6 12 2 8 6" />
+                <line x1="12" y1="2" x2="12" y2="15" />
+              </svg>
+              Share
+            </button>
+            <button
               onClick={() => {
                 if (onEdit) {
                   onEdit(null) // Pass null to start fresh
@@ -273,6 +292,26 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
             }`}
           >
             My Creations ({creations.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('variations')}
+            className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              activeTab === 'variations'
+                ? 'bg-stone-900 text-white'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+            }`}
+          >
+            Variations
+          </button>
+          <button
+            onClick={() => setActiveTab('metadata')}
+            className={`px-4 py-2 text-sm font-medium rounded-full transition-colors ${
+              activeTab === 'metadata'
+                ? 'bg-stone-900 text-white'
+                : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+            }`}
+          >
+            Details
           </button>
         </div>
       </div>
@@ -428,82 +467,7 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
         )}
 
         {activeTab === 'assets' && (
-          <div>
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h2 className="text-lg font-semibold text-stone-900">Asset Library</h2>
-                <p className="text-sm text-stone-500 mt-1">
-                  Your private assets • Saved to cloud for access from any device
-                </p>
-              </div>
-              <button
-                onClick={() => assetUploadInputRef.current?.click()}
-                disabled={uploadingAsset}
-                className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-full text-sm font-semibold transition-colors shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {uploadingAsset ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    <span>Uploading...</span>
-                  </>
-                ) : (
-                  <>
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    <span>Upload Asset</span>
-                  </>
-                )}
-              </button>
-            </div>
-            <input
-              ref={assetUploadInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) {
-                  handleAssetUpload(file)
-                }
-                // Reset input so same file can be selected again
-                e.target.value = ''
-              }}
-            />
-            {loadingAssets ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin"></div>
-              </div>
-            ) : assets.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-stone-500">No assets in library yet</p>
-                <p className="text-sm text-stone-400 mt-2">Assets uploaded by users will appear here</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-4 gap-4">
-                {assets.map((asset) => (
-                  <div
-                    key={asset.id}
-                    className="aspect-square rounded-xl overflow-hidden border border-stone-200 bg-stone-50 group cursor-pointer hover:border-stone-300 transition-colors relative"
-                  >
-                    <img
-                      src={asset.url}
-                      alt={asset.name}
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <p className="text-xs truncate">{asset.name}</p>
-                      {asset.description && (
-                        <p className="text-[10px] text-stone-300 truncate mt-0.5">{asset.description}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <AssetLibrary projectId={projectId} />
         )}
 
         {activeTab === 'creations' && (
@@ -543,6 +507,12 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
                         >
                           Edit
                         </button>
+                        <button
+                          onClick={() => setShowExportModal(true)}
+                          className="px-4 py-2 bg-white text-stone-900 rounded-full text-xs font-semibold hover:bg-stone-100 transition-colors"
+                        >
+                          Export
+                        </button>
                       </div>
                     )}
                     {creation.description && (
@@ -556,7 +526,32 @@ export default function ProjectView({ projectId, onEdit, onBack }) {
             )}
           </div>
         )}
+
+        {activeTab === 'variations' && (
+          <VariationsComparisonView projectId={projectId} />
+        )}
+
+        {activeTab === 'metadata' && (
+          <ProjectMetadataForm projectId={projectId} />
+        )}
       </div>
+
+      {/* Share Modal */}
+      {showShareModal && (
+        <ShareModal
+          projectId={projectId}
+          onClose={() => setShowShareModal(false)}
+        />
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <ExportModal
+          projectId={projectId}
+          projectName={project?.name || 'Project'}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   )
 }

@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth } from '@clerk/clerk-react'
 import { getProject, updateProject, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
+import AssetLibrary from './AssetLibrary'
+import ExportModal from './ExportModal'
 
 export default function WorkspaceView({ projectId, onBack, onSave, initialCreation = null }) {
   const { userId } = useAuth()
@@ -15,6 +17,10 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
   const [error, setError] = useState('')
   const [prompt, setPrompt] = useState('')
   const [showEditingMenu, setShowEditingMenu] = useState(false)
+  const [generatingVariations, setGeneratingVariations] = useState(false)
+  const [variationCount, setVariationCount] = useState(3)
+  const [showAssetLibrary, setShowAssetLibrary] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
   const roomInputRef = useRef(null)
   const libraryInputRef = useRef(null)
   const assetInputRef = useRef(null)
@@ -416,8 +422,155 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
     alert('Project saved successfully!')
   }
 
+  const generateVariations = async () => {
+    if (!roomFile && !prompt) {
+      setError('Please provide a prompt or upload a room image')
+      return
+    }
+
+    setGeneratingVariations(true)
+    setError('')
+
+    try {
+      const variations = []
+      
+      // Generate multiple variations
+      for (let i = 0; i < variationCount; i++) {
+        const variationPrompt = prompt 
+          ? `${prompt} (variation ${i + 1}, different style and composition)`
+          : `Create a beautiful interior design variation ${i + 1} with proper lighting and realistic details.`
+        
+        // Prepare request body
+        const requestBody = {
+          description: variationPrompt,
+          useAIDesigner: false,
+        }
+        
+        if (roomFile) {
+          const roomBase64 = await fileToBase64(roomFile)
+          requestBody.roomBase64 = roomBase64
+        }
+        
+        if (assetFile) {
+          const assetBase64 = await fileToBase64(assetFile)
+          requestBody.furnitureBase64 = assetBase64
+        }
+
+        const response = await fetch('/api/nano-banana/visualize', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(requestBody),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          throw new Error(`Variation ${i + 1} failed: ${errorText}`)
+        }
+
+        const data = await response.json()
+        
+        if (data.imageUrl) {
+          // Upload result to cloud
+          let resultUrl = data.imageUrl
+          if (data.imageUrl.startsWith('data:')) {
+            const imgResponse = await fetch(data.imageUrl)
+            const blob = await imgResponse.blob()
+            const file = new File([blob], `variation-${i + 1}-${Date.now()}.png`, { type: 'image/png' })
+            const uploadResult = await uploadFileToCloud(file, userId)
+            resultUrl = uploadResult.url
+          }
+
+          variations.push({
+            project_id: projectId,
+            name: `Variation ${i + 1}`,
+            prompt: variationPrompt,
+            room_file_url: roomPreviewUrl,
+            asset_file_url: assetPreviewUrl,
+            result_url: resultUrl,
+            generation_params: {
+              variation_index: i,
+              timestamp: new Date().toISOString(),
+            },
+          })
+        }
+      }
+
+      // Save all variations to database
+      if (variations.length > 0) {
+        const response = await fetch('/api/variations', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userId}`,
+          },
+          body: JSON.stringify({ variations }),
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          // Set first variation as result
+          if (data.variations && data.variations.length > 0) {
+            setResultUrl(data.variations[0].result_url)
+          }
+          alert(`Successfully generated ${variations.length} variations!`)
+        }
+      }
+    } catch (error) {
+      setError(`Failed to generate variations: ${error.message}`)
+    } finally {
+      setGeneratingVariations(false)
+    }
+  }
+
+  const handleSelectAsset = (asset) => {
+    setAssetPreviewUrl(asset.url)
+    setShowAssetLibrary(false)
+    // Create a file-like object for compatibility
+    fetch(asset.url)
+      .then(res => res.blob())
+      .then(blob => {
+        const file = new File([blob], asset.name, { type: blob.type })
+        setAssetFile(file)
+      })
+  }
+
   return (
     <div className="h-full flex flex-col bg-white">
+      {/* Header */}
+      {onBack && (
+        <div className="border-b border-stone-200 px-8 py-4 flex items-center justify-between flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBack}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m12 19-7-7 7-7" />
+                <path d="M19 12H5" />
+              </svg>
+              Back
+            </button>
+            <h1 className="text-xl font-semibold text-stone-900 font-serif-ature">
+              {project?.name || 'Workspace'}
+            </h1>
+          </div>
+          {resultUrl && (
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              Export
+            </button>
+          )}
+        </div>
+      )}
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Center Canvas Area */}
@@ -587,9 +740,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
-                        if (libraryInputRef.current) {
-                          libraryInputRef.current.click()
-                        }
+                        setShowAssetLibrary(true)
                       }}
                       className="aspect-square flex flex-col items-center justify-center gap-1.5 p-3 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-all group"
                     >
@@ -598,7 +749,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                       </svg>
-                      <span className="text-[10px] font-medium text-stone-700 text-center leading-tight">Upload from library</span>
+                      <span className="text-[10px] font-medium text-stone-700 text-center leading-tight">From library</span>
                     </button>
                   </div>
 
@@ -713,25 +864,72 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                       placeholder="Describe how you want to modify the image..."
                       className="w-full p-3 bg-stone-50 rounded-lg border border-stone-100 text-xs text-stone-600 leading-relaxed font-normal resize-none focus:outline-none focus:border-stone-300 focus:ring-2 focus:ring-stone-200 min-h-[60px]"
                     />
-                    <button
-                      onClick={() => callGeminiAPI(prompt || 'Create a beautiful interior design with proper lighting and realistic details.')}
-                      disabled={isProcessing}
-                      className="w-full px-4 py-2.5 bg-stone-900 text-white rounded-full text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      {isProcessing ? (
-                        <>
-                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                          <span>Generating...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <polygon points="5 3 19 12 5 21 5 3" />
-                          </svg>
-                          <span>Generate</span>
-                        </>
-                      )}
-                    </button>
+                    
+                    {/* Variation Count Selector */}
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs text-stone-500">Variations:</label>
+                      <select
+                        value={variationCount}
+                        onChange={(e) => setVariationCount(parseInt(e.target.value))}
+                        disabled={isProcessing || generatingVariations}
+                        className="px-2 py-1 border border-stone-200 rounded-lg bg-white text-xs text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-200 disabled:opacity-50"
+                      >
+                        <option value={1}>1</option>
+                        <option value={2}>2</option>
+                        <option value={3}>3</option>
+                        <option value={4}>4</option>
+                      </select>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => callGeminiAPI(prompt || 'Create a beautiful interior design with proper lighting and realistic details.')}
+                        disabled={isProcessing || generatingVariations}
+                        className="flex-1 px-4 py-2.5 bg-stone-900 text-white rounded-full text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                      >
+                        {isProcessing ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <polygon points="5 3 19 12 5 21 5 3" />
+                            </svg>
+                            <span>Generate</span>
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={generateVariations}
+                        disabled={isProcessing || generatingVariations}
+                        className="px-4 py-2.5 bg-stone-100 hover:bg-stone-200 text-stone-900 rounded-full text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border border-stone-200"
+                        title="Generate multiple variations"
+                      >
+                        {generatingVariations ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-stone-900 border-t-transparent rounded-full animate-spin"></div>
+                            <span>Generating {variationCount}...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <rect x="3" y="3" width="7" height="7" />
+                              <rect x="14" y="3" width="7" height="7" />
+                              <rect x="14" y="14" width="7" height="7" />
+                              <rect x="3" y="14" width="7" height="7" />
+                            </svg>
+                            <span>{variationCount}</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                    {generatingVariations && (
+                      <div className="text-xs text-stone-500 text-center bg-stone-50 rounded-lg p-2 border border-stone-200">
+                        Generating {variationCount} variations... This may take a moment.
+                      </div>
+                    )}
                   </div>
 
                   {/* Preset Action Buttons */}
@@ -803,6 +1001,38 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
           </div>
         </aside>
       </div>
+
+      {/* Asset Library Modal */}
+      {showAssetLibrary && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowAssetLibrary(false)}>
+          <div className="bg-white rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 flex-shrink-0">
+              <h2 className="text-xl font-semibold">Asset Library</h2>
+              <button
+                onClick={() => setShowAssetLibrary(false)}
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <AssetLibrary onSelectAsset={handleSelectAsset} projectId={projectId} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Export Modal */}
+      {showExportModal && (
+        <ExportModal
+          projectId={projectId}
+          projectName={project?.name || 'Design'}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
     </div>
   )
 }

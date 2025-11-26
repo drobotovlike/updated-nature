@@ -14,6 +14,7 @@ const AccountPage = lazy(() => import('./pages/AccountPage'))
 const SignInPage = lazy(() => import('./pages/SignInPage'))
 const SignUpPage = lazy(() => import('./pages/SignUpPage'))
 const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+const SharedView = lazy(() => import('./components/SharedView'))
 
 // Wrapper components for lazy-loaded pages with Layout
 function PricingPageWrapper() {
@@ -1573,12 +1574,21 @@ function StudioPage() {
   )
 }
 
+function SharedViewWrapper() {
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <SharedView />
+    </Suspense>
+  )
+}
+
 function App() {
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/dashboard" element={<DashboardPageWrapper />} />
       <Route path="/studio" element={<StudioPage />} />
+      <Route path="/share/:token" element={<SharedViewWrapper />} />
       <Route path="/pricing" element={<PricingPageWrapper />} />
       <Route path="/blog" element={<BlogPageWrapper />} />
       <Route path="/about" element={<AboutPageWrapper />} />

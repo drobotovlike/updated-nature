@@ -70,16 +70,49 @@ export default async function handler(req, res) {
 
           return res.status(200).json(asset)
         } else {
-          // Get user's private assets only
-          const { data: assets, error: assetsError } = await supabase
+          // Get user's private assets with search and filter support
+          const { search, tags, sortBy, sortOrder } = req.query
+          
+          let query = supabase
             .from('assets')
-            .select('*')
-            .eq('user_id', userId) // Filter by user_id - assets are private
-            .order('created_at', { ascending: false })
+            .select(`
+              *,
+              asset_tags(tag)
+            `)
+            .eq('user_id', userId)
+
+          // Search by name or description
+          if (search) {
+            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`)
+          }
+
+          // Filter by tags (if tags parameter provided)
+          if (tags) {
+            const tagArray = Array.isArray(tags) ? tags : [tags]
+            // This requires a join - simplified for now
+            // Full implementation would use a subquery
+          }
+
+          // Sorting
+          const sortColumn = sortBy || 'created_at'
+          const ascending = sortOrder !== 'desc'
+          query = query.order(sortColumn, { ascending })
+
+          const { data: assets, error: assetsError } = await query
 
           if (assetsError) throw assetsError
 
-          return res.status(200).json({ assets: assets || [] })
+          // Filter by tags in memory if needed (simplified approach)
+          let filteredAssets = assets || []
+          if (tags) {
+            const tagArray = Array.isArray(tags) ? tags : [tags]
+            filteredAssets = filteredAssets.filter(asset => {
+              const assetTags = asset.asset_tags?.map(t => t.tag) || []
+              return tagArray.some(tag => assetTags.includes(tag))
+            })
+          }
+
+          return res.status(200).json({ assets: filteredAssets })
         }
 
       case 'POST':

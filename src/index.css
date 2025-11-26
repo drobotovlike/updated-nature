@@ -179,19 +179,32 @@ model-viewer::part(default-ar-button):hover {
 }
 
 /* Clerk Button Fixes - Ensure buttons are fully rounded without cut-off */
+/* Target all possible Clerk button selectors */
 .cl-formButtonPrimary,
 .cl-socialButtonsBlockButton,
 .cl-formButtonPrimary button,
 .cl-socialButtonsBlockButton button,
 button[type="submit"],
-.cl-root button {
+.cl-root button,
+[class*="cl-formButton"],
+[class*="cl-socialButton"],
+[class*="cl-button"],
+button.cl-formButtonPrimary,
+button.cl-socialButtonsBlockButton {
   border-radius: 9999px !important;
   overflow: hidden !important;
   clip-path: none !important;
+  -webkit-clip-path: none !important;
   shape-outside: none !important;
   mask: none !important;
   -webkit-mask: none !important;
   position: relative !important;
+  transform: none !important;
+  /* Force rectangular shape without cuts */
+  border-top-right-radius: 9999px !important;
+  border-top-left-radius: 9999px !important;
+  border-bottom-right-radius: 9999px !important;
+  border-bottom-left-radius: 9999px !important;
 }
 
 /* Remove all pseudo-elements that might cause cut-off */
@@ -202,18 +215,29 @@ button[type="submit"],
 .cl-formButtonPrimary button::before,
 .cl-formButtonPrimary button::after,
 .cl-socialButtonsBlockButton button::before,
-.cl-socialButtonsBlockButton button::after {
+.cl-socialButtonsBlockButton button::after,
+[class*="cl-formButton"]::before,
+[class*="cl-formButton"]::after,
+[class*="cl-socialButton"]::before,
+[class*="cl-socialButton"]::after {
   display: none !important;
   content: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
-/* Fix internal button elements */
+/* Fix internal button elements and remove any clip-path */
 .cl-formButtonPrimary *,
 .cl-socialButtonsBlockButton *,
 .cl-formButtonPrimary button *,
-.cl-socialButtonsBlockButton button * {
+.cl-socialButtonsBlockButton button *,
+[class*="cl-formButton"] *,
+[class*="cl-socialButton"] * {
   border-radius: inherit !important;
   clip-path: none !important;
+  -webkit-clip-path: none !important;
   shape-outside: none !important;
 }
 
@@ -224,6 +248,7 @@ button[type="submit"],
 .cl-socialButtonsBlockButton button svg {
   border-radius: 0 !important;
   overflow: visible !important;
+  clip-path: none !important;
 }
 
 /* Ensure button content is properly contained */
@@ -231,13 +256,23 @@ button[type="submit"],
 .cl-socialButtonsBlockButton > * {
   border-radius: inherit !important;
   overflow: hidden !important;
+  clip-path: none !important;
 }
 
-/* Target any Clerk-specific button wrapper classes */
-[class*="cl-formButton"],
-[class*="cl-socialButton"],
-[class*="cl-button"] {
-  border-radius: 9999px !important;
-  overflow: hidden !important;
+/* Target any wrapper divs that might have clip-path */
+.cl-formButtonPrimary > div,
+.cl-socialButtonsBlockButton > div {
   clip-path: none !important;
+  -webkit-clip-path: none !important;
+  border-radius: inherit !important;
+  overflow: hidden !important;
+}
+
+/* Force remove any triangular shapes or cuts */
+.cl-formButtonPrimary,
+.cl-socialButtonsBlockButton,
+[class*="cl-formButton"],
+[class*="cl-socialButton"] {
+  background-clip: border-box !important;
+  -webkit-background-clip: border-box !important;
 }

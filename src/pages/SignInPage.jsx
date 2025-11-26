@@ -21,6 +21,36 @@ export default function SignInPage() {
   
   return (
     <Layout>
+      <style>{`
+        /* Force remove all button cuts with maximum specificity */
+        .cl-formButtonPrimary,
+        .cl-socialButtonsBlockButton,
+        button.cl-formButtonPrimary,
+        button.cl-socialButtonsBlockButton,
+        [class*="cl-formButtonPrimary"],
+        [class*="cl-socialButtonsBlockButton"] {
+          clip-path: none !important;
+          -webkit-clip-path: none !important;
+          border-radius: 9999px !important;
+          overflow: hidden !important;
+        }
+        .cl-formButtonPrimary::before,
+        .cl-formButtonPrimary::after,
+        .cl-socialButtonsBlockButton::before,
+        .cl-socialButtonsBlockButton::after,
+        .cl-formButtonPrimary *::before,
+        .cl-formButtonPrimary *::after,
+        .cl-socialButtonsBlockButton *::before,
+        .cl-socialButtonsBlockButton *::after {
+          display: none !important;
+          content: none !important;
+        }
+        .cl-formButtonPrimary *,
+        .cl-socialButtonsBlockButton * {
+          clip-path: none !important;
+          -webkit-clip-path: none !important;
+        }
+      `}</style>
       <div className="min-h-[calc(100vh-200px)] flex flex-col items-center justify-center py-16 px-4 relative overflow-hidden">
         {/* Background decorative elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">

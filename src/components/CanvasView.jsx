@@ -13,7 +13,7 @@ const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
 
 // Canvas Item Component
-function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasurements, zoom }) {
+function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, showMeasurements, zoom }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
@@ -72,8 +72,21 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
       draggable={!item.is_locked}
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
-      onClick={onSelect}
-      onTap={onSelect}
+      onClick={(e) => {
+        if (e.evt.shiftKey) {
+          // Multi-select
+          onSelect(e, true)
+        } else {
+          onSelect(e, false)
+        }
+      }}
+      onTap={(e) => {
+        if (e.evt.shiftKey) {
+          onSelect(e, true)
+        } else {
+          onSelect(e, false)
+        }
+      }}
       opacity={item.opacity || 1}
     >
       <Image
@@ -87,7 +100,7 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
         saturation={saturation}
         cache
       />
-      {isSelected && (
+      {(isSelected || isMultiSelected) && (
         <>
           {/* Selection border */}
           <Rect
@@ -95,7 +108,7 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
             y={-5}
             width={(item.width || image.width) + 10}
             height={(item.height || image.height) + 10}
-            stroke="#3b82f6"
+            stroke={isMultiSelected ? "#10b981" : "#3b82f6"}
             strokeWidth={2 / zoom}
             dash={[5, 5]}
             listening={false}
@@ -159,6 +172,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Canvas state
   const [items, setItems] = useState([])
   const [selectedItemId, setSelectedItemId] = useState(null)
+  const [selectedItemIds, setSelectedItemIds] = useState(new Set()) // Multi-select
+  const [clipboard, setClipboard] = useState(null) // For copy/paste
+  const [history, setHistory] = useState([]) // For undo
+  const [historyIndex, setHistoryIndex] = useState(-1) // Current history position
   const [canvasState, setCanvasState] = useState({
     zoom: 1,
     panX: 0,
@@ -189,6 +206,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   
   // Calculate selectedItem - must be defined before useEffects
   const selectedItem = items.find((item) => item.id === selectedItemId)
+  const selectedItems = items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
   
   // Auto-open sidebar when item is selected
   useEffect(() => {
@@ -1000,20 +1018,65 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 }
               }}
             >
-              {/* Canvas Items Layer */}
+              {/* Canvas Items Layer - Virtual Rendering */}
               <Layer>
-                {items.map((item) => (
-                  <CanvasItem
-                    key={item.id}
-                    item={item}
-                    isSelected={item.id === selectedItemId}
-                    onSelect={() => setSelectedItemId(item.id)}
-                    onUpdate={handleItemUpdate}
-                    onDelete={handleItemDelete}
-                    showMeasurements={canvasState.showMeasurements}
-                    zoom={canvasState.zoom}
-                  />
-                ))}
+                {(() => {
+                  // Virtual rendering: only render items visible in viewport
+                  const stage = stageRef.current
+                  if (!stage) return items
+
+                  const viewport = {
+                    left: -stage.x() / stage.scaleX(),
+                    right: (dimensions.width - stage.x()) / stage.scaleX(),
+                    top: -stage.y() / stage.scaleY(),
+                    bottom: (dimensions.height - stage.y()) / stage.scaleY(),
+                  }
+
+                  // Add padding for items partially visible
+                  const padding = 200
+                  const visibleItems = items.filter((item) => {
+                    const itemLeft = item.x_position
+                    const itemRight = item.x_position + (item.width || 0)
+                    const itemTop = item.y_position
+                    const itemBottom = item.y_position + (item.height || 0)
+
+                    return !(
+                      itemRight < viewport.left - padding ||
+                      itemLeft > viewport.right + padding ||
+                      itemBottom < viewport.top - padding ||
+                      itemTop > viewport.bottom + padding
+                    )
+                  })
+
+                  return visibleItems.map((item) => (
+                    <CanvasItem
+                      key={item.id}
+                      item={item}
+                      isSelected={item.id === selectedItemId}
+                      isMultiSelected={selectedItemIds.has(item.id)}
+                      onSelect={(e, isMulti) => {
+                        if (isMulti) {
+                          setSelectedItemIds(prev => {
+                            const newSet = new Set(prev)
+                            if (newSet.has(item.id)) {
+                              newSet.delete(item.id)
+                            } else {
+                              newSet.add(item.id)
+                            }
+                            return newSet
+                          })
+                        } else {
+                          setSelectedItemId(item.id)
+                          setSelectedItemIds(new Set())
+                        }
+                      }}
+                      onUpdate={handleItemUpdate}
+                      onDelete={handleItemDelete}
+                      showMeasurements={canvasState.showMeasurements}
+                      zoom={canvasState.zoom}
+                    />
+                  ))
+                })()}
               </Layer>
             </Stage>
           )}
@@ -1120,6 +1183,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <div className="px-3 py-1 text-xs text-stone-500 font-medium">
               {Math.round(canvasState.zoom * 100)}%
             </div>
+
+            {/* Performance Indicator (dev mode) */}
+            {process.env.NODE_ENV === 'development' && items.length > 10 && (
+              <div className="px-3 py-1 text-xs text-stone-400 font-medium">
+                {visibleItemsCount}/{items.length} visible
+              </div>
+            )}
           </div>
 
           {/* Generation Controls Panel */}

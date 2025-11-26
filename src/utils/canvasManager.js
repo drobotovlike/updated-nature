@@ -41,13 +41,21 @@ export async function getCanvasData(userId, projectId) {
   }
 
   try {
+    console.log('Loading canvas data for project:', projectId, 'user:', userId)
     const data = await canvasApiRequest(`?projectId=${projectId}`, { method: 'GET' }, userId)
+    console.log('Canvas data loaded:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
     return {
       items: data.items || [],
       state: data.state || null,
     }
   } catch (error) {
     console.error('Error loading canvas data:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      userId,
+      projectId,
+    })
     throw error
   }
 }

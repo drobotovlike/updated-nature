@@ -138,6 +138,7 @@ export default async function handler(req, res) {
           return res.status(200).json(item)
         } else if (projectId) {
           // Get all canvas items for project
+          console.log('Fetching canvas items for project:', projectId, 'user:', userId)
           const { data: items, error: itemsError } = await supabase
             .from('canvas_items')
             .select('*')
@@ -146,7 +147,12 @@ export default async function handler(req, res) {
             .order('z_index', { ascending: true })
             .order('created_at', { ascending: true })
 
-          if (itemsError) throw itemsError
+          if (itemsError) {
+            console.error('Error fetching canvas items:', itemsError)
+            throw itemsError
+          }
+
+          console.log('Canvas items fetched:', items?.length || 0)
 
           // Get canvas state (don't error if no state exists)
           const { data: state, error: stateError } = await supabase
@@ -157,15 +163,23 @@ export default async function handler(req, res) {
             .single()
 
           // PGRST116 means no rows found, which is fine - just return null for state
-          if (stateError && stateError.code !== 'PGRST116') {
-            console.error('Error fetching canvas state:', stateError)
-            // Don't throw - just continue without state
+          if (stateError) {
+            if (stateError.code === 'PGRST116') {
+              console.log('No canvas state found for project:', projectId, '(this is normal for new projects)')
+            } else {
+              console.error('Error fetching canvas state:', stateError)
+              // Don't throw - just continue without state
+            }
+          } else {
+            console.log('Canvas state fetched successfully')
           }
 
-          return res.status(200).json({
+          const response = {
             items: items || [],
             state: state || null,
-          })
+          }
+          console.log('Returning canvas data:', { itemsCount: response.items.length, hasState: !!response.state })
+          return res.status(200).json(response)
         } else {
           return res.status(400).json({ error: 'projectId or itemId required' })
         }
@@ -286,7 +300,18 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('Canvas API error:', error)
-    return res.status(500).json({ error: error.message || 'Internal server error' })
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      stack: error.stack,
+    })
+    return res.status(500).json({ 
+      error: error.message || 'Internal server error',
+      code: error.code,
+      details: process.env.NODE_ENV === 'development' ? error.details : undefined,
+    })
   }
 }
 

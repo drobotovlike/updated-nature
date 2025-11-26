@@ -294,12 +294,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [error, setError] = useState('')
 
   const loadCanvas = async () => {
-    if (!projectId || !userId) return
+    if (!projectId || !userId) {
+      console.warn('Cannot load canvas: missing projectId or userId', { projectId, userId })
+      setError('Missing project or user information. Please refresh the page.')
+      setLoading(false)
+      return
+    }
     
     setLoading(true)
     setError('')
     try {
+      console.log('Loading canvas for project:', projectId)
       const data = await getCanvasData(userId, projectId)
+      console.log('Canvas data received:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
+      
       setItems(data.items || [])
       
       if (data.state) {
@@ -324,9 +332,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           }
         }, 100)
       }
+      console.log('Canvas loaded successfully')
     } catch (error) {
       console.error('Error loading canvas:', error)
-      setError('Failed to load canvas. Please refresh the page.')
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+        projectId,
+        userId,
+      })
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to load canvas. Please refresh the page.'
+      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+        errorMessage = 'Authentication failed. Please refresh the page and sign in again.'
+      } else if (error.message?.includes('404') || error.message?.includes('not found')) {
+        errorMessage = 'Canvas not found. This may be a new project.'
+      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your connection and try again.'
+      } else if (error.message) {
+        errorMessage = `Failed to load canvas: ${error.message}`
+      }
+      
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }

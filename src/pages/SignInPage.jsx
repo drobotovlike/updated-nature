@@ -13,6 +13,68 @@ export default function SignInPage() {
       navigate('/dashboard', { replace: true })
     }
   }, [isSignedIn, isLoaded, navigate])
+
+  // Force fix button styles after Clerk renders
+  useEffect(() => {
+    const fixButtonStyles = () => {
+      // Find all Clerk buttons
+      const buttons = document.querySelectorAll(
+        '.cl-formButtonPrimary, .cl-socialButtonsBlockButton, [class*="cl-formButton"], [class*="cl-socialButton"]'
+      )
+      
+      buttons.forEach((button) => {
+        if (button instanceof HTMLElement) {
+          // Remove clip-path
+          button.style.clipPath = 'none'
+          button.style.webkitClipPath = 'none'
+          button.style.borderRadius = '9999px'
+          button.style.overflow = 'hidden'
+          
+          // Remove all pseudo-elements
+          const style = document.createElement('style')
+          style.textContent = `
+            ${button.className.split(' ').map(cls => `.${cls}::before, .${cls}::after`).join(', ')} {
+              display: none !important;
+              content: none !important;
+            }
+          `
+          document.head.appendChild(style)
+          
+          // Fix all child elements
+          const children = button.querySelectorAll('*')
+          children.forEach((child) => {
+            if (child instanceof HTMLElement) {
+              child.style.clipPath = 'none'
+              child.style.webkitClipPath = 'none'
+            }
+          })
+        }
+      })
+    }
+
+    // Run immediately and also after a delay to catch dynamically loaded buttons
+    fixButtonStyles()
+    const timer1 = setTimeout(fixButtonStyles, 100)
+    const timer2 = setTimeout(fixButtonStyles, 500)
+    const timer3 = setTimeout(fixButtonStyles, 1000)
+
+    // Use MutationObserver to catch buttons added dynamically
+    const observer = new MutationObserver(() => {
+      fixButtonStyles()
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+    })
+
+    return () => {
+      clearTimeout(timer1)
+      clearTimeout(timer2)
+      clearTimeout(timer3)
+      observer.disconnect()
+    }
+  }, [])
   
   // If already signed in, redirect to dashboard
   if (isSignedIn) {
@@ -28,11 +90,17 @@ export default function SignInPage() {
         button.cl-formButtonPrimary,
         button.cl-socialButtonsBlockButton,
         [class*="cl-formButtonPrimary"],
-        [class*="cl-socialButtonsBlockButton"] {
+        [class*="cl-socialButtonsBlockButton"],
+        [class*="cl-formButton"],
+        [class*="cl-socialButton"] {
           clip-path: none !important;
           -webkit-clip-path: none !important;
           border-radius: 9999px !important;
           overflow: hidden !important;
+          border-top-left-radius: 9999px !important;
+          border-top-right-radius: 9999px !important;
+          border-bottom-left-radius: 9999px !important;
+          border-bottom-right-radius: 9999px !important;
         }
         .cl-formButtonPrimary::before,
         .cl-formButtonPrimary::after,
@@ -41,12 +109,22 @@ export default function SignInPage() {
         .cl-formButtonPrimary *::before,
         .cl-formButtonPrimary *::after,
         .cl-socialButtonsBlockButton *::before,
-        .cl-socialButtonsBlockButton *::after {
+        .cl-socialButtonsBlockButton *::after,
+        [class*="cl-formButton"]::before,
+        [class*="cl-formButton"]::after,
+        [class*="cl-socialButton"]::before,
+        [class*="cl-socialButton"]::after {
           display: none !important;
           content: none !important;
+          visibility: hidden !important;
+          opacity: 0 !important;
+          width: 0 !important;
+          height: 0 !important;
         }
         .cl-formButtonPrimary *,
-        .cl-socialButtonsBlockButton * {
+        .cl-socialButtonsBlockButton *,
+        [class*="cl-formButton"] *,
+        [class*="cl-socialButton"] * {
           clip-path: none !important;
           -webkit-clip-path: none !important;
         }

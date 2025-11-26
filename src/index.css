@@ -177,3 +177,24 @@ model-viewer::part(default-ar-button):hover {
   0% { transform: scale(0.8); opacity: 1; }
   100% { transform: scale(2.5); opacity: 0; }
 }
+
+/* Clerk Button Fixes - Ensure buttons are fully rounded without cut-off */
+.cl-formButtonPrimary,
+.cl-socialButtonsBlockButton,
+button[type="submit"] {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  clip-path: none !important;
+  shape-outside: none !important;
+}
+
+.cl-formButtonPrimary::after,
+.cl-socialButtonsBlockButton::after {
+  display: none !important;
+}
+
+/* Remove any triangular or cut shapes from buttons */
+.cl-formButtonPrimary *,
+.cl-socialButtonsBlockButton * {
+  border-radius: inherit !important;
+}

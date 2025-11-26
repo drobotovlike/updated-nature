@@ -1006,7 +1006,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </div>
             <div className="flex-1 overflow-y-auto">
               <AssetLibrary
-                onSelectAsset={(asset) => {
+                onSelectAsset={async (asset) => {
                   // Add asset to canvas
                   const stage = stageRef.current
                   const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : 0

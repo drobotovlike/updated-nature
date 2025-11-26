@@ -17,9 +17,12 @@
     "@google/model-viewer": "^4.1.0",
     "@supabase/supabase-js": "^2.84.0",
     "@vercel/analytics": "^1.5.0",
+    "konva": "^10.0.12",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.9.6"
+    "react-konva": "^19.2.0",
+    "react-router-dom": "^7.9.6",
+    "use-image": "^1.1.4"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

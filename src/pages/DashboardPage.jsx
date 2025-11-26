@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
 import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject } from '../utils/projectManager'
 import WorkspaceView from '../components/WorkspaceView'
+import CanvasView from '../components/CanvasView'
 import AccountView from '../components/AccountView'
 import ProjectView from '../components/ProjectView'
 
@@ -697,10 +698,9 @@ export default function DashboardPage() {
               />
             </div>
           ) : currentView === 'workspace' && selectedProjectId && userId ? (
-            <div className="h-full px-8 pb-12 pt-8">
-              <WorkspaceView
+            <div className="h-full">
+              <CanvasView
                 projectId={selectedProjectId}
-                initialCreation={editingCreation}
                 onBack={() => {
                   setCurrentView('project-view')
                   setEditingCreation(null)

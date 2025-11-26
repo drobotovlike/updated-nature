@@ -299,6 +299,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [generatingVariations, setGeneratingVariations] = useState(false)
   const [variationCount, setVariationCount] = useState(3)
+  
+  // UI State
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [chatInput, setChatInput] = useState('')
 
   // Load canvas data
   useEffect(() => {
@@ -307,21 +311,35 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [projectId, userId])
 
-  // Update dimensions on resize
+  // Update dimensions on resize - fixed size, always full screen
   useEffect(() => {
     const updateDimensions = () => {
-      if (containerRef.current) {
-        setDimensions({
-          width: containerRef.current.offsetWidth,
-          height: containerRef.current.offsetHeight,
-        })
-      }
+      // Always use full viewport size, not container size
+      const sidebarWidth = sidebarOpen ? 320 : 0
+      const toolbarHeight = 120 // Account for bottom toolbar
+      setDimensions({
+        width: window.innerWidth - sidebarWidth,
+        height: window.innerHeight - toolbarHeight,
+      })
     }
 
     updateDimensions()
     window.addEventListener('resize', updateDimensions)
     return () => window.removeEventListener('resize', updateDimensions)
-  }, [])
+  }, [sidebarOpen])
+  
+  // Update dimensions when sidebar toggles
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const sidebarWidth = sidebarOpen ? 320 : 0
+      const toolbarHeight = 120
+      setDimensions({
+        width: window.innerWidth - sidebarWidth,
+        height: window.innerHeight - toolbarHeight,
+      })
+    }, 300) // Wait for animation
+    return () => clearTimeout(timer)
+  }, [sidebarOpen])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -703,109 +721,154 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const selectedItem = items.find((item) => item.id === selectedItemId)
 
+  const handleChatSubmit = async (e) => {
+    e.preventDefault()
+    if (!chatInput.trim()) return
+    
+    setChatInput('')
+    await generateToCanvas(chatInput)
+  }
+
   return (
-    <div className="h-full flex flex-col bg-white">
-      {/* Header */}
-      <div className="border-b border-stone-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
-        <div className="flex items-center gap-4">
-          {onBack && (
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="m12 19-7-7 7-7" />
-                <path d="M19 12H5" />
-              </svg>
-              Back
-            </button>
-          )}
-          <h1 className="text-xl font-semibold text-stone-900 font-serif-ature">Canvas</h1>
-        </div>
+    <div className="h-screen w-screen flex overflow-hidden bg-stone-50">
+      {/* Collapsible Left Sidebar */}
+      <div className={`fixed left-0 top-0 h-full bg-white border-r border-stone-200 z-30 transition-transform duration-300 ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+      }`} style={{ width: '320px' }}>
+        {selectedItem ? (
+          <div className="h-full flex flex-col">
+            <div className="p-4 border-b border-stone-200 flex items-center justify-between">
+              <div>
+                <h3 className="font-semibold text-stone-900 mb-1">Selected Item</h3>
+                <p className="text-sm text-stone-600 truncate">{selectedItem.name || 'Untitled'}</p>
+              </div>
+              <button
+                onClick={() => setSidebarOpen(false)}
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="m18 6-12 12" />
+                  <path d="m6 6 12 12" />
+                </svg>
+              </button>
+            </div>
 
-        <div className="flex items-center gap-3">
-          {/* Canvas Controls */}
-          <div className="flex items-center gap-2 bg-stone-100 rounded-lg p-1">
-            <button
-              onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'
-              }`}
-            >
-              Grid
-            </button>
-            <button
-              onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                canvasState.rulerEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'
-              }`}
-            >
-              Ruler
-            </button>
-            <button
-              onClick={() => setCanvasState((prev) => ({ ...prev, snapToGrid: !prev.snapToGrid }))}
-              className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                canvasState.snapToGrid ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600'
-              }`}
-            >
-              Snap
-            </button>
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {/* Art Director Mode */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                  Art Director
+                </label>
+                <textarea
+                  value={generatePrompt}
+                  onChange={(e) => setGeneratePrompt(e.target.value)}
+                  placeholder="Describe changes to regenerate..."
+                  className="w-full p-3 bg-stone-50 rounded-lg border border-stone-100 text-xs text-stone-600 resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 min-h-[60px]"
+                />
+                <button
+                  onClick={() => regenerateSelected(generatePrompt)}
+                  disabled={isGenerating}
+                  className="w-full mt-2 px-4 py-2.5 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50"
+                >
+                  {isGenerating ? 'Regenerating...' : 'Regenerate'}
+                </button>
+              </div>
+
+              {/* Transform Controls */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                  Transform
+                </label>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-stone-600 mb-1 block">Opacity</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="1"
+                      step="0.1"
+                      value={selectedItem.opacity || 1}
+                      onChange={(e) => handleItemUpdate(selectedItemId, { opacity: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-600 mb-1 block">Rotation</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="360"
+                      step="1"
+                      value={selectedItem.rotation || 0}
+                      onChange={(e) => handleItemUpdate(selectedItemId, { rotation: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                  Actions
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    onClick={() => handleItemUpdate(selectedItemId, { is_locked: !selectedItem.is_locked })}
+                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    {selectedItem.is_locked ? 'Unlock' : 'Lock'}
+                  </button>
+                  <button
+                    onClick={() => handleItemDelete(selectedItemId)}
+                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-
-          <button
-            onClick={() => setShowAssetLibrary(true)}
-            className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-900 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <circle cx="9" cy="9" r="2" />
-              <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-            </svg>
-            Assets
-          </button>
-          <button
-            onClick={() => setShowGenerateModal(true)}
-            className="px-4 py-2 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            Generate
-          </button>
-          {items.length > 0 && (
-            <button
-              onClick={() => setShowExportModal(true)}
-              className="px-4 py-2 bg-stone-100 hover:bg-stone-200 text-stone-900 rounded-lg text-sm font-semibold transition-colors flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="7 10 12 15 17 10" />
-                <line x1="12" y1="15" x2="12" y2="3" />
-              </svg>
-              Export
-            </button>
-          )}
-        </div>
+        ) : (
+          <div className="h-full flex items-center justify-center p-4">
+            <p className="text-sm text-stone-400">Select an item to edit</p>
+          </div>
+        )}
       </div>
 
-      {/* Error Message */}
-      {error && (
-        <div className="mx-6 mt-4 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center justify-between">
-          <p className="text-sm text-red-600">{error}</p>
-          <button
-            onClick={() => setError('')}
-            className="text-red-400 hover:text-red-600"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
+      {/* Sidebar Toggle Button (when closed) */}
+      {!sidebarOpen && selectedItem && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="fixed left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-white border border-stone-200 rounded-lg shadow-lg hover:bg-stone-50 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+        </button>
       )}
 
-      {/* Canvas Area */}
-      <div ref={containerRef} className="flex-1 relative overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+      {/* Main Canvas Area - Full Screen */}
+      <div className="flex-1 flex flex-col" style={{ marginLeft: sidebarOpen ? '320px' : '0', transition: 'margin-left 300ms' }}>
+
+        {/* Error Message */}
+        {error && (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 shadow-lg">
+            <p className="text-sm text-red-600">{error}</p>
+            <button
+              onClick={() => setError('')}
+              className="text-red-400 hover:text-red-600"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+        )}
+
+        {/* Canvas Area - Full Screen */}
+        <div ref={containerRef} className="flex-1 relative overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
@@ -882,142 +945,145 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           </Stage>
         )}
 
-        {/* Zoom Controls */}
-        <div className="absolute bottom-4 right-4 flex flex-col gap-2 bg-white rounded-lg shadow-lg border border-stone-200 p-2">
-          <button
-            onClick={() => {
-              const stage = stageRef.current
-              if (stage) {
-                const current = stage.scaleX()
-                const proposed = current * ZOOM_STEP
-                const newScale = Math.min(MAX_ZOOM, proposed)
-                stage.scale({ x: newScale, y: newScale })
-                setCanvasState((prev) => ({ ...prev, zoom: newScale }))
-              }
-            }}
-            className="px-3 py-2 hover:bg-stone-100 rounded text-sm font-medium text-stone-700"
-          >
-            +
-          </button>
-          <div className="px-3 py-1 text-xs text-stone-500 text-center border-t border-b border-stone-200">
-            {Math.round(canvasState.zoom * 100)}%
-          </div>
-          <button
-            onClick={() => {
-              const stage = stageRef.current
-              if (stage) {
-                const current = stage.scaleX()
-                const proposed = current / ZOOM_STEP
-                const newScale = Math.max(MIN_ZOOM, proposed)
-                stage.scale({ x: newScale, y: newScale })
-                setCanvasState((prev) => ({ ...prev, zoom: newScale }))
-              }
-            }}
-            className="px-3 py-2 hover:bg-stone-100 rounded text-sm font-medium text-stone-700"
-          >
-            −
-          </button>
-          <button
-            onClick={() => {
-              const stage = stageRef.current
-              if (stage) {
-                stage.scale({ x: 1, y: 1 })
-                stage.position({ x: 0, y: 0 })
-                setCanvasState((prev) => ({ ...prev, zoom: 1, panX: 0, panY: 0 }))
-              }
-            }}
-            className="px-3 py-2 hover:bg-stone-100 rounded text-sm font-medium text-stone-700 border-t border-stone-200"
-          >
-            Reset
-          </button>
         </div>
-      </div>
 
-      {/* Sidebar - Selected Item Controls */}
-      {selectedItem && (
-        <div className="w-80 border-l border-stone-200 bg-white flex flex-col">
-          <div className="p-4 border-b border-stone-200">
-            <h3 className="font-semibold text-stone-900 mb-2">Selected Item</h3>
-            <p className="text-sm text-stone-600">{selectedItem.name || 'Untitled'}</p>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {/* Art Director Mode */}
-            <div>
-              <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                Art Director
-              </label>
-              <textarea
-                value={generatePrompt}
-                onChange={(e) => setGeneratePrompt(e.target.value)}
-                placeholder="Describe changes to regenerate..."
-                className="w-full p-3 bg-stone-50 rounded-lg border border-stone-100 text-xs text-stone-600 resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 min-h-[60px]"
-              />
+        {/* Bottom Toolbar - Compact Design */}
+        <div className="absolute bottom-0 left-0 right-0 z-40 flex flex-col items-center pb-4">
+          {/* Toolbar Controls */}
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-stone-200">
+            {/* Back Button */}
+            {onBack && (
               <button
-                onClick={() => regenerateSelected(generatePrompt)}
-                disabled={isGenerating}
-                className="w-full mt-2 px-4 py-2.5 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50"
+                onClick={onBack}
+                className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+                title="Back"
               >
-                {isGenerating ? 'Regenerating...' : 'Regenerate'}
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <path d="m12 19-7-7 7-7" />
+                  <path d="M19 12H5" />
+                </svg>
+              </button>
+            )}
+
+            {/* Canvas Controls */}
+            <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1">
+              <button
+                onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
+                className={`p-1.5 rounded-full transition-colors ${
+                  canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                }`}
+                title="Toggle Grid"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
+                className={`p-1.5 rounded-full transition-colors ${
+                  canvasState.rulerEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                }`}
+                title="Toggle Ruler"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCanvasState((prev) => ({ ...prev, snapToGrid: !prev.snapToGrid }))}
+                className={`p-1.5 rounded-full transition-colors ${
+                  canvasState.snapToGrid ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                }`}
+                title="Toggle Snap"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+                </svg>
               </button>
             </div>
 
-            {/* Transform Controls */}
-            <div>
-              <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                Transform
-              </label>
-              <div className="space-y-2">
-                <div>
-                  <label className="text-xs text-stone-600 mb-1 block">Opacity</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="1"
-                    step="0.1"
-                    value={selectedItem.opacity || 1}
-                    onChange={(e) => handleItemUpdate(selectedItemId, { opacity: parseFloat(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-stone-600 mb-1 block">Rotation</label>
-                  <input
-                    type="range"
-                    min="0"
-                    max="360"
-                    step="1"
-                    value={selectedItem.rotation || 0}
-                    onChange={(e) => handleItemUpdate(selectedItemId, { rotation: parseFloat(e.target.value) })}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-            </div>
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
 
-            {/* Quick Actions */}
-            <div>
-              <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                Actions
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => handleItemUpdate(selectedItemId, { is_locked: !selectedItem.is_locked })}
-                  className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  {selectedItem.is_locked ? 'Unlock' : 'Lock'}
-                </button>
-                <button
-                  onClick={() => handleItemDelete(selectedItemId)}
-                  className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-medium transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+            {/* Action Buttons */}
+            <button
+              onClick={() => setShowAssetLibrary(true)}
+              className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+              title="Asset Library"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+            </button>
+            
+            {items.length > 0 && (
+              <button
+                onClick={() => setShowExportModal(true)}
+                className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+                title="Export"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+              </button>
+            )}
+
+            {/* Zoom Display */}
+            <div className="px-3 py-1 text-xs text-stone-500 font-medium">
+              {Math.round(canvasState.zoom * 100)}%
             </div>
           </div>
+
+          {/* Chat Input Area */}
+          <form onSubmit={handleChatSubmit} className="mt-3 w-full max-w-2xl mx-auto">
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg border border-stone-200">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="What would you like to create?"
+                className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 placeholder:text-stone-400"
+              />
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setShowAssetLibrary(true)}
+                  className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
+                  title="Add Asset"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                </button>
+                <button
+                  type="submit"
+                  disabled={!chatInput.trim() || isGenerating || generatingVariations}
+                  className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Generate"
+                >
+                  {isGenerating || generatingVariations ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          </form>
         </div>
-      )}
+      </div>
 
       {/* Generate Modal */}
       {showGenerateModal && (

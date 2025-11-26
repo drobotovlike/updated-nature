@@ -32,10 +32,18 @@ CREATE TABLE IF NOT EXISTS canvas_items (
 );
 
 -- Step 3: Add missing columns if table already existed
+-- This ensures all columns exist even if the table was created with an older schema
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'z_index') THEN
-    ALTER TABLE canvas_items ADD COLUMN z_index INTEGER DEFAULT 0;
+  -- Core columns
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'width') THEN
+    ALTER TABLE canvas_items ADD COLUMN width FLOAT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'height') THEN
+    ALTER TABLE canvas_items ADD COLUMN height FLOAT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'rotation') THEN
+    ALTER TABLE canvas_items ADD COLUMN rotation FLOAT DEFAULT 0;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'scale_x') THEN
     ALTER TABLE canvas_items ADD COLUMN scale_x FLOAT DEFAULT 1;
@@ -43,17 +51,38 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'scale_y') THEN
     ALTER TABLE canvas_items ADD COLUMN scale_y FLOAT DEFAULT 1;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'z_index') THEN
+    ALTER TABLE canvas_items ADD COLUMN z_index INTEGER DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'name') THEN
+    ALTER TABLE canvas_items ADD COLUMN name TEXT;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'description') THEN
     ALTER TABLE canvas_items ADD COLUMN description TEXT;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'prompt') THEN
     ALTER TABLE canvas_items ADD COLUMN prompt TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'is_selected') THEN
+    ALTER TABLE canvas_items ADD COLUMN is_selected BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'is_locked') THEN
+    ALTER TABLE canvas_items ADD COLUMN is_locked BOOLEAN DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'opacity') THEN
+    ALTER TABLE canvas_items ADD COLUMN opacity FLOAT DEFAULT 1;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'filters') THEN
     ALTER TABLE canvas_items ADD COLUMN filters JSONB;
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'metadata') THEN
     ALTER TABLE canvas_items ADD COLUMN metadata JSONB;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'created_at') THEN
+    ALTER TABLE canvas_items ADD COLUMN created_at TIMESTAMPTZ DEFAULT NOW();
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'updated_at') THEN
+    ALTER TABLE canvas_items ADD COLUMN updated_at TIMESTAMPTZ DEFAULT NOW();
   END IF;
 END $$;
 

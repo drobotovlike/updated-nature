@@ -141,7 +141,7 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
   )
 }
 
-// Grid Component - Fixed in world space, only scales with zoom
+// Grid Component - Fixed in world space, always fills full viewport
 function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
   const lines = []
   
@@ -151,41 +151,43 @@ function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
   const worldTop = -panY / zoom
   const worldBottom = (height - panY) / zoom
 
-  // Add padding for seamless coverage
-  const padding = gridSize * 2
+  // Add generous padding to ensure grid extends well beyond viewport edges
+  const padding = Math.max(gridSize * 5, 200)
 
-  // Calculate grid line positions in world space
+  // Calculate grid line positions in world space with padding
   const gridStartX = Math.floor(worldLeft / gridSize) * gridSize - padding
   const gridEndX = Math.ceil(worldRight / gridSize) * gridSize + padding
   const gridStartY = Math.floor(worldTop / gridSize) * gridSize - padding
   const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize + padding
 
-  // Draw vertical lines - fixed in world space
+  // Draw vertical lines - always full height of viewport + padding
   for (let worldX = gridStartX; worldX <= gridEndX; worldX += gridSize) {
     const screenX = worldX * zoom + panX
-    if (screenX >= -50 && screenX <= width + 50) {
+    // Draw if line would be visible anywhere in viewport (with padding)
+    if (screenX >= -padding && screenX <= width + padding) {
       lines.push(
         <Line
           key={`v-${worldX}`}
-          points={[screenX, -50, screenX, height + 50]}
+          points={[screenX, -padding, screenX, height + padding]}
           stroke="#e5e7eb"
-          strokeWidth={0.5 / zoom}
+          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
           listening={false}
         />
       )
     }
   }
 
-  // Draw horizontal lines - fixed in world space
+  // Draw horizontal lines - always full width of viewport + padding
   for (let worldY = gridStartY; worldY <= gridEndY; worldY += gridSize) {
     const screenY = worldY * zoom + panY
-    if (screenY >= -50 && screenY <= height + 50) {
+    // Draw if line would be visible anywhere in viewport (with padding)
+    if (screenY >= -padding && screenY <= height + padding) {
       lines.push(
         <Line
           key={`h-${worldY}`}
-          points={[-50, screenY, width + 50, screenY]}
+          points={[-padding, screenY, width + padding, screenY]}
           stroke="#e5e7eb"
-          strokeWidth={0.5 / zoom}
+          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
           listening={false}
         />
       )
@@ -836,7 +838,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 }
               }}
             >
-              {/* Grid Layer */}
+              {/* Grid Layer - Must be first layer (behind items) */}
               {canvasState.gridEnabled && (
                 <Layer>
                   <GridLayer
@@ -850,7 +852,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </Layer>
               )}
 
-              {/* Canvas Items Layer */}
+              {/* Canvas Items Layer - Above grid */}
               <Layer>
                 {items.map((item) => (
                   <CanvasItem

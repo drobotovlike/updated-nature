@@ -8,6 +8,11 @@ import ExportModal from './ExportModal'
 import { getCanvasData, createCanvasItem, updateCanvasItem, deleteCanvasItem, saveCanvasState } from '../utils/canvasManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 
+// Zoom constants
+const MIN_ZOOM = 0.25
+const MAX_ZOOM = 3
+const ZOOM_STEP = 1.08
+
 // Canvas Item Component
 function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasurements, snapToGrid, gridSize, zoom }) {
   const [image] = useImage(item.image_url)
@@ -21,9 +26,8 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
 
     // Snap to grid if enabled
     if (snapToGrid && gridSize) {
-      const adjustedGridSize = gridSize * zoom
-      x = Math.round(x / adjustedGridSize) * adjustedGridSize
-      y = Math.round(y / adjustedGridSize) * adjustedGridSize
+      x = Math.round(x / gridSize) * gridSize
+      y = Math.round(y / gridSize) * gridSize
       node.position({ x, y })
     }
 
@@ -32,7 +36,7 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
       y_position: y,
     })
     setIsDragging(false)
-  }, [item.id, onUpdate, snapToGrid, gridSize, zoom])
+  }, [item.id, onUpdate, snapToGrid, gridSize])
 
   const handleTransformEnd = useCallback(() => {
     const node = shapeRef.current
@@ -83,7 +87,7 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
             width={(item.width || image.width) + 10}
             height={(item.height || image.height) + 10}
             stroke="#3b82f6"
-            strokeWidth={2}
+            strokeWidth={2 / zoom}
             dash={[5, 5]}
             listening={false}
           />
@@ -92,20 +96,20 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
             <Group listening={false}>
               <Text
                 text={`${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`}
-                fontSize={12}
+                fontSize={12 / zoom}
                 fill="#3b82f6"
                 x={5}
-                y={-20}
-                padding={4}
+                y={-20 / zoom}
+                padding={4 / zoom}
                 background="#ffffff"
-                cornerRadius={4}
+                cornerRadius={4 / zoom}
               />
             </Group>
           )}
           {/* Delete button */}
           <Group
-            x={(item.width || image.width) - 20}
-            y={-20}
+            x={(item.width || image.width) - 20 / zoom}
+            y={-20 / zoom}
             onClick={(e) => {
               e.cancelBubble = true
               onDelete(item.id)
@@ -116,18 +120,18 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
             }}
           >
             <Rect
-              width={24}
-              height={24}
+              width={24 / zoom}
+              height={24 / zoom}
               fill="#ef4444"
-              cornerRadius={12}
+              cornerRadius={12 / zoom}
               listening={false}
             />
             <Text
               text="×"
-              fontSize={16}
+              fontSize={16 / zoom}
               fill="white"
-              x={6}
-              y={2}
+              x={6 / zoom}
+              y={2 / zoom}
               listening={false}
             />
           </Group>
@@ -137,61 +141,51 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
   )
 }
 
-// Grid Component - Always fills full screen viewport dynamically
+// Grid Component - Fixed in world space, only scales with zoom
 function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
   const lines = []
   
-  // Grid size in screen pixels (scales with zoom)
-  const screenGridSize = gridSize * zoom
-  
-  // Calculate world coordinates of viewport corners
-  // When panX/panY are negative, we're viewing content to the right/down
+  // Grid stays fixed in world space - calculate visible world area
   const worldLeft = -panX / zoom
   const worldRight = (width - panX) / zoom
   const worldTop = -panY / zoom
   const worldBottom = (height - panY) / zoom
 
-  // Add padding to ensure grid extends beyond viewport edges
-  const padding = screenGridSize * 3
+  // Add padding for seamless coverage
+  const padding = gridSize * 2
 
   // Calculate grid line positions in world space
-  const gridStartX = Math.floor(worldLeft / gridSize) * gridSize
-  const gridEndX = Math.ceil(worldRight / gridSize) * gridSize
-  const gridStartY = Math.floor(worldTop / gridSize) * gridSize
-  const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize
+  const gridStartX = Math.floor(worldLeft / gridSize) * gridSize - padding
+  const gridEndX = Math.ceil(worldRight / gridSize) * gridSize + padding
+  const gridStartY = Math.floor(worldTop / gridSize) * gridSize - padding
+  const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize + padding
 
-  // Draw vertical lines (full height of viewport + padding)
+  // Draw vertical lines - fixed in world space
   for (let worldX = gridStartX; worldX <= gridEndX; worldX += gridSize) {
-    // Convert world coordinate to screen coordinate
     const screenX = worldX * zoom + panX
-    
-    // Only draw if line would be visible (with padding)
-    if (screenX >= -padding && screenX <= width + padding) {
+    if (screenX >= -50 && screenX <= width + 50) {
       lines.push(
         <Line
           key={`v-${worldX}`}
-          points={[screenX, -padding, screenX, height + padding]}
+          points={[screenX, -50, screenX, height + 50]}
           stroke="#e5e7eb"
-          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
+          strokeWidth={0.5 / zoom}
           listening={false}
         />
       )
     }
   }
 
-  // Draw horizontal lines (full width of viewport + padding)
+  // Draw horizontal lines - fixed in world space
   for (let worldY = gridStartY; worldY <= gridEndY; worldY += gridSize) {
-    // Convert world coordinate to screen coordinate
     const screenY = worldY * zoom + panY
-    
-    // Only draw if line would be visible (with padding)
-    if (screenY >= -padding && screenY <= height + padding) {
+    if (screenY >= -50 && screenY <= height + 50) {
       lines.push(
         <Line
           key={`h-${worldY}`}
-          points={[-padding, screenY, width + padding, screenY]}
+          points={[-50, screenY, width + 50, screenY]}
           stroke="#e5e7eb"
-          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
+          strokeWidth={0.5 / zoom}
           listening={false}
         />
       )
@@ -200,77 +194,6 @@ function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
 
   return <Group>{lines}</Group>
 }
-
-// Ruler Component
-function Ruler({ position, length, isVertical, zoom, offset }) {
-  const marks = []
-  const markInterval = 50 * zoom
-  const numMarks = Math.floor(length / markInterval)
-
-  for (let i = 0; i <= numMarks; i++) {
-    const value = i * 50
-    const pos = i * markInterval
-
-    if (isVertical) {
-      marks.push(
-        <Group key={i}>
-          <Line
-            points={[0, pos, 10, pos]}
-            stroke="#78716c"
-            strokeWidth={1}
-            listening={false}
-          />
-          <Text
-            text={value.toString()}
-            fontSize={10}
-            fill="#78716c"
-            x={12}
-            y={pos - 6}
-            listening={false}
-          />
-        </Group>
-      )
-    } else {
-      marks.push(
-        <Group key={i}>
-          <Line
-            points={[pos, 0, pos, 10]}
-            stroke="#78716c"
-            strokeWidth={1}
-            listening={false}
-          />
-          <Text
-            text={value.toString()}
-            fontSize={10}
-            fill="#78716c"
-            x={pos - 10}
-            y={12}
-            listening={false}
-          />
-        </Group>
-      )
-    }
-  }
-
-  return (
-    <Group x={position.x} y={position.y}>
-      <Rect
-        width={isVertical ? 30 : length}
-        height={isVertical ? length : 30}
-        fill="#fafaf9"
-        stroke="#d6d3d1"
-        strokeWidth={1}
-        listening={false}
-      />
-      {marks}
-    </Group>
-  )
-}
-
-// Zoom configuration (keeps zoom comfortable and less sensitive)
-const MIN_ZOOM = 0.25 // 25%
-const MAX_ZOOM = 3 // 300%
-const ZOOM_STEP = 1.08 // gentler than 1.2/1.1 for smoother zoom
 
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId } = useAuth()
@@ -402,11 +325,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
       
       // For new projects or if API fails, allow canvas to load with empty state
-      // This is better UX than blocking the user
       console.warn('Canvas API error, loading with empty state. This is normal for new projects.')
       setItems([])
       
-      // Only show error if it's a critical issue (auth, network, or table missing)
+      // Only show error if it's a critical issue
       if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
         setError('Authentication failed. Please refresh the page and sign in again.')
       } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
@@ -414,8 +336,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       } else if (error.message?.includes('does not exist') || error.message?.includes('42P01')) {
         setError('Canvas database tables not found. Please run database-canvas-migration-safe.sql in Supabase.')
       } else {
-        // For other errors (like 404 or database issues), silently continue
-        // The canvas will work fine with an empty state
         console.log('Non-critical error, continuing with empty canvas state')
       }
     } finally {
@@ -446,7 +366,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
     } catch (error) {
       console.error('Error saving canvas state:', error)
-      // Don't show error to user for background saves
     }
   }, [projectId, userId, canvasState])
 
@@ -604,6 +523,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         setItems((prev) => [...prev, newItem])
         setShowGenerateModal(false)
         setGeneratePrompt('')
+        setChatInput('')
       }
     } catch (error) {
       console.error('Error generating to canvas:', error)
@@ -726,6 +646,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (newItems.length > 0) {
         setItems((prev) => [...prev, ...newItems])
         setGeneratePrompt('')
+        setChatInput('')
       }
     } catch (error) {
       console.error('Error generating batch variations:', error)
@@ -870,7 +791,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           width: (sidebarOpen && selectedItem) ? 'calc(100% - 320px)' : '100%'
         }}
       >
-
         {/* Error Message */}
         {error && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-40 bg-red-50 border border-red-200 rounded-lg px-4 py-3 flex items-center gap-3 shadow-lg">
@@ -893,82 +813,61 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           className="flex-1 relative w-full h-full overflow-hidden" 
           style={{ backgroundColor: canvasState.backgroundColor }}
         >
-        {loading ? (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin mx-auto mb-2"></div>
-              <p className="text-sm text-stone-500">Loading canvas...</p>
+          {loading ? (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="text-center">
+                <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin mx-auto mb-2"></div>
+                <p className="text-sm text-stone-500">Loading canvas...</p>
+              </div>
             </div>
-          </div>
-        ) : dimensions.width > 0 && dimensions.height > 0 && (
-          <Stage
-            ref={stageRef}
-            width={dimensions.width}
-            height={dimensions.height}
-            draggable
-            onDrag={handleStageDrag}
-            onDragEnd={handleStageDragEnd}
-            onWheel={handleWheel}
-            onClick={(e) => {
-              if (e.target === e.target.getStage()) {
-                setSelectedItemId(null)
-              }
-            }}
-          >
-            {/* Grid Layer */}
-            {canvasState.gridEnabled && (
+          ) : dimensions.width > 0 && dimensions.height > 0 && (
+            <Stage
+              ref={stageRef}
+              width={dimensions.width}
+              height={dimensions.height}
+              draggable
+              onDrag={handleStageDrag}
+              onDragEnd={handleStageDragEnd}
+              onWheel={handleWheel}
+              onClick={(e) => {
+                if (e.target === e.target.getStage()) {
+                  setSelectedItemId(null)
+                }
+              }}
+            >
+              {/* Grid Layer */}
+              {canvasState.gridEnabled && (
+                <Layer>
+                  <GridLayer
+                    gridSize={canvasState.gridSize}
+                    width={dimensions.width}
+                    height={dimensions.height}
+                    panX={canvasState.panX}
+                    panY={canvasState.panY}
+                    zoom={canvasState.zoom}
+                  />
+                </Layer>
+              )}
+
+              {/* Canvas Items Layer */}
               <Layer>
-                <GridLayer
-                  gridSize={canvasState.gridSize}
-                  width={dimensions.width}
-                  height={dimensions.height}
-                  panX={canvasState.panX}
-                  panY={canvasState.panY}
-                  zoom={canvasState.zoom}
-                />
+                {items.map((item) => (
+                  <CanvasItem
+                    key={item.id}
+                    item={item}
+                    isSelected={item.id === selectedItemId}
+                    onSelect={() => setSelectedItemId(item.id)}
+                    onUpdate={handleItemUpdate}
+                    onDelete={handleItemDelete}
+                    showMeasurements={canvasState.showMeasurements}
+                    snapToGrid={canvasState.snapToGrid}
+                    gridSize={canvasState.gridSize}
+                    zoom={canvasState.zoom}
+                  />
+                ))}
               </Layer>
-            )}
-
-            {/* Rulers */}
-            {canvasState.rulerEnabled && (
-              <Layer>
-                <Ruler
-                  position={{ x: 0, y: 0 }}
-                  length={dimensions.width}
-                  isVertical={false}
-                  zoom={canvasState.zoom}
-                  offset={canvasState.panX}
-                />
-                <Ruler
-                  position={{ x: 0, y: 0 }}
-                  length={dimensions.height}
-                  isVertical={true}
-                  zoom={canvasState.zoom}
-                  offset={canvasState.panY}
-                />
-              </Layer>
-            )}
-
-            {/* Canvas Items Layer */}
-            <Layer>
-              {items.map((item) => (
-                <CanvasItem
-                  key={item.id}
-                  item={item}
-                  isSelected={item.id === selectedItemId}
-                  onSelect={() => setSelectedItemId(item.id)}
-                  onUpdate={handleItemUpdate}
-                  onDelete={handleItemDelete}
-                  showMeasurements={canvasState.showMeasurements}
-                  snapToGrid={canvasState.snapToGrid}
-                  gridSize={canvasState.gridSize}
-                  zoom={canvasState.zoom}
-                />
-              ))}
-            </Layer>
-          </Stage>
-        )}
-
+            </Stage>
+          )}
         </div>
 
         {/* Bottom Toolbar - Compact Design */}
@@ -1109,66 +1008,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </div>
       </div>
 
-      {/* Generate Modal */}
-      {showGenerateModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowGenerateModal(false)}>
-          <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border border-stone-200" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-stone-900 font-serif-ature">Generate to Canvas</h2>
-              <button
-                onClick={() => setShowGenerateModal(false)}
-                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-            <textarea
-              value={generatePrompt}
-              onChange={(e) => setGeneratePrompt(e.target.value)}
-              placeholder="Describe the interior design you want to create..."
-              className="w-full p-3 bg-stone-50 rounded-lg border border-stone-100 text-sm text-stone-600 resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 min-h-[100px] mb-4"
-            />
-            <div className="flex items-center gap-2 mb-4">
-              <label className="text-xs text-stone-600">Variations:</label>
-              <select
-                value={variationCount}
-                onChange={(e) => setVariationCount(parseInt(e.target.value))}
-                className="px-2 py-1 border border-stone-200 rounded-lg bg-white text-xs text-stone-700 focus:outline-none"
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-                <option value={4}>4</option>
-              </select>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowGenerateModal(false)}
-                className="flex-1 px-4 py-2.5 border border-stone-200 rounded-lg hover:bg-stone-50 text-stone-700 font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  if (variationCount === 1) {
-                    generateToCanvas(generatePrompt)
-                  } else {
-                    generateBatchVariations(generatePrompt, variationCount)
-                  }
-                }}
-                disabled={isGenerating || generatingVariations || !generatePrompt.trim()}
-                className="flex-1 px-4 py-2.5 bg-stone-900 text-white rounded-lg hover:bg-stone-800 disabled:opacity-50 disabled:cursor-not-allowed font-semibold transition-colors"
-              >
-                {isGenerating || generatingVariations ? `Generating ${variationCount}...` : variationCount > 1 ? `Generate ${variationCount} Variations` : 'Generate'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Asset Library Modal */}
       {showAssetLibrary && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowAssetLibrary(false)}>
@@ -1188,7 +1027,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <div className="flex-1 overflow-y-auto">
               <AssetLibrary
                 onSelectAsset={async (asset) => {
-                  // Add asset to canvas
                   if (!asset || !asset.url) {
                     setError('Invalid asset selected. Please try again.')
                     return
@@ -1217,18 +1055,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     console.log('Asset added successfully:', newItem)
                     setItems((prev) => [...prev, newItem])
                     setShowAssetLibrary(false)
-                    setError('') // Clear any previous errors
+                    setError('')
                   } catch (error) {
                     console.error('Error adding asset to canvas:', error)
-                    console.error('Error details:', {
-                      message: error.message,
-                      stack: error.stack,
-                      assetUrl: asset.url,
-                      projectId,
-                      userId,
-                    })
-                    
-                    // Provide more specific error messages
                     let errorMessage = 'Failed to add asset to canvas. Please try again.'
                     if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
                       errorMessage = 'Authentication failed. Please refresh the page and sign in again.'
@@ -1239,7 +1068,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     } else if (error.message) {
                       errorMessage = `Failed to add asset: ${error.message}`
                     }
-                    
                     setError(errorMessage)
                   }
                 }}
@@ -1261,4 +1089,3 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     </div>
   )
 }
-

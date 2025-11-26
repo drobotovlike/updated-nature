@@ -157,8 +157,15 @@ export default async function handler(req, res) {
             
             if (itemsError) {
               console.error('Error fetching canvas items:', itemsError)
-              // Don't throw - return empty array for items
-              items = []
+              // Check if table doesn't exist (42P01) or permission issue
+              if (itemsError.code === '42P01' || itemsError.message?.includes('does not exist')) {
+                console.warn('Canvas tables may not exist. Please run database-canvas-migration-safe.sql')
+                // Return empty array - canvas will work but won't persist data
+                items = []
+              } else {
+                // Other errors - still return empty array
+                items = []
+              }
             } else {
               console.log('Canvas items fetched:', items.length)
             }
@@ -181,6 +188,9 @@ export default async function handler(req, res) {
             if (stateResult.error) {
               if (stateResult.error.code === 'PGRST116') {
                 console.log('No canvas state found for project:', projectId, '(this is normal for new projects)')
+              } else if (stateResult.error.code === '42P01' || stateResult.error.message?.includes('does not exist')) {
+                console.warn('Canvas states table may not exist. Please run database-canvas-migration-safe.sql')
+                // Continue without state
               } else {
                 console.error('Error fetching canvas state:', stateResult.error)
                 // Don't throw - just continue without state

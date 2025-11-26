@@ -348,11 +348,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       console.warn('Canvas API error, loading with empty state. This is normal for new projects.')
       setItems([])
       
-      // Only show error if it's a critical issue (auth, network)
+      // Only show error if it's a critical issue (auth, network, or table missing)
       if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
         setError('Authentication failed. Please refresh the page and sign in again.')
       } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
         setError('Network error. Please check your connection and try again.')
+      } else if (error.message?.includes('does not exist') || error.message?.includes('42P01')) {
+        setError('Canvas database tables not found. Please run database-canvas-migration-safe.sql in Supabase.')
       } else {
         // For other errors (like 404 or database issues), silently continue
         // The canvas will work fine with an empty state

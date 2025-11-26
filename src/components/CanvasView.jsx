@@ -137,37 +137,59 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
   )
 }
 
-// Grid Component
+// Grid Component - Always fills full screen viewport
 function GridLayer({ gridSize, width, height, offsetX, offsetY, zoom }) {
   const lines = []
   const adjustedGridSize = gridSize * zoom
 
-  // Vertical lines
-  const startX = Math.floor(offsetX / adjustedGridSize) * adjustedGridSize
-  for (let x = startX; x < width + offsetX; x += adjustedGridSize) {
-    lines.push(
-      <Line
-        key={`v-${x}`}
-        points={[x - offsetX, 0, x - offsetX, height]}
-        stroke="#e5e7eb"
-        strokeWidth={0.5}
-        listening={false}
-      />
-    )
+  // Calculate the visible area in world coordinates
+  // We need to draw grid lines that cover the entire visible viewport
+  const worldLeft = -offsetX / zoom
+  const worldRight = (width - offsetX) / zoom
+  const worldTop = -offsetY / zoom
+  const worldBottom = (height - offsetY) / zoom
+
+  // Add some padding to ensure grid extends beyond viewport
+  const padding = adjustedGridSize * 2
+
+  // Vertical lines - cover full viewport height
+  const startX = Math.floor(worldLeft / gridSize) * gridSize
+  const endX = Math.ceil(worldRight / gridSize) * gridSize
+  
+  for (let x = startX; x <= endX; x += gridSize) {
+    const screenX = x * zoom + offsetX
+    // Only draw if within viewport (with padding)
+    if (screenX >= -padding && screenX <= width + padding) {
+      lines.push(
+        <Line
+          key={`v-${x}`}
+          points={[screenX, -padding, screenX, height + padding]}
+          stroke="#e5e7eb"
+          strokeWidth={0.5 / zoom}
+          listening={false}
+        />
+      )
+    }
   }
 
-  // Horizontal lines
-  const startY = Math.floor(offsetY / adjustedGridSize) * adjustedGridSize
-  for (let y = startY; y < height + offsetY; y += adjustedGridSize) {
-    lines.push(
-      <Line
-        key={`h-${y}`}
-        points={[0, y - offsetY, width, y - offsetY]}
-        stroke="#e5e7eb"
-        strokeWidth={0.5}
-        listening={false}
-      />
-    )
+  // Horizontal lines - cover full viewport width
+  const startY = Math.floor(worldTop / gridSize) * gridSize
+  const endY = Math.ceil(worldBottom / gridSize) * gridSize
+  
+  for (let y = startY; y <= endY; y += gridSize) {
+    const screenY = y * zoom + offsetY
+    // Only draw if within viewport (with padding)
+    if (screenY >= -padding && screenY <= height + padding) {
+      lines.push(
+        <Line
+          key={`h-${y}`}
+          points={[-padding, screenY, width + padding, screenY]}
+          stroke="#e5e7eb"
+          strokeWidth={0.5 / zoom}
+          listening={false}
+        />
+      )
+    }
   }
 
   return <Group>{lines}</Group>

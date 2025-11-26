@@ -928,6 +928,59 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </div>
               </div>
 
+              {/* Alignment Tools */}
+              {(selectedItemIds.size > 0 || selectedItemId) && (
+                <div>
+                  <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                    Align {selectedItemIds.size > 0 ? `${selectedItemIds.size + (selectedItemId ? 1 : 0)} Items` : ''}
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => alignItems('left')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Left"
+                    >
+                      ←
+                    </button>
+                    <button
+                      onClick={() => alignItems('center')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Center"
+                    >
+                      ↔
+                    </button>
+                    <button
+                      onClick={() => alignItems('right')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Right"
+                    >
+                      →
+                    </button>
+                    <button
+                      onClick={() => alignItems('top')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Top"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => alignItems('middle')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Middle"
+                    >
+                      ↕
+                    </button>
+                    <button
+                      onClick={() => alignItems('bottom')}
+                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
+                      title="Align Bottom"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* Quick Actions */}
               <div>
                 <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">

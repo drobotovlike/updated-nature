@@ -81,19 +81,29 @@ export async function createCanvasItem(userId, projectId, itemData) {
   }
 
   try {
-    return await canvasApiRequest(
+    console.log('Creating canvas item:', { projectId, userId, imageUrl: itemData.image_url })
+    const result = await canvasApiRequest(
       `?projectId=${projectId}`,
       {
         method: 'POST',
         body: JSON.stringify({
-          project_id: projectId,
+          // Don't send project_id in body - it comes from query param
           ...itemData,
         }),
       },
       userId
     )
+    console.log('Canvas item created successfully:', result)
+    return result
   } catch (error) {
     console.error('Error creating canvas item:', error)
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      projectId,
+      userId,
+      itemData,
+    })
     throw error
   }
 }

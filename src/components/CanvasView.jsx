@@ -1041,25 +1041,58 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <AssetLibrary
                 onSelectAsset={async (asset) => {
                   // Add asset to canvas
+                  if (!asset || !asset.url) {
+                    setError('Invalid asset selected. Please try again.')
+                    return
+                  }
+
+                  if (!userId || !projectId) {
+                    setError('Missing user or project information. Please refresh the page.')
+                    return
+                  }
+
                   const stage = stageRef.current
                   const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : 0
                   const centerY = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : 0
 
                   try {
+                    console.log('Adding asset to canvas:', { assetUrl: asset.url, projectId, userId })
                     const newItem = await createCanvasItem(userId, projectId, {
                       image_url: asset.url,
                       x_position: centerX - 200,
                       y_position: centerY - 200,
                       width: 400,
                       height: 400,
-                      name: asset.name,
+                      name: asset.name || 'Asset',
                       description: asset.description,
                     })
+                    console.log('Asset added successfully:', newItem)
                     setItems((prev) => [...prev, newItem])
                     setShowAssetLibrary(false)
+                    setError('') // Clear any previous errors
                   } catch (error) {
                     console.error('Error adding asset to canvas:', error)
-                    setError('Failed to add asset to canvas. Please try again.')
+                    console.error('Error details:', {
+                      message: error.message,
+                      stack: error.stack,
+                      assetUrl: asset.url,
+                      projectId,
+                      userId,
+                    })
+                    
+                    // Provide more specific error messages
+                    let errorMessage = 'Failed to add asset to canvas. Please try again.'
+                    if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
+                      errorMessage = 'Authentication failed. Please refresh the page and sign in again.'
+                    } else if (error.message?.includes('does not exist') || error.message?.includes('42P01')) {
+                      errorMessage = 'Canvas database tables not found. Please run database-canvas-migration-safe.sql in Supabase.'
+                    } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
+                      errorMessage = 'Network error. Please check your connection and try again.'
+                    } else if (error.message) {
+                      errorMessage = `Failed to add asset: ${error.message}`
+                    }
+                    
+                    setError(errorMessage)
                   }
                 }}
                 projectId={projectId}

@@ -216,6 +216,10 @@ export default async function handler(req, res) {
 
       case 'POST':
         // Create new canvas item
+        if (!projectId) {
+          return res.status(400).json({ error: 'projectId is required in query parameter' })
+        }
+
         const {
           image_url,
           x_position = 0,
@@ -234,37 +238,55 @@ export default async function handler(req, res) {
           metadata,
         } = req.body
 
-        if (!image_url || !projectId) {
-          return res.status(400).json({ error: 'image_url and projectId are required' })
+        if (!image_url) {
+          return res.status(400).json({ error: 'image_url is required' })
         }
 
-        const { data: newItem, error: insertError } = await supabase
-          .from('canvas_items')
-          .insert({
-            project_id: projectId,
-            user_id: userId,
-            image_url,
-            x_position,
-            y_position,
-            width,
-            height,
-            rotation,
-            scale_x,
-            scale_y,
-            z_index,
-            name: name || `Design ${Date.now()}`,
-            description,
-            prompt,
-            opacity,
-            filters: filters || {},
-            metadata: metadata || {},
-          })
-          .select()
-          .single()
+        console.log('Creating canvas item:', { projectId, userId, imageUrl: image_url })
 
-        if (insertError) throw insertError
+        try {
+          const { data: newItem, error: insertError } = await supabase
+            .from('canvas_items')
+            .insert({
+              project_id: projectId,
+              user_id: userId,
+              image_url,
+              x_position,
+              y_position,
+              width,
+              height,
+              rotation,
+              scale_x,
+              scale_y,
+              z_index,
+              name: name || `Design ${Date.now()}`,
+              description,
+              prompt,
+              opacity,
+              filters: filters || {},
+              metadata: metadata || {},
+            })
+            .select()
+            .single()
 
-        return res.status(201).json(newItem)
+          if (insertError) {
+            console.error('Error inserting canvas item:', insertError)
+            // Check if table doesn't exist
+            if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
+              return res.status(500).json({ 
+                error: 'Canvas database tables not found. Please run database-canvas-migration-safe.sql in Supabase.',
+                code: 'TABLE_NOT_FOUND'
+              })
+            }
+            throw insertError
+          }
+
+          console.log('Canvas item created successfully:', newItem.id)
+          return res.status(201).json(newItem)
+        } catch (err) {
+          console.error('Exception creating canvas item:', err)
+          throw err
+        }
 
       case 'PUT':
         if (!itemId) {

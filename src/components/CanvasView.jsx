@@ -740,6 +740,65 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     await generateToCanvas(prompt)
   }
 
+  // Alignment function
+  const alignItems = useCallback((alignment) => {
+    if (selectedItemIds.size === 0 && !selectedItemId) return
+
+    const itemsToAlign = selectedItemIds.size > 0
+      ? items.filter(item => selectedItemIds.has(item.id))
+      : [items.find(item => item.id === selectedItemId)]
+
+    if (itemsToAlign.length === 0) return
+
+    const bounds = itemsToAlign.reduce((acc, item) => {
+      const left = item.x_position
+      const right = item.x_position + (item.width || 200)
+      const top = item.y_position
+      const bottom = item.y_position + (item.height || 200)
+      
+      if (acc.minLeft === null || left < acc.minLeft) acc.minLeft = left
+      if (acc.maxRight === null || right > acc.maxRight) acc.maxRight = right
+      if (acc.minTop === null || top < acc.minTop) acc.minTop = top
+      if (acc.maxBottom === null || bottom > acc.maxBottom) acc.maxBottom = bottom
+      
+      return acc
+    }, { minLeft: null, maxRight: null, minTop: null, maxBottom: null })
+
+    const centerX = (bounds.minLeft + bounds.maxRight) / 2
+    const centerY = (bounds.minTop + bounds.maxBottom) / 2
+
+    itemsToAlign.forEach((item) => {
+      let newX = item.x_position
+      let newY = item.y_position
+
+      switch (alignment) {
+        case 'left':
+          newX = bounds.minLeft
+          break
+        case 'center':
+          newX = centerX - (item.width || 200) / 2
+          break
+        case 'right':
+          newX = bounds.maxRight - (item.width || 200)
+          break
+        case 'top':
+          newY = bounds.minTop
+          break
+        case 'middle':
+          newY = centerY - (item.height || 200) / 2
+          break
+        case 'bottom':
+          newY = bounds.maxBottom - (item.height || 200)
+          break
+      }
+
+      handleItemUpdate(item.id, {
+        x_position: newX,
+        y_position: newY,
+      })
+    })
+  }, [selectedItemIds, selectedItemId, items, handleItemUpdate])
+
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
       {/* Collapsible Left Sidebar - Only show when item is selected */}

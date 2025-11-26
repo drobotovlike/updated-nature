@@ -16,8 +16,101 @@ export default async function handler(req, res) {
   }
 
   const { method } = req
-  const { projectId, itemId } = req.query
+  const { projectId, itemId, type } = req.query
 
+  // Handle canvas state requests
+  if (type === 'state') {
+    if (!projectId) {
+      return res.status(400).json({ error: 'projectId required' })
+    }
+
+    try {
+      switch (method) {
+        case 'GET':
+          const { data: state, error: getError } = await supabase
+            .from('canvas_states')
+            .select('*')
+            .eq('project_id', projectId)
+            .eq('user_id', userId)
+            .single()
+
+          if (getError && getError.code !== 'PGRST116') {
+            throw getError
+          }
+
+          return res.status(200).json(state || null)
+
+        case 'POST':
+        case 'PUT':
+          const {
+            zoom_level,
+            pan_x,
+            pan_y,
+            grid_enabled,
+            grid_size,
+            ruler_enabled,
+            snap_to_grid,
+            show_measurements,
+            background_color,
+          } = req.body
+
+          const stateData = {
+            project_id: projectId,
+            user_id: userId,
+          }
+
+          if (zoom_level !== undefined) stateData.zoom_level = zoom_level
+          if (pan_x !== undefined) stateData.pan_x = pan_x
+          if (pan_y !== undefined) stateData.pan_y = pan_y
+          if (grid_enabled !== undefined) stateData.grid_enabled = grid_enabled
+          if (grid_size !== undefined) stateData.grid_size = grid_size
+          if (ruler_enabled !== undefined) stateData.ruler_enabled = ruler_enabled
+          if (snap_to_grid !== undefined) stateData.snap_to_grid = snap_to_grid
+          if (show_measurements !== undefined) stateData.show_measurements = show_measurements
+          if (background_color !== undefined) stateData.background_color = background_color
+
+          const { data: existingState } = await supabase
+            .from('canvas_states')
+            .select('id')
+            .eq('project_id', projectId)
+            .eq('user_id', userId)
+            .single()
+
+          let result
+          if (existingState) {
+            const { data: updatedState, error: updateError } = await supabase
+              .from('canvas_states')
+              .update(stateData)
+              .eq('id', existingState.id)
+              .select()
+              .single()
+
+            if (updateError) throw updateError
+            result = updatedState
+          } else {
+            const { data: newState, error: insertError } = await supabase
+              .from('canvas_states')
+              .insert(stateData)
+              .select()
+              .single()
+
+            if (insertError) throw insertError
+            result = newState
+          }
+
+          return res.status(200).json(result)
+
+        default:
+          res.setHeader('Allow', ['GET', 'POST', 'PUT'])
+          return res.status(405).json({ error: `Method ${method} not allowed` })
+      }
+    } catch (error) {
+      console.error('Canvas state API error:', error)
+      return res.status(500).json({ error: error.message || 'Internal server error' })
+    }
+  }
+
+  // Handle canvas items
   try {
     switch (method) {
       case 'GET':

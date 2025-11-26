@@ -21,7 +21,120 @@ export default async function handler(req, res) {
   }
 
   const { method } = req
-  const { token, projectId, linkId } = req.query
+  const { token, projectId, linkId, action } = req.query
+
+  // Handle comments
+  if (action === 'comments') {
+    const { commentId } = req.query
+    try {
+      switch (method) {
+        case 'GET':
+          if (!token) {
+            return res.status(400).json({ error: 'Link token is required' })
+          }
+
+          const { data: link } = await supabase
+            .from('shared_links')
+            .select('id, access_type')
+            .eq('token', token)
+            .single()
+
+          if (!link) {
+            return res.status(404).json({ error: 'Shared link not found' })
+          }
+
+          const { data: comments, error } = await supabase
+            .from('comments')
+            .select('*')
+            .eq('shared_link_id', link.id)
+            .order('created_at', { ascending: true })
+
+          if (error) throw error
+          return res.status(200).json({ comments })
+
+        case 'POST':
+          const { content, xPosition, yPosition, userName, userEmail, parentId } = req.body
+
+          if (!token || !content) {
+            return res.status(400).json({ error: 'Link token and content are required' })
+          }
+
+          const { data: linkData } = await supabase
+            .from('shared_links')
+            .select('id, access_type')
+            .eq('token', token)
+            .single()
+
+          if (!linkData) {
+            return res.status(404).json({ error: 'Shared link not found' })
+          }
+
+          if (!['comment', 'edit'].includes(linkData.access_type)) {
+            return res.status(403).json({ error: 'Comments not allowed on this link' })
+          }
+
+          const authHeader = req.headers.authorization
+          let userId = null
+          if (authHeader && authHeader.startsWith('Bearer ')) {
+            userId = authHeader.replace('Bearer ', '')
+          }
+
+          const { data: newComment, error: insertError } = await supabase
+            .from('comments')
+            .insert({
+              shared_link_id: linkData.id,
+              user_id: userId,
+              user_name: userName || null,
+              user_email: userEmail || null,
+              content,
+              x_position: xPosition || null,
+              y_position: yPosition || null,
+              parent_id: parentId || null,
+            })
+            .select()
+            .single()
+
+          if (insertError) throw insertError
+          return res.status(201).json(newComment)
+
+        case 'PUT':
+          if (!commentId) {
+            return res.status(400).json({ error: 'Comment ID is required' })
+          }
+
+          const updates = req.body
+          const { data: updatedComment, error: updateError } = await supabase
+            .from('comments')
+            .update(updates)
+            .eq('id', commentId)
+            .select()
+            .single()
+
+          if (updateError) throw updateError
+          return res.status(200).json(updatedComment)
+
+        case 'DELETE':
+          if (!commentId) {
+            return res.status(400).json({ error: 'Comment ID is required' })
+          }
+
+          const { error: deleteError } = await supabase
+            .from('comments')
+            .delete()
+            .eq('id', commentId)
+
+          if (deleteError) throw deleteError
+          return res.status(200).json({ message: 'Comment deleted' })
+
+        default:
+          res.setHeader('Allow', ['GET', 'POST', 'PUT', 'DELETE'])
+          return res.status(405).json({ error: `Method ${method} not allowed` })
+      }
+    } catch (error) {
+      console.error('Comments API Error:', error)
+      return res.status(500).json({ error: 'Internal server error', details: error.message })
+    }
+  }
 
   // For public access (token-based), no auth required
   if (method === 'GET' && token) {

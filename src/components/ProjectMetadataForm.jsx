@@ -26,7 +26,7 @@ export default function ProjectMetadataForm({ projectId, onSave }) {
 
   const loadMetadata = async () => {
     try {
-      const response = await fetch(`/api/projects/metadata?projectId=${projectId}`, {
+      const response = await fetch(`/api/projects?projectId=${projectId}&action=metadata`, {
         headers: {
           'Authorization': `Bearer ${userId}`,
         },
@@ -57,7 +57,7 @@ export default function ProjectMetadataForm({ projectId, onSave }) {
   const handleSave = async () => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/projects/metadata?projectId=${projectId}`, {
+      const response = await fetch(`/api/projects?projectId=${projectId}&action=metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

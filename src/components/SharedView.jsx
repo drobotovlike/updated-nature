@@ -42,7 +42,7 @@ export default function SharedView() {
 
   const loadComments = async () => {
     try {
-      const response = await fetch(`/api/sharing/comments?linkToken=${token}`)
+      const response = await fetch(`/api/sharing?action=comments&token=${token}`)
       if (response.ok) {
         const data = await response.json()
         setComments(data.comments || [])
@@ -56,7 +56,7 @@ export default function SharedView() {
     if (!newComment.trim()) return
 
     try {
-      const response = await fetch('/api/sharing/comments', {
+      const response = await fetch('/api/sharing?action=comments', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

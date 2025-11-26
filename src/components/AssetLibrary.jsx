@@ -48,7 +48,7 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
 
   const loadTags = async () => {
     try {
-      const response = await fetch('/api/assets/tags', {
+      const response = await fetch('/api/assets?action=tags', {
         headers: {
           'Authorization': `Bearer ${userId}`,
         },

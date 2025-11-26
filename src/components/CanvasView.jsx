@@ -11,7 +11,6 @@ import { uploadFileToCloud } from '../utils/cloudProjectManager'
 // Zoom constants
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
-const ZOOM_STEP = 1.08
 
 // Canvas Item Component
 function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasurements, snapToGrid, gridSize, zoom }) {
@@ -447,8 +446,25 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const pointer = stage.getPointerPosition()
     if (!pointer) return
 
-    const scaleBy = ZOOM_STEP
-    const proposedScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    // Use device-native scroll sensitivity
+    // deltaY is typically -100 to 100 for mouse wheels, but can be much larger for trackpads
+    // Normalize to a reasonable zoom factor based on actual scroll amount
+    const deltaY = e.evt.deltaY
+    const absDelta = Math.abs(deltaY)
+    
+    // Calculate zoom factor based on scroll amount
+    // For small deltas (mouse wheel), use smaller steps
+    // For large deltas (trackpad), use proportionally larger steps
+    // This makes zoom feel natural on both input devices
+    const baseZoomFactor = 1.001 // Very small base increment
+    const sensitivity = Math.min(absDelta / 10, 50) // Cap sensitivity to prevent extreme zoom
+    const zoomFactor = 1 + (baseZoomFactor * sensitivity)
+    
+    // Apply zoom in the correct direction
+    const proposedScale = deltaY > 0 
+      ? oldScale / zoomFactor  // Zoom out
+      : oldScale * zoomFactor  // Zoom in
+    
     const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
     const mousePointTo = {

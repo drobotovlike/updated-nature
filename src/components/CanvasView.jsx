@@ -52,6 +52,18 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
 
   if (!image) return null
 
+  // Apply color adjustments using Konva filters
+  const adjustments = item.adjustments || {}
+  const brightness = (adjustments.brightness || 1) - 1 // Konva expects -1 to 1
+  const contrast = (adjustments.contrast || 1) - 1 // Konva expects -1 to 1
+  const saturation = (adjustments.saturation || 1) - 1 // Konva expects -1 to 1
+
+  // Create filter array
+  const filters = []
+  if (brightness !== 0) filters.push(Konva.Filters.Brighten)
+  if (contrast !== 0) filters.push(Konva.Filters.Contrast)
+  if (saturation !== 0) filters.push(Konva.Filters.HSL)
+
   return (
     <Group
       ref={shapeRef}
@@ -69,6 +81,11 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
         width={item.width || image.width}
         height={item.height || image.height}
         rotation={item.rotation || 0}
+        filters={filters.length > 0 ? filters : undefined}
+        brightness={brightness}
+        contrast={contrast}
+        saturation={saturation}
+        cache
       />
       {isSelected && (
         <>
@@ -777,6 +794,116 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       step="1"
                       value={selectedItem.rotation || 0}
                       onChange={(e) => handleItemUpdate(selectedItemId, { rotation: parseFloat(e.target.value) })}
+                      className="w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Image Editing Tools */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                  Edit Image
+                </label>
+                <div className="space-y-2">
+                  <button
+                    onClick={async () => {
+                      if (!selectedItem) return
+                      setIsGenerating(true)
+                      try {
+                        const response = await fetch('/api/upscale', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            image_url: selectedItem.image_url,
+                            scale: 2,
+                          }),
+                        })
+                        const data = await response.json()
+                        if (data.image_url) {
+                          // Get original dimensions
+                          const img = new Image()
+                          img.onload = async () => {
+                            await handleItemUpdate(selectedItemId, {
+                              image_url: data.image_url,
+                              width: img.width * 2,
+                              height: img.height * 2,
+                            })
+                          }
+                          img.src = selectedItem.image_url
+                        }
+                      } catch (error) {
+                        console.error('Error upscaling:', error)
+                        setError('Failed to upscale image. Please try again.')
+                      } finally {
+                        setIsGenerating(false)
+                      }
+                    }}
+                    disabled={isGenerating}
+                    className="w-full px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                  >
+                    {isGenerating ? 'Upscaling...' : 'Upscale 2x'}
+                  </button>
+                  <button
+                    onClick={() => {
+                      // TODO: Open retouch tool with mask selection
+                      setError('Retouch tool coming soon!')
+                    }}
+                    className="w-full px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors"
+                  >
+                    Retouch (Coming Soon)
+                  </button>
+                </div>
+              </div>
+
+              {/* Color Adjustments */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
+                  Adjustments
+                </label>
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-stone-600 mb-1 block">Brightness</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={selectedItem.adjustments?.brightness || 1}
+                      onChange={(e) => {
+                        const adjustments = { ...(selectedItem.adjustments || {}), brightness: parseFloat(e.target.value) }
+                        handleItemUpdate(selectedItemId, { adjustments })
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-600 mb-1 block">Contrast</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={selectedItem.adjustments?.contrast || 1}
+                      onChange={(e) => {
+                        const adjustments = { ...(selectedItem.adjustments || {}), contrast: parseFloat(e.target.value) }
+                        handleItemUpdate(selectedItemId, { adjustments })
+                      }}
+                      className="w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-stone-600 mb-1 block">Saturation</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2"
+                      step="0.1"
+                      value={selectedItem.adjustments?.saturation || 1}
+                      onChange={(e) => {
+                        const adjustments = { ...(selectedItem.adjustments || {}), saturation: parseFloat(e.target.value) }
+                        handleItemUpdate(selectedItemId, { adjustments })
+                      }}
                       className="w-full"
                     />
                   </div>

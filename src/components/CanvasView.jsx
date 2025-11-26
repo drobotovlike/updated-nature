@@ -150,44 +150,50 @@ function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
   const worldTop = -panY / zoom
   const worldBottom = (height - panY) / zoom
 
-  // Add generous padding to ensure grid extends well beyond viewport edges
-  const padding = Math.max(gridSize * 5, 200)
+  // Adaptive padding based on zoom - less padding at low zoom to prevent artifacts
+  const basePadding = 100
+  const adaptivePadding = Math.min(basePadding / zoom, 500) // Cap padding at low zoom
 
-  // Calculate grid line positions in world space with padding
-  const gridStartX = Math.floor(worldLeft / gridSize) * gridSize - padding
-  const gridEndX = Math.ceil(worldRight / gridSize) * gridSize + padding
-  const gridStartY = Math.floor(worldTop / gridSize) * gridSize - padding
-  const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize + padding
+  // Calculate grid line positions in world space
+  const gridStartX = Math.floor(worldLeft / gridSize) * gridSize
+  const gridEndX = Math.ceil(worldRight / gridSize) * gridSize
+  const gridStartY = Math.floor(worldTop / gridSize) * gridSize
+  const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize
 
-  // Draw vertical lines - always full height of viewport + padding
-  for (let worldX = gridStartX; worldX <= gridEndX; worldX += gridSize) {
+  // At very low zoom, use larger grid spacing to reduce line count
+  const effectiveGridSize = zoom < 0.5 ? gridSize * 2 : gridSize
+
+  // Draw vertical lines - full viewport height
+  for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
     const screenX = worldX * zoom + panX
-    // Draw if line would be visible anywhere in viewport (with padding)
-    if (screenX >= -padding && screenX <= width + padding) {
+    // Only draw if line is within viewport bounds (with small padding)
+    if (screenX >= -50 && screenX <= width + 50) {
       lines.push(
         <Line
           key={`v-${worldX}`}
-          points={[screenX, -padding, screenX, height + padding]}
+          points={[screenX, 0, screenX, height]}
           stroke="#e5e7eb"
           strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
           listening={false}
+          perfect={false}
         />
       )
     }
   }
 
-  // Draw horizontal lines - always full width of viewport + padding
-  for (let worldY = gridStartY; worldY <= gridEndY; worldY += gridSize) {
+  // Draw horizontal lines - full viewport width
+  for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
     const screenY = worldY * zoom + panY
-    // Draw if line would be visible anywhere in viewport (with padding)
-    if (screenY >= -padding && screenY <= height + padding) {
+    // Only draw if line is within viewport bounds (with small padding)
+    if (screenY >= -50 && screenY <= height + 50) {
       lines.push(
         <Line
           key={`h-${worldY}`}
-          points={[-padding, screenY, width + padding, screenY]}
+          points={[0, screenY, width, screenY]}
           stroke="#e5e7eb"
           strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
           listening={false}
+          perfect={false}
         />
       )
     }

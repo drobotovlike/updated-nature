@@ -178,7 +178,7 @@ model-viewer::part(default-ar-button):hover {
   100% { transform: scale(2.5); opacity: 0; }
 }
 
-/* Clerk Button Fixes - Ensure buttons are fully rounded without cut-off */
+/* Clerk Button Fixes - NUCLEAR OPTION: Remove ALL oval/circle cuts */
 /* Target all possible Clerk button selectors */
 .cl-formButtonPrimary,
 .cl-socialButtonsBlockButton,
@@ -190,7 +190,8 @@ button[type="submit"],
 [class*="cl-socialButton"],
 [class*="cl-button"],
 button.cl-formButtonPrimary,
-button.cl-socialButtonsBlockButton {
+button.cl-socialButtonsBlockButton,
+button[class*="cl-"] {
   border-radius: 9999px !important;
   overflow: hidden !important;
   clip-path: none !important;
@@ -205,6 +206,27 @@ button.cl-socialButtonsBlockButton {
   border-top-left-radius: 9999px !important;
   border-bottom-right-radius: 9999px !important;
   border-bottom-left-radius: 9999px !important;
+}
+
+/* Remove ALL SVG elements that might be creating oval cuts */
+.cl-formButtonPrimary svg,
+.cl-socialButtonsBlockButton svg,
+[class*="cl-formButton"] svg,
+[class*="cl-socialButton"] svg {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Remove clipPath definitions */
+.cl-formButtonPrimary clipPath,
+.cl-socialButtonsBlockButton clipPath,
+[class*="cl-formButton"] clipPath,
+[class*="cl-socialButton"] clipPath,
+defs clipPath {
+  display: none !important;
 }
 
 /* Remove all pseudo-elements that might cause cut-off */

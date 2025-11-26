@@ -14,64 +14,115 @@ export default function SignUpPage() {
     }
   }, [isSignedIn, isLoaded, navigate])
 
-  // Force fix button styles after Clerk renders
+  // Force fix button styles after Clerk renders - AGGRESSIVE FIX
   useEffect(() => {
     const fixButtonStyles = () => {
-      // Find all Clerk buttons
+      // Find all Clerk buttons and any button-like elements
       const buttons = document.querySelectorAll(
-        '.cl-formButtonPrimary, .cl-socialButtonsBlockButton, [class*="cl-formButton"], [class*="cl-socialButton"]'
+        '.cl-formButtonPrimary, .cl-socialButtonsBlockButton, [class*="cl-formButton"], [class*="cl-socialButton"], button[class*="cl-"]'
       )
       
       buttons.forEach((button) => {
         if (button instanceof HTMLElement) {
-          // Remove clip-path
+          // Remove ALL clip-path and mask properties
           button.style.clipPath = 'none'
           button.style.webkitClipPath = 'none'
+          button.style.mask = 'none'
+          button.style.webkitMask = 'none'
           button.style.borderRadius = '9999px'
           button.style.overflow = 'hidden'
+          button.style.position = 'relative'
           
-          // Remove all pseudo-elements
-          const style = document.createElement('style')
-          style.textContent = `
-            ${button.className.split(' ').map(cls => `.${cls}::before, .${cls}::after`).join(', ')} {
-              display: none !important;
-              content: none !important;
-            }
-          `
-          document.head.appendChild(style)
-          
-          // Fix all child elements
-          const children = button.querySelectorAll('*')
-          children.forEach((child) => {
-            if (child instanceof HTMLElement) {
-              child.style.clipPath = 'none'
-              child.style.webkitClipPath = 'none'
+          // Remove ALL SVG elements inside buttons (these might be the oval!)
+          const svgs = button.querySelectorAll('svg')
+          svgs.forEach(svg => {
+            // Check if SVG has oval/circle paths
+            const paths = svg.querySelectorAll('path, circle, ellipse')
+            paths.forEach(path => {
+              const d = path.getAttribute('d') || ''
+              // If it looks like an oval/circle clip, remove it
+              if (d.includes('M') && d.includes('A') || path.tagName === 'circle' || path.tagName === 'ellipse') {
+                path.remove()
+              }
+            })
+            // If SVG is just for clipping, remove entire SVG
+            if (svg.getAttribute('clipPath') || svg.querySelector('clipPath')) {
+              svg.remove()
             }
           })
+          
+          // Remove ALL elements with clip-path or mask
+          const allChildren = button.querySelectorAll('*')
+          allChildren.forEach((child) => {
+            if (child instanceof HTMLElement) {
+              const computedStyle = window.getComputedStyle(child)
+              if (computedStyle.clipPath !== 'none' || computedStyle.webkitClipPath !== 'none' || 
+                  computedStyle.mask !== 'none' || computedStyle.webkitMask !== 'none') {
+                child.style.clipPath = 'none'
+                child.style.webkitClipPath = 'none'
+                child.style.mask = 'none'
+                child.style.webkitMask = 'none'
+              }
+              // Remove any clipPath elements
+              if (child.tagName === 'clipPath' || child.closest('clipPath')) {
+                child.remove()
+              }
+            }
+          })
+          
+          // Remove any defs with clipPath definitions
+          const defs = button.querySelectorAll('defs')
+          defs.forEach(def => {
+            const clipPaths = def.querySelectorAll('clipPath')
+            clipPaths.forEach(cp => cp.remove())
+          })
+        }
+      })
+      
+      // Also target any elements with oval/circle clip-paths globally
+      const allElements = document.querySelectorAll('*')
+      allElements.forEach((el) => {
+        if (el instanceof HTMLElement) {
+          const style = window.getComputedStyle(el)
+          const clipPath = style.clipPath || style.webkitClipPath
+          // If clip-path contains ellipse or circle, remove it
+          if (clipPath && (clipPath.includes('ellipse') || clipPath.includes('circle') || clipPath.includes('inset'))) {
+            el.style.clipPath = 'none'
+            el.style.webkitClipPath = 'none'
+          }
         }
       })
     }
 
-    // Run immediately and also after a delay to catch dynamically loaded buttons
+    // Run immediately and multiple times
     fixButtonStyles()
-    const timer1 = setTimeout(fixButtonStyles, 100)
-    const timer2 = setTimeout(fixButtonStyles, 500)
-    const timer3 = setTimeout(fixButtonStyles, 1000)
+    const timers = [50, 100, 200, 500, 1000, 2000].map(delay => setTimeout(fixButtonStyles, delay))
 
-    // Use MutationObserver to catch buttons added dynamically
-    const observer = new MutationObserver(() => {
+    // Use MutationObserver with aggressive watching
+    const observer = new MutationObserver((mutations) => {
       fixButtonStyles()
+      // Also check for any new SVG or clipPath elements
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLElement) {
+            const svgs = node.querySelectorAll ? node.querySelectorAll('svg, clipPath') : []
+            if (svgs.length > 0 || node.tagName === 'SVG' || node.tagName === 'CLIPPATH') {
+              fixButtonStyles()
+            }
+          }
+        })
+      })
     })
 
     observer.observe(document.body, {
       childList: true,
       subtree: true,
+      attributes: true,
+      attributeFilter: ['style', 'clip-path', 'clipPath']
     })
 
     return () => {
-      clearTimeout(timer1)
-      clearTimeout(timer2)
-      clearTimeout(timer3)
+      timers.forEach(timer => clearTimeout(timer))
       observer.disconnect()
     }
   }, [])

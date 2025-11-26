@@ -47,7 +47,7 @@ export default async function handler(req, res) {
   }
 
   try {
-  const { method } = req
+    const { method } = req
   const { assetId, action } = req.query
 
   // Handle asset tags
@@ -146,7 +146,7 @@ export default async function handler(req, res) {
   }
 
   // Handle asset operations
-  switch (method) {
+    switch (method) {
       case 'GET':
         if (assetId) {
           // Get single asset (only if user owns it)

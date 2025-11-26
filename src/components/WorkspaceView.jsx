@@ -882,25 +882,25 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
                     </div>
 
                     <div className="flex gap-2">
-                      <button
-                        onClick={() => callGeminiAPI(prompt || 'Create a beautiful interior design with proper lighting and realistic details.')}
+                    <button
+                      onClick={() => callGeminiAPI(prompt || 'Create a beautiful interior design with proper lighting and realistic details.')}
                         disabled={isProcessing || generatingVariations}
                         className="flex-1 px-4 py-2.5 bg-stone-900 text-white rounded-full text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      >
-                        {isProcessing ? (
-                          <>
-                            <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                            <span>Generating...</span>
-                          </>
-                        ) : (
-                          <>
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                              <polygon points="5 3 19 12 5 21 5 3" />
-                            </svg>
-                            <span>Generate</span>
-                          </>
-                        )}
-                      </button>
+                    >
+                      {isProcessing ? (
+                        <>
+                          <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                          <span>Generating...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polygon points="5 3 19 12 5 21 5 3" />
+                          </svg>
+                          <span>Generate</span>
+                        </>
+                      )}
+                    </button>
                       <button
                         onClick={generateVariations}
                         disabled={isProcessing || generatingVariations}

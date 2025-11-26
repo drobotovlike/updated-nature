@@ -181,20 +181,63 @@ model-viewer::part(default-ar-button):hover {
 /* Clerk Button Fixes - Ensure buttons are fully rounded without cut-off */
 .cl-formButtonPrimary,
 .cl-socialButtonsBlockButton,
-button[type="submit"] {
+.cl-formButtonPrimary button,
+.cl-socialButtonsBlockButton button,
+button[type="submit"],
+.cl-root button {
   border-radius: 9999px !important;
   overflow: hidden !important;
   clip-path: none !important;
   shape-outside: none !important;
+  mask: none !important;
+  -webkit-mask: none !important;
+  position: relative !important;
 }
 
+/* Remove all pseudo-elements that might cause cut-off */
+.cl-formButtonPrimary::before,
 .cl-formButtonPrimary::after,
-.cl-socialButtonsBlockButton::after {
+.cl-socialButtonsBlockButton::before,
+.cl-socialButtonsBlockButton::after,
+.cl-formButtonPrimary button::before,
+.cl-formButtonPrimary button::after,
+.cl-socialButtonsBlockButton button::before,
+.cl-socialButtonsBlockButton button::after {
   display: none !important;
+  content: none !important;
 }
 
-/* Remove any triangular or cut shapes from buttons */
+/* Fix internal button elements */
 .cl-formButtonPrimary *,
-.cl-socialButtonsBlockButton * {
+.cl-socialButtonsBlockButton *,
+.cl-formButtonPrimary button *,
+.cl-socialButtonsBlockButton button * {
   border-radius: inherit !important;
+  clip-path: none !important;
+  shape-outside: none !important;
+}
+
+/* Fix SVG icons inside buttons */
+.cl-formButtonPrimary svg,
+.cl-socialButtonsBlockButton svg,
+.cl-formButtonPrimary button svg,
+.cl-socialButtonsBlockButton button svg {
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+
+/* Ensure button content is properly contained */
+.cl-formButtonPrimary > *,
+.cl-socialButtonsBlockButton > * {
+  border-radius: inherit !important;
+  overflow: hidden !important;
+}
+
+/* Target any Clerk-specific button wrapper classes */
+[class*="cl-formButton"],
+[class*="cl-socialButton"],
+[class*="cl-button"] {
+  border-radius: 9999px !important;
+  overflow: hidden !important;
+  clip-path: none !important;
 }

@@ -42,15 +42,26 @@ export default function SignUpPage() {
         lastName: lastName || undefined,
       })
 
+      console.log('Sign-up result:', result.status, result)
+
       // Check if email verification is required
       if (result.status === 'missing_requirements') {
+        // User is created but needs verification
+        console.log('User created, preparing email verification...')
         await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
         setPendingVerification(true)
       } else if (result.status === 'complete') {
+        // User is created and verified
+        console.log('User created and verified, setting session...')
         await setActive({ session: result.createdSessionId })
         navigate('/dashboard', { replace: true })
+      } else {
+        // Handle other statuses
+        console.log('Unexpected status:', result.status)
+        setError(`Unexpected status: ${result.status}. Please try again.`)
       }
     } catch (err) {
+      console.error('Sign-up error:', err)
       setError(err.errors?.[0]?.message || 'Failed to create account. Please try again.')
     } finally {
       setLoading(false)
@@ -65,11 +76,18 @@ export default function SignUpPage() {
     try {
       const result = await signUp.attemptEmailAddressVerification({ code })
 
+      console.log('Verification result:', result.status, result)
+
       if (result.status === 'complete') {
+        console.log('Email verified, setting session...')
         await setActive({ session: result.createdSessionId })
         navigate('/dashboard', { replace: true })
+      } else {
+        console.log('Verification incomplete, status:', result.status)
+        setError('Verification incomplete. Please try again.')
       }
     } catch (err) {
+      console.error('Verification error:', err)
       setError(err.errors?.[0]?.message || 'Invalid verification code.')
     } finally {
       setLoading(false)

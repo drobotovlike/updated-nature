@@ -245,27 +245,32 @@ export default async function handler(req, res) {
         console.log('Creating canvas item:', { projectId, userId, imageUrl: image_url })
 
         try {
+          // Build insert object, only including fields that exist
+          const insertData = {
+            project_id: projectId,
+            user_id: userId,
+            image_url,
+            x_position,
+            y_position,
+            width,
+            height,
+            rotation,
+            scale_x,
+            scale_y,
+            z_index,
+            name: name || `Design ${Date.now()}`,
+            opacity,
+            filters: filters || {},
+            metadata: metadata || {},
+          }
+
+          // Only add optional fields if they're provided
+          if (description !== undefined) insertData.description = description
+          if (prompt !== undefined) insertData.prompt = prompt
+
           const { data: newItem, error: insertError } = await supabase
             .from('canvas_items')
-            .insert({
-              project_id: projectId,
-              user_id: userId,
-              image_url,
-              x_position,
-              y_position,
-              width,
-              height,
-              rotation,
-              scale_x,
-              scale_y,
-              z_index,
-              name: name || `Design ${Date.now()}`,
-              description,
-              prompt,
-              opacity,
-              filters: filters || {},
-              metadata: metadata || {},
-            })
+            .insert(insertData)
             .select()
             .single()
 

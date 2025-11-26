@@ -43,6 +43,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'scale_y') THEN
     ALTER TABLE canvas_items ADD COLUMN scale_y FLOAT DEFAULT 1;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'description') THEN
+    ALTER TABLE canvas_items ADD COLUMN description TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'prompt') THEN
+    ALTER TABLE canvas_items ADD COLUMN prompt TEXT;
+  END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'canvas_items' AND column_name = 'filters') THEN
     ALTER TABLE canvas_items ADD COLUMN filters JSONB;
   END IF;

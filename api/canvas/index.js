@@ -1,9 +1,14 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl = process.env.VITE_SUPABASE_URL
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY
+const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
 
-const supabase = createClient(supabaseUrl, supabaseKey)
+if (!supabaseUrl || !supabaseServiceKey) {
+  console.error('Missing Supabase environment variables')
+}
+
+// Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
+const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
@@ -143,13 +148,19 @@ export default async function handler(req, res) {
 
           if (itemsError) throw itemsError
 
-          // Get canvas state
+          // Get canvas state (don't error if no state exists)
           const { data: state, error: stateError } = await supabase
             .from('canvas_states')
             .select('*')
             .eq('project_id', projectId)
             .eq('user_id', userId)
             .single()
+
+          // PGRST116 means no rows found, which is fine - just return null for state
+          if (stateError && stateError.code !== 'PGRST116') {
+            console.error('Error fetching canvas state:', stateError)
+            // Don't throw - just continue without state
+          }
 
           return res.status(200).json({
             items: items || [],

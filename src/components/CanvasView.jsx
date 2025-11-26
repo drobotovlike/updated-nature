@@ -227,6 +227,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
   
+  // Calculate selectedItem - must be defined before useEffects
+  const selectedItem = items.find((item) => item.id === selectedItemId)
+  
   // Auto-open sidebar when item is selected
   useEffect(() => {
     if (selectedItem) {
@@ -655,8 +658,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setGeneratingVariations(false)
     }
   }
-
-  const selectedItem = items.find((item) => item.id === selectedItemId)
 
   const handleChatSubmit = async (e) => {
     e.preventDefault()

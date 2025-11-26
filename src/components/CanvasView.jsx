@@ -550,6 +550,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
+    
+    if (!userId || !projectId) {
+      setError('Missing user or project information. Please refresh the page.')
+      return
+    }
 
     setIsGenerating(true)
     try {
@@ -579,10 +584,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           imageUrl = uploadResult.url
         }
 
-        // Add to canvas
+        // Add to canvas - use safe defaults if dimensions not ready
         const stage = stageRef.current
-        const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : 0
-        const centerY = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : 0
+        const width = dimensions?.width || window.innerWidth
+        const height = dimensions?.height || window.innerHeight
+        const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : 0
+        const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : 0
 
         const newItem = await createCanvasItem(userId, projectId, {
           image_url: imageUrl,
@@ -655,15 +662,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }
 
   const generateBatchVariations = async (prompt, count) => {
-    if (!prompt.trim()) return
+    if (!prompt.trim() || !userId || !projectId) return
 
     setGeneratingVariations(true)
     setShowGenerateModal(false)
     
     try {
       const stage = stageRef.current
-      const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : 0
-      const centerY = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : 0
+      const width = dimensions?.width || window.innerWidth
+      const height = dimensions?.height || window.innerHeight
+      const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : 0
+      const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : 0
 
       const newItems = []
       
@@ -730,10 +739,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const handleChatSubmit = async (e) => {
     e.preventDefault()
-    if (!chatInput.trim()) return
+    if (!chatInput.trim() || !userId || !projectId) return
     
+    const prompt = chatInput.trim()
     setChatInput('')
-    await generateToCanvas(chatInput)
+    await generateToCanvas(prompt)
   }
 
   return (

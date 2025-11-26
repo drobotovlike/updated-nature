@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Stage, Layer, Image, Group, Rect, Line, Text, Circle } from 'react-konva'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Stage, Layer, Image, Group, Rect, Text, Circle } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
 import useImage from 'use-image'
@@ -13,29 +13,22 @@ const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
 
 // Canvas Item Component
-function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasurements, snapToGrid, gridSize, zoom }) {
+function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasurements, zoom }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
 
   const handleDragEnd = useCallback((e) => {
     const node = e.target
-    let x = node.x()
-    let y = node.y()
-
-    // Snap to grid if enabled
-    if (snapToGrid && gridSize) {
-      x = Math.round(x / gridSize) * gridSize
-      y = Math.round(y / gridSize) * gridSize
-      node.position({ x, y })
-    }
+    const x = node.x()
+    const y = node.y()
 
     onUpdate(item.id, {
       x_position: x,
       y_position: y,
     })
     setIsDragging(false)
-  }, [item.id, onUpdate, snapToGrid, gridSize])
+  }, [item.id, onUpdate])
 
   const handleTransformEnd = useCallback(() => {
     const node = shapeRef.current
@@ -140,68 +133,6 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
   )
 }
 
-// Grid Component - Fixed in world space, always fills full viewport
-// Uses useMemo to recalculate when dependencies change for dynamic updates
-function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
-  const lines = useMemo(() => {
-    const gridLines = []
-    
-    // Grid stays fixed in world space - calculate visible world area
-    const worldLeft = -panX / zoom
-    const worldRight = (width - panX) / zoom
-    const worldTop = -panY / zoom
-    const worldBottom = (height - panY) / zoom
-
-    // Calculate grid line positions in world space
-    const gridStartX = Math.floor(worldLeft / gridSize) * gridSize
-    const gridEndX = Math.ceil(worldRight / gridSize) * gridSize
-    const gridStartY = Math.floor(worldTop / gridSize) * gridSize
-    const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize
-
-    // At very low zoom, use larger grid spacing to reduce line count
-    const effectiveGridSize = zoom < 0.5 ? gridSize * 2 : gridSize
-
-    // Draw vertical lines - full viewport height
-    for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
-      const screenX = worldX * zoom + panX
-      // Only draw if line is within viewport bounds (with small padding)
-      if (screenX >= -50 && screenX <= width + 50) {
-        gridLines.push(
-          <Line
-            key={`v-${worldX}`}
-            points={[screenX, 0, screenX, height]}
-            stroke="#e5e7eb"
-            strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
-            listening={false}
-            perfect={false}
-          />
-        )
-      }
-    }
-
-    // Draw horizontal lines - full viewport width
-    for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
-      const screenY = worldY * zoom + panY
-      // Only draw if line is within viewport bounds (with small padding)
-      if (screenY >= -50 && screenY <= height + 50) {
-        gridLines.push(
-          <Line
-            key={`h-${worldY}`}
-            points={[0, screenY, width, screenY]}
-            stroke="#e5e7eb"
-            strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
-            listening={false}
-            perfect={false}
-          />
-        )
-      }
-    }
-
-    return gridLines
-  }, [gridSize, width, height, panX, panY, zoom]) // Recalculate when any of these change
-
-  return <Group>{lines}</Group>
-}
 
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId } = useAuth()
@@ -215,10 +146,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     zoom: 1,
     panX: 0,
     panY: 0,
-    gridEnabled: true,
-    gridSize: 20,
     rulerEnabled: false,
-    snapToGrid: true,
     showMeasurements: true,
     backgroundColor: '#fafaf9',
   })
@@ -307,10 +235,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           zoom: data.state.zoom_level || 1,
           panX: data.state.pan_x || 0,
           panY: data.state.pan_y || 0,
-          gridEnabled: data.state.grid_enabled !== false,
-          gridSize: data.state.grid_size || 20,
           rulerEnabled: data.state.ruler_enabled || false,
-          snapToGrid: data.state.snap_to_grid !== false,
           showMeasurements: data.state.show_measurements !== false,
           backgroundColor: data.state.background_color || '#fafaf9',
         }
@@ -368,10 +293,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         zoom_level: scale,
         pan_x: position.x,
         pan_y: position.y,
-        grid_enabled: canvasState.gridEnabled,
-        grid_size: canvasState.gridSize,
         ruler_enabled: canvasState.rulerEnabled,
-        snap_to_grid: canvasState.snapToGrid,
         show_measurements: canvasState.showMeasurements,
         background_color: canvasState.backgroundColor,
       })
@@ -861,23 +783,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 }
               }}
             >
-              {/* Grid Layer - Must be first layer (behind items) */}
-              {canvasState.gridEnabled && (
-                <Layer
-                  key={`grid-${canvasState.panX}-${canvasState.panY}-${canvasState.zoom}-${dimensions.width}-${dimensions.height}`}
-                >
-                  <GridLayer
-                    gridSize={canvasState.gridSize}
-                    width={dimensions.width}
-                    height={dimensions.height}
-                    panX={canvasState.panX}
-                    panY={canvasState.panY}
-                    zoom={canvasState.zoom}
-                  />
-                </Layer>
-              )}
-
-              {/* Canvas Items Layer - Above grid */}
+              {/* Canvas Items Layer */}
               <Layer>
                 {items.map((item) => (
                   <CanvasItem
@@ -888,8 +794,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     onUpdate={handleItemUpdate}
                     onDelete={handleItemDelete}
                     showMeasurements={canvasState.showMeasurements}
-                    snapToGrid={canvasState.snapToGrid}
-                    gridSize={canvasState.gridSize}
                     zoom={canvasState.zoom}
                   />
                 ))}
@@ -919,20 +823,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             {/* Canvas Controls */}
             <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1">
               <button
-                onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
-                className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
-                }`}
-                title="Toggle Grid"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>
-              </button>
-              <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
                 className={`p-1.5 rounded-full transition-colors ${
                   canvasState.rulerEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
@@ -941,18 +831,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setCanvasState((prev) => ({ ...prev, snapToGrid: !prev.snapToGrid }))}
-                className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.snapToGrid ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
-                }`}
-                title="Toggle Snap"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
                 </svg>
               </button>
             </div>

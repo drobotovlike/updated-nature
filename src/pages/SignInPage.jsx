@@ -21,18 +21,28 @@ export default function SignInPage() {
   
   return (
     <Layout>
-      <div className="min-h-[calc(100vh-200px)] flex flex-col items-center justify-center py-16 px-4">
-        <div className="w-full max-w-md">
-          {/* Header - Centered */}
-          <div className="mb-12 text-center">
-            <Link to="/" className="text-2xl font-bold tracking-tight text-stone-900 mb-3 inline-block">
+      <div className="min-h-[calc(100vh-200px)] flex flex-col items-center justify-center py-16 px-4 relative overflow-hidden">
+        {/* Background decorative elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-stone-100/30 rounded-full blur-3xl -translate-y-1/2"></div>
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-stone-100/30 rounded-full blur-3xl translate-y-1/2"></div>
+        </div>
+        
+        <div className="w-full max-w-md relative z-10">
+          {/* Header - Centered with better typography */}
+          <div className="mb-12 text-center reveal-element">
+            <Link to="/" className="text-3xl md:text-4xl font-bold tracking-tight text-stone-900 mb-4 inline-block hover:opacity-80 transition-opacity">
               ature studio.
             </Link>
-            <p className="text-stone-600 text-sm">Sign in to your account</p>
+            <h1 className="text-2xl md:text-3xl font-serif-ature font-semibold text-stone-900 mb-2">Welcome back</h1>
+            <p className="text-stone-500 text-base">Sign in to continue to your workspace</p>
           </div>
           
-          {/* Card - Perfectly centered with consistent padding */}
-          <div className="bg-white rounded-2xl shadow-lg border border-stone-200 p-10">
+          {/* Card - Enhanced with better shadows and spacing */}
+          <div className="bg-white/95 backdrop-blur-sm rounded-[2rem] shadow-2xl shadow-stone-200/50 border border-stone-200/80 p-8 md:p-10 relative overflow-hidden">
+            {/* Subtle gradient overlay */}
+            <div className="absolute inset-0 bg-gradient-to-br from-stone-50/50 via-transparent to-stone-50/30 pointer-events-none"></div>
+            <div className="relative z-10">
             <SignIn
               appearance={{
                 baseTheme: undefined,
@@ -40,8 +50,8 @@ export default function SignInPage() {
                   rootBox: 'w-full m-0 p-0',
                   card: 'shadow-none border-0 bg-transparent p-0 m-0',
                   cardBox: 'shadow-none border-0 bg-transparent p-0 m-0 w-full',
-                  headerTitle: 'text-stone-900 font-serif-ature text-2xl font-semibold mb-2 text-center p-0 m-0',
-                  headerSubtitle: 'text-stone-500 text-sm mb-8 text-center p-0 m-0',
+                  headerTitle: 'hidden',
+                  headerSubtitle: 'hidden',
                   socialButtonsBlock: 'p-0 m-0 mb-8',
                   socialButtonsBlockButton: 'border border-stone-200 hover:border-stone-300 hover:bg-stone-50 text-stone-900 transition-all rounded-full font-medium w-full mb-3 last:mb-0',
                   socialButtonsBlockButtonText: 'text-stone-900 font-medium text-sm',
@@ -81,15 +91,22 @@ export default function SignInPage() {
               signUpUrl="/sign-up"
               afterSignInUrl="/dashboard"
             />
+            </div>
           </div>
           
-          {/* Footer link - Centered */}
-          <p className="mt-10 text-center text-sm text-stone-500">
-            Don't have an account?{' '}
-            <Link to="/sign-up" className="text-stone-900 font-semibold hover:underline">
-              Sign up
-            </Link>
-          </p>
+          {/* Footer link - Enhanced styling */}
+          <div className="mt-8 text-center">
+            <p className="text-sm text-stone-500">
+              Don't have an account?{' '}
+              <Link to="/sign-up" className="text-stone-900 font-semibold hover:text-stone-700 transition-colors inline-flex items-center gap-1 group">
+                Sign up
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="transition-transform group-hover:translate-x-0.5">
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </Link>
+            </p>
+          </div>
         </div>
       </div>
     </Layout>

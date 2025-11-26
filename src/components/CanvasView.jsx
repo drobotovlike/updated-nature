@@ -301,8 +301,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [variationCount, setVariationCount] = useState(3)
   
   // UI State
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
+  
+  // Auto-open sidebar when item is selected
+  useEffect(() => {
+    if (selectedItem) {
+      setSidebarOpen(true)
+    }
+  }, [selectedItem])
 
   // Load canvas data
   useEffect(() => {
@@ -315,7 +322,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   useEffect(() => {
     const updateDimensions = () => {
       // Always use full viewport size, not container size
-      const sidebarWidth = sidebarOpen ? 320 : 0
+      const sidebarWidth = (sidebarOpen && selectedItem) ? 320 : 0
       const toolbarHeight = 120 // Account for bottom toolbar
       setDimensions({
         width: window.innerWidth - sidebarWidth,
@@ -326,12 +333,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     updateDimensions()
     window.addEventListener('resize', updateDimensions)
     return () => window.removeEventListener('resize', updateDimensions)
-  }, [sidebarOpen])
+  }, [sidebarOpen, selectedItem])
   
-  // Update dimensions when sidebar toggles
+  // Update dimensions when sidebar toggles or item selection changes
   useEffect(() => {
     const timer = setTimeout(() => {
-      const sidebarWidth = sidebarOpen ? 320 : 0
+      const sidebarWidth = (sidebarOpen && selectedItem) ? 320 : 0
       const toolbarHeight = 120
       setDimensions({
         width: window.innerWidth - sidebarWidth,
@@ -339,7 +346,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
     }, 300) // Wait for animation
     return () => clearTimeout(timer)
-  }, [sidebarOpen])
+  }, [sidebarOpen, selectedItem])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -730,12 +737,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden bg-stone-50">
-      {/* Collapsible Left Sidebar */}
-      <div className={`fixed left-0 top-0 h-full bg-white border-r border-stone-200 z-30 transition-transform duration-300 ${
-        sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-      }`} style={{ width: '320px' }}>
-        {selectedItem ? (
+    <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+      {/* Collapsible Left Sidebar - Only show when item is selected */}
+      {selectedItem && (
+        <div className={`fixed left-0 top-0 h-full bg-white border-r border-stone-200 z-30 transition-transform duration-300 ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`} style={{ width: '320px' }}>
           <div className="h-full flex flex-col">
             <div className="p-4 border-b border-stone-200 flex items-center justify-between">
               <div>
@@ -829,14 +836,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </div>
             </div>
           </div>
-        ) : (
-          <div className="h-full flex items-center justify-center p-4">
-            <p className="text-sm text-stone-400">Select an item to edit</p>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Sidebar Toggle Button (when closed) */}
+      {/* Sidebar Toggle Button (when closed and item selected) */}
       {!sidebarOpen && selectedItem && (
         <button
           onClick={() => setSidebarOpen(true)}
@@ -849,7 +852,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       )}
 
       {/* Main Canvas Area - Full Screen */}
-      <div className="flex-1 flex flex-col" style={{ marginLeft: sidebarOpen ? '320px' : '0', transition: 'margin-left 300ms' }}>
+      <div 
+        className="flex-1 flex flex-col w-full h-full" 
+        style={{ 
+          marginLeft: (sidebarOpen && selectedItem) ? '320px' : '0', 
+          transition: 'margin-left 300ms',
+          width: (sidebarOpen && selectedItem) ? 'calc(100% - 320px)' : '100%'
+        }}
+      >
 
         {/* Error Message */}
         {error && (
@@ -868,7 +878,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         )}
 
         {/* Canvas Area - Full Screen */}
-        <div ref={containerRef} className="flex-1 relative overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+        <div 
+          ref={containerRef} 
+          className="flex-1 relative w-full h-full overflow-hidden" 
+          style={{ backgroundColor: canvasState.backgroundColor }}
+        >
         {loading ? (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">

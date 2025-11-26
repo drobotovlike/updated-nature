@@ -239,6 +239,11 @@ function Ruler({ position, length, isVertical, zoom, offset }) {
   )
 }
 
+// Zoom configuration (keeps zoom comfortable and less sensitive)
+const MIN_ZOOM = 0.25 // 25%
+const MAX_ZOOM = 3 // 300%
+const ZOOM_STEP = 1.08 // gentler than 1.2/1.1 for smoother zoom
+
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId } = useAuth()
   const stageRef = useRef(null)
@@ -444,10 +449,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     const oldScale = stage.scaleX()
     const pointer = stage.getPointerPosition()
+    if (!pointer) return
 
-    const scaleBy = 1.1
-    const newScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
-    const clampedScale = Math.max(0.1, Math.min(5, newScale))
+    const scaleBy = ZOOM_STEP
+    const proposedScale = e.evt.deltaY > 0 ? oldScale / scaleBy : oldScale * scaleBy
+    const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
     const mousePointTo = {
       x: (pointer.x - stage.x()) / oldScale,
@@ -834,7 +840,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             onClick={() => {
               const stage = stageRef.current
               if (stage) {
-                const newScale = Math.min(5, stage.scaleX() * 1.2)
+                const current = stage.scaleX()
+                const proposed = current * ZOOM_STEP
+                const newScale = Math.min(MAX_ZOOM, proposed)
                 stage.scale({ x: newScale, y: newScale })
                 setCanvasState((prev) => ({ ...prev, zoom: newScale }))
               }
@@ -850,7 +858,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             onClick={() => {
               const stage = stageRef.current
               if (stage) {
-                const newScale = Math.max(0.1, stage.scaleX() / 1.2)
+                const current = stage.scaleX()
+                const proposed = current / ZOOM_STEP
+                const newScale = Math.max(MIN_ZOOM, proposed)
                 stage.scale({ x: newScale, y: newScale })
                 setCanvasState((prev) => ({ ...prev, zoom: newScale }))
               }

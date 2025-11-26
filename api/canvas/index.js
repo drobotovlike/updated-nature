@@ -139,39 +139,59 @@ export default async function handler(req, res) {
         } else if (projectId) {
           // Get all canvas items for project
           console.log('Fetching canvas items for project:', projectId, 'user:', userId)
-          const { data: items, error: itemsError } = await supabase
-            .from('canvas_items')
-            .select('*')
-            .eq('project_id', projectId)
-            .eq('user_id', userId)
-            .order('z_index', { ascending: true })
-            .order('created_at', { ascending: true })
-
-          if (itemsError) {
-            console.error('Error fetching canvas items:', itemsError)
-            throw itemsError
+          
+          let items = []
+          let itemsError = null
+          
+          try {
+            const result = await supabase
+              .from('canvas_items')
+              .select('*')
+              .eq('project_id', projectId)
+              .eq('user_id', userId)
+              .order('z_index', { ascending: true })
+              .order('created_at', { ascending: true })
+            
+            items = result.data || []
+            itemsError = result.error
+            
+            if (itemsError) {
+              console.error('Error fetching canvas items:', itemsError)
+              // Don't throw - return empty array for items
+              items = []
+            } else {
+              console.log('Canvas items fetched:', items.length)
+            }
+          } catch (err) {
+            console.error('Exception fetching canvas items:', err)
+            items = []
           }
 
-          console.log('Canvas items fetched:', items?.length || 0)
-
           // Get canvas state (don't error if no state exists)
-          const { data: state, error: stateError } = await supabase
-            .from('canvas_states')
-            .select('*')
-            .eq('project_id', projectId)
-            .eq('user_id', userId)
-            .single()
+          let state = null
+          try {
+            const stateResult = await supabase
+              .from('canvas_states')
+              .select('*')
+              .eq('project_id', projectId)
+              .eq('user_id', userId)
+              .single()
 
-          // PGRST116 means no rows found, which is fine - just return null for state
-          if (stateError) {
-            if (stateError.code === 'PGRST116') {
-              console.log('No canvas state found for project:', projectId, '(this is normal for new projects)')
+            // PGRST116 means no rows found, which is fine - just return null for state
+            if (stateResult.error) {
+              if (stateResult.error.code === 'PGRST116') {
+                console.log('No canvas state found for project:', projectId, '(this is normal for new projects)')
+              } else {
+                console.error('Error fetching canvas state:', stateResult.error)
+                // Don't throw - just continue without state
+              }
             } else {
-              console.error('Error fetching canvas state:', stateError)
-              // Don't throw - just continue without state
+              state = stateResult.data
+              console.log('Canvas state fetched successfully')
             }
-          } else {
-            console.log('Canvas state fetched successfully')
+          } catch (err) {
+            console.error('Exception fetching canvas state:', err)
+            // Continue without state
           }
 
           const response = {

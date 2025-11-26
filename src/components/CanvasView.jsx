@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Stage, Layer, Image, Group, Rect, Line, Text, Circle } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
@@ -141,63 +141,64 @@ function CanvasItem({ item, isSelected, onSelect, onUpdate, onDelete, showMeasur
 }
 
 // Grid Component - Fixed in world space, always fills full viewport
+// Uses useMemo to recalculate when dependencies change for dynamic updates
 function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
-  const lines = []
-  
-  // Grid stays fixed in world space - calculate visible world area
-  const worldLeft = -panX / zoom
-  const worldRight = (width - panX) / zoom
-  const worldTop = -panY / zoom
-  const worldBottom = (height - panY) / zoom
+  const lines = useMemo(() => {
+    const gridLines = []
+    
+    // Grid stays fixed in world space - calculate visible world area
+    const worldLeft = -panX / zoom
+    const worldRight = (width - panX) / zoom
+    const worldTop = -panY / zoom
+    const worldBottom = (height - panY) / zoom
 
-  // Adaptive padding based on zoom - less padding at low zoom to prevent artifacts
-  const basePadding = 100
-  const adaptivePadding = Math.min(basePadding / zoom, 500) // Cap padding at low zoom
+    // Calculate grid line positions in world space
+    const gridStartX = Math.floor(worldLeft / gridSize) * gridSize
+    const gridEndX = Math.ceil(worldRight / gridSize) * gridSize
+    const gridStartY = Math.floor(worldTop / gridSize) * gridSize
+    const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize
 
-  // Calculate grid line positions in world space
-  const gridStartX = Math.floor(worldLeft / gridSize) * gridSize
-  const gridEndX = Math.ceil(worldRight / gridSize) * gridSize
-  const gridStartY = Math.floor(worldTop / gridSize) * gridSize
-  const gridEndY = Math.ceil(worldBottom / gridSize) * gridSize
+    // At very low zoom, use larger grid spacing to reduce line count
+    const effectiveGridSize = zoom < 0.5 ? gridSize * 2 : gridSize
 
-  // At very low zoom, use larger grid spacing to reduce line count
-  const effectiveGridSize = zoom < 0.5 ? gridSize * 2 : gridSize
-
-  // Draw vertical lines - full viewport height
-  for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
-    const screenX = worldX * zoom + panX
-    // Only draw if line is within viewport bounds (with small padding)
-    if (screenX >= -50 && screenX <= width + 50) {
-      lines.push(
-        <Line
-          key={`v-${worldX}`}
-          points={[screenX, 0, screenX, height]}
-          stroke="#e5e7eb"
-          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
-          listening={false}
-          perfect={false}
-        />
-      )
+    // Draw vertical lines - full viewport height
+    for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
+      const screenX = worldX * zoom + panX
+      // Only draw if line is within viewport bounds (with small padding)
+      if (screenX >= -50 && screenX <= width + 50) {
+        gridLines.push(
+          <Line
+            key={`v-${worldX}`}
+            points={[screenX, 0, screenX, height]}
+            stroke="#e5e7eb"
+            strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
+            listening={false}
+            perfect={false}
+          />
+        )
+      }
     }
-  }
 
-  // Draw horizontal lines - full viewport width
-  for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
-    const screenY = worldY * zoom + panY
-    // Only draw if line is within viewport bounds (with small padding)
-    if (screenY >= -50 && screenY <= height + 50) {
-      lines.push(
-        <Line
-          key={`h-${worldY}`}
-          points={[0, screenY, width, screenY]}
-          stroke="#e5e7eb"
-          strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
-          listening={false}
-          perfect={false}
-        />
-      )
+    // Draw horizontal lines - full viewport width
+    for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
+      const screenY = worldY * zoom + panY
+      // Only draw if line is within viewport bounds (with small padding)
+      if (screenY >= -50 && screenY <= height + 50) {
+        gridLines.push(
+          <Line
+            key={`h-${worldY}`}
+            points={[0, screenY, width, screenY]}
+            stroke="#e5e7eb"
+            strokeWidth={Math.max(0.3, 0.5 / Math.max(0.25, zoom))}
+            listening={false}
+            perfect={false}
+          />
+        )
+      }
     }
-  }
+
+    return gridLines
+  }, [gridSize, width, height, panX, panY, zoom]) // Recalculate when any of these change
 
   return <Group>{lines}</Group>
 }
@@ -862,7 +863,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             >
               {/* Grid Layer - Must be first layer (behind items) */}
               {canvasState.gridEnabled && (
-                <Layer>
+                <Layer
+                  key={`grid-${canvasState.panX}-${canvasState.panY}-${canvasState.zoom}-${dimensions.width}-${dimensions.height}`}
+                >
                   <GridLayer
                     gridSize={canvasState.gridSize}
                     width={dimensions.width}

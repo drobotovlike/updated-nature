@@ -159,6 +159,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [generatingVariations, setGeneratingVariations] = useState(false)
   const [variationCount, setVariationCount] = useState(3)
   
+  // Enhanced Generation State
+  const [selectedModel, setSelectedModel] = useState('gemini')
+  const [selectedStyle, setSelectedStyle] = useState(null)
+  const [referenceImage, setReferenceImage] = useState(null)
+  const [styles, setStyles] = useState([])
+  const [showStyleLibrary, setShowStyleLibrary] = useState(false)
+  
   // UI State
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
@@ -212,6 +219,29 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+
+  // Load styles on mount
+  useEffect(() => {
+    if (!userId) return
+    
+    const loadStyles = async () => {
+      try {
+        const response = await fetch('/api/styles', {
+          headers: {
+            'Authorization': `Bearer ${userId}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setStyles(data || [])
+        }
+      } catch (error) {
+        console.error('Error loading styles:', error)
+      }
+    }
+    
+    loadStyles()
+  }, [userId])
 
   const loadCanvas = async () => {
     if (!projectId || !userId) {
@@ -427,14 +457,39 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     setIsGenerating(true)
     try {
-      const response = await fetch('/api/nano-banana/visualize', {
+      // Apply style if selected
+      let finalPrompt = prompt
+      if (selectedStyle) {
+        finalPrompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+      }
+
+      // Convert reference image to base64 if it's a URL
+      let refImage = referenceImage
+      if (refImage && !refImage.startsWith('data:')) {
+        try {
+          const imgResponse = await fetch(refImage)
+          const blob = await imgResponse.blob()
+          const reader = new FileReader()
+          refImage = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result)
+            reader.readAsDataURL(blob)
+          })
+        } catch (e) {
+          console.warn('Failed to convert reference image to base64:', e)
+        }
+      }
+
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          description: prompt,
-          useAIDesigner: false,
+          prompt: finalPrompt,
+          model: selectedModel,
+          style_id: selectedStyle?.id,
+          reference_image: refImage,
+          reference_strength: 0.7,
         }),
       })
 
@@ -467,7 +522,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           width: 400,
           height: 400,
           name: `Generated: ${prompt.substring(0, 30)}`,
-          prompt: prompt,
+          prompt: finalPrompt,
+          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''}`,
         })
 
         setItems((prev) => [...prev, newItem])
@@ -489,16 +545,40 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     setIsGenerating(true)
     try {
-      const prompt = newPrompt || `${selectedItem.prompt || 'interior design'} ${newPrompt || 'with modifications'}`
+      let prompt = newPrompt || `${selectedItem.prompt || 'interior design'} ${newPrompt || 'with modifications'}`
       
-      const response = await fetch('/api/nano-banana/visualize', {
+      // Apply style if selected
+      if (selectedStyle) {
+        prompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+      }
+
+      // Use selected item as reference if no reference image set
+      let refImage = referenceImage || selectedItem.image_url
+      if (refImage && !refImage.startsWith('data:')) {
+        try {
+          const imgResponse = await fetch(refImage)
+          const blob = await imgResponse.blob()
+          const reader = new FileReader()
+          refImage = await new Promise((resolve) => {
+            reader.onloadend = () => resolve(reader.result)
+            reader.readAsDataURL(blob)
+          })
+        } catch (e) {
+          console.warn('Failed to convert reference image to base64:', e)
+        }
+      }
+      
+      const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          description: prompt,
-          useAIDesigner: false,
+          prompt: prompt,
+          model: selectedModel,
+          style_id: selectedStyle?.id,
+          reference_image: refImage,
+          reference_strength: 0.7,
         }),
       })
 
@@ -521,6 +601,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         await handleItemUpdate(selectedItemId, {
           image_url: imageUrl,
           prompt: prompt,
+          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''}`,
         })
       }
     } catch (error) {
@@ -546,17 +627,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       const newItems = []
       
+      // Apply style if selected
+      let basePrompt = prompt
+      if (selectedStyle) {
+        basePrompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+      }
+
       for (let i = 0; i < count; i++) {
-        const variationPrompt = `${prompt} (variation ${i + 1}, different style and composition)`
+        const variationPrompt = `${basePrompt} (variation ${i + 1}, different style and composition)`
         
-        const response = await fetch('/api/nano-banana/visualize', {
+        const response = await fetch('/api/generate', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            description: variationPrompt,
-            useAIDesigner: false,
+            prompt: variationPrompt,
+            model: selectedModel,
+            style_id: selectedStyle?.id,
+            reference_image: referenceImage,
+            reference_strength: 0.7,
           }),
         })
 
@@ -840,14 +930,48 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             {/* Action Buttons */}
             <button
+              onClick={() => {
+                // Use selected item as reference if available
+                if (selectedItem) {
+                  setReferenceImage(selectedItem.image_url)
+                } else {
+                  // Open file picker
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = 'image/*'
+                  input.onchange = (e) => {
+                    const file = e.target.files[0]
+                    if (file) {
+                      const reader = new FileReader()
+                      reader.onloadend = () => {
+                        setReferenceImage(reader.result)
+                      }
+                      reader.readAsDataURL(file)
+                    }
+                  }
+                  input.click()
+                }
+              }}
+              className={`p-2 hover:bg-stone-100 rounded-full transition-colors ${
+                referenceImage ? 'bg-stone-100' : ''
+              }`}
+              title="Add Reference Image"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <circle cx="9" cy="9" r="2" />
+                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+              </svg>
+            </button>
+            
+            <button
               onClick={() => setShowAssetLibrary(true)}
               className="p-2 hover:bg-stone-100 rounded-full transition-colors"
               title="Asset Library"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                <path d="M9 9h6v6H9z" />
               </svg>
             </button>
             
@@ -871,48 +995,196 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </div>
           </div>
 
-          {/* Chat Input Area */}
-          <form onSubmit={handleChatSubmit} className="mt-3 w-full max-w-2xl mx-auto">
-            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg border border-stone-200">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="What would you like to create?"
-                className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 placeholder:text-stone-400"
-              />
-              <div className="flex items-center gap-1">
+          {/* Generation Controls Panel */}
+          <div className="mt-3 w-full max-w-2xl mx-auto">
+            {/* Model & Style Selection */}
+            <div className="flex items-center gap-2 mb-2">
+              <select
+                value={selectedModel}
+                onChange={(e) => setSelectedModel(e.target.value)}
+                className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
+              >
+                <option value="gemini">Gemini 2.5 Flash</option>
+                <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
+                <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
+                <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
+              </select>
+
+              <select
+                value={selectedStyle?.id || ''}
+                onChange={(e) => {
+                  const style = styles.find(s => s.id === e.target.value)
+                  setSelectedStyle(style || null)
+                }}
+                className="flex-1 px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
+              >
+                <option value="">No Style</option>
+                {styles.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.name} {style.is_public ? '(Public)' : ''}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                onClick={() => setShowStyleLibrary(true)}
+                className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors bg-white border border-stone-200 shadow-sm"
+                title="Style Library"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Reference Image */}
+            {referenceImage && (
+              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 mb-2 shadow-sm">
+                <img src={referenceImage} alt="Reference" className="w-10 h-10 object-cover rounded" />
+                <span className="flex-1 text-xs text-stone-600 truncate">Using reference image</span>
                 <button
-                  type="button"
-                  onClick={() => setShowAssetLibrary(true)}
-                  className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
-                  title="Add Asset"
+                  onClick={() => setReferenceImage(null)}
+                  className="p-1 hover:bg-stone-200 rounded transition-colors"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <circle cx="9" cy="9" r="2" />
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
                   </svg>
                 </button>
-                <button
-                  type="submit"
-                  disabled={!chatInput.trim() || isGenerating || generatingVariations}
-                  className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  title="Generate"
-                >
-                  {isGenerating || generatingVariations ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polygon points="5 3 19 12 5 21 5 3" />
-                    </svg>
-                  )}
-                </button>
               </div>
-            </div>
-          </form>
+            )}
+
+            {/* Chat Input */}
+            <form onSubmit={handleChatSubmit}>
+              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg border border-stone-200">
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="What would you like to create?"
+                  className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 placeholder:text-stone-400"
+                />
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      // Use selected item as reference if available
+                      if (selectedItem) {
+                        setReferenceImage(selectedItem.image_url)
+                      } else {
+                        // Open file picker
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.onchange = (e) => {
+                          const file = e.target.files[0]
+                          if (file) {
+                            const reader = new FileReader()
+                            reader.onloadend = () => {
+                              setReferenceImage(reader.result)
+                            }
+                            reader.readAsDataURL(file)
+                          }
+                        }
+                        input.click()
+                      }
+                    }}
+                    className={`p-1.5 hover:bg-stone-100 rounded-full transition-colors ${
+                      referenceImage ? 'bg-stone-100' : ''
+                    }`}
+                    title="Add Reference Image"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssetLibrary(true)}
+                    className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
+                    title="Add Asset"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || isGenerating || generatingVariations}
+                    className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Generate"
+                  >
+                    {isGenerating || generatingVariations ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <polygon points="5 3 19 12 5 21 5 3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
         </div>
       </div>
+
+      {/* Style Library Modal */}
+      {showStyleLibrary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setShowStyleLibrary(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] flex flex-col m-4" onClick={(e) => e.stopPropagation()}>
+            <div className="p-6 border-b border-stone-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-stone-900">Style Library</h2>
+              <button
+                onClick={() => setShowStyleLibrary(false)}
+                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {styles.map((style) => (
+                  <button
+                    key={style.id}
+                    onClick={() => {
+                      setSelectedStyle(style)
+                      setShowStyleLibrary(false)
+                    }}
+                    className={`p-4 rounded-lg border-2 transition-all text-left ${
+                      selectedStyle?.id === style.id
+                        ? 'border-stone-900 bg-stone-50'
+                        : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                    }`}
+                  >
+                    {style.preview_image_url ? (
+                      <img src={style.preview_image_url} alt={style.name} className="w-full h-24 object-cover rounded mb-2" />
+                    ) : (
+                      <div className="w-full h-24 bg-stone-100 rounded mb-2 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+                          <rect x="3" y="3" width="18" height="18" rx="2" />
+                          <circle cx="9" cy="9" r="2" />
+                          <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                        </svg>
+                      </div>
+                    )}
+                    <h3 className="font-semibold text-sm text-stone-900 mb-1">{style.name}</h3>
+                    {style.description && (
+                      <p className="text-xs text-stone-600 line-clamp-2">{style.description}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Asset Library Modal */}
       {showAssetLibrary && (

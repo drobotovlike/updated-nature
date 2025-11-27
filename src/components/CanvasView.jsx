@@ -10,6 +10,12 @@ import LayersPanel from './LayersPanel'
 import { getCanvasData, createCanvasItem, updateCanvasItem, deleteCanvasItem, saveCanvasState } from '../utils/canvasManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
+import { getProject, getAssets, addAssetToLibrary } from '../utils/projectManager'
+import Folder from './Folder'
+import ShareModal from './ShareModal'
+import ProjectMetadataForm from './ProjectMetadataForm'
+import VariationsView from './VariationsView'
+import VariationsComparisonView from './VariationsComparisonView'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -429,6 +435,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [showMinimap, setShowMinimap] = useState(false)
   const [showPromptHistory, setShowPromptHistory] = useState(false)
   const [promptHistory, setPromptHistory] = useState([])
+  
+  // Project sidebar state
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [activeTab, setActiveTab] = useState('overview') // 'overview', 'assets', 'creations', 'variations', 'details'
+  const [project, setProject] = useState(null)
+  const [sharedAssets, setSharedAssets] = useState([])
+  const [loadingAssets, setLoadingAssets] = useState(true)
+  const [showShareModal, setShowShareModal] = useState(false)
   
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
@@ -2327,6 +2341,234 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+      {/* Left Sidebar - Project Info & Tabs */}
+      <div 
+        className={`absolute left-0 top-0 bottom-0 z-50 bg-surface-base border-r border-border transition-all duration-macro ease-apple ${
+          sidebarOpen ? 'w-80' : 'w-0'
+        } overflow-hidden`}
+      >
+        {sidebarOpen && (
+          <div className="h-full flex flex-col">
+            {/* Header */}
+            <div className="p-6 border-b border-border">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h1 className="text-xl font-semibold text-text-primary mb-1">
+                    {project?.name || 'Untitled'}
+                  </h1>
+                  <p className="text-xs text-text-tertiary">
+                    {project?.createdAt ? `Created ${new Date(project.createdAt).toLocaleDateString()}` : 'Loading...'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-2 hover:bg-surface-elevated rounded-lg transition-colors"
+                  aria-label="Hide sidebar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-secondary">
+                    <path d="M18 6L6 18" />
+                    <path d="M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setShowShareModal(true)}
+                  className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
+                  </svg>
+                  Share
+                </button>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="px-3 py-1.5 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors"
+                >
+                  Start Creating
+                </button>
+                {onBack && (
+                  <button
+                    onClick={onBack}
+                    className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors"
+                  >
+                    ← Back
+                  </button>
+                )}
+              </div>
+
+              {/* Tabs */}
+              <div className="flex gap-1 mt-4 overflow-x-auto">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    activeTab === 'overview'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  Overview
+                </button>
+                <button
+                  onClick={() => setActiveTab('assets')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    activeTab === 'assets'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  Asset Library ({assets.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('creations')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    activeTab === 'creations'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  My Creations ({creations.length})
+                </button>
+                <button
+                  onClick={() => setActiveTab('variations')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    activeTab === 'variations'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  Variations
+                </button>
+                <button
+                  onClick={() => setActiveTab('details')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
+                    activeTab === 'details'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                  }`}
+                >
+                  Details
+                </button>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              {activeTab === 'overview' && (
+                <div className="space-y-6">
+                  {assets.length === 0 && creations.length === 0 ? (
+                    <div className="text-center py-12">
+                      <p className="text-text-secondary mb-4">No content yet</p>
+                      <button
+                        onClick={() => setSidebarOpen(false)}
+                        className="px-4 py-2 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors"
+                      >
+                        Start Creating
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <h2 className="text-sm font-semibold text-text-primary mb-3">Folders</h2>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Folder
+                            name="Designs"
+                            color="#9333ea"
+                            itemCount={creations.length}
+                            lastUpdated={creations.length > 0 ? creations[0]?.createdAt : null}
+                            onClick={() => setActiveTab('creations')}
+                          />
+                          <Folder
+                            name="Assets"
+                            color="#3b82f6"
+                            itemCount={assets.length}
+                            lastUpdated={assets.length > 0 ? assets[0]?.createdAt : null}
+                            onClick={() => setActiveTab('assets')}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <h2 className="text-sm font-semibold text-text-primary mb-3">Project Overview</h2>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="bg-surface-elevated rounded-lg p-4 border border-border">
+                            <h3 className="text-xs font-semibold text-text-secondary mb-1">Asset Library</h3>
+                            <p className="text-xl font-semibold text-text-primary">{assets.length}</p>
+                            <p className="text-xs text-text-tertiary mt-1">Your private assets</p>
+                          </div>
+                          <div className="bg-surface-elevated rounded-lg p-4 border border-border">
+                            <h3 className="text-xs font-semibold text-text-secondary mb-1">Generated Creations</h3>
+                            <p className="text-xl font-semibold text-text-primary">{creations.length}</p>
+                            <p className="text-xs text-text-tertiary mt-1">AI-generated designs</p>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+              {activeTab === 'assets' && (
+                <AssetLibrary
+                  userId={userId}
+                  onSelect={(asset) => {
+                    const file = { url: asset.url, name: asset.name }
+                    handleFileUpload(file, null)
+                    setSidebarOpen(false)
+                  }}
+                />
+              )}
+              {activeTab === 'creations' && (
+                <div className="space-y-4">
+                  {creations.length === 0 ? (
+                    <p className="text-text-tertiary text-center py-8">No creations yet</p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      {creations.map((creation) => (
+                        <div
+                          key={creation.id}
+                          className="aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary-400 transition-colors"
+                          onClick={() => {
+                            const file = { url: creation.url, name: creation.name }
+                            handleFileUpload(file, null)
+                            setSidebarOpen(false)
+                          }}
+                        >
+                          <img src={creation.url} alt={creation.name} className="w-full h-full object-cover" />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {activeTab === 'variations' && project && (
+                <VariationsView projectId={projectId} project={project} />
+              )}
+              {activeTab === 'details' && project && (
+                <ProjectMetadataForm project={project} projectId={projectId} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Menu Button - Show when sidebar is closed */}
+      {!sidebarOpen && (
+        <button
+          onClick={() => setSidebarOpen(true)}
+          className="absolute left-4 top-4 z-50 p-2 bg-surface-base hover:bg-surface-elevated rounded-lg border border-border shadow-lg transition-colors"
+          aria-label="Show sidebar"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-primary">
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
+      )}
+
       {/* Context Menu - Right-click menu */}
       {contextMenuPosition.visible && (
         <div
@@ -2787,9 +3029,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </div>
       )}
 
-      {/* Main Canvas Area - Full Screen */}
+      {/* Main Canvas Area - Adjust for sidebar */}
       <div 
-        className="flex-1 flex flex-col w-full h-full"
+        className="flex-1 flex flex-col w-full h-full transition-all duration-macro ease-apple"
+        style={{ marginLeft: sidebarOpen ? '320px' : '0' }}
       >
         {/* Error Message */}
         {error && (
@@ -3656,6 +3899,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && project && (
+        <ShareModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          project={project}
+        />
       )}
     </div>
   )

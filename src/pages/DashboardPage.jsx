@@ -94,13 +94,13 @@ export default function DashboardPage() {
     
     const loadThumbnails = async () => {
       const thumbnails = {}
-      const projectsToLoad = [...recentProjects, ...savedProjects]
+      const allProjects = [...new Set([...recentProjects, ...savedProjects].map(p => p.id))]
       
-      for (const project of projectsToLoad) {
-        if (!canvasThumbnails[project.id]) {
-          const thumbnail = await getCanvasThumbnail(project.id)
+      for (const projectId of allProjects) {
+        if (!canvasThumbnails[projectId]) {
+          const thumbnail = await getCanvasThumbnail(projectId)
           if (thumbnail) {
-            thumbnails[project.id] = thumbnail
+            thumbnails[projectId] = thumbnail
           }
         }
       }
@@ -113,7 +113,7 @@ export default function DashboardPage() {
     if (recentProjects.length > 0 || savedProjects.length > 0) {
       loadThumbnails()
     }
-  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasThumbnail, canvasThumbnails])
+  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasThumbnail])
 
   // Load spaces and projects on mount
   useEffect(() => {
@@ -402,10 +402,10 @@ export default function DashboardPage() {
                 }
               }
             }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${
               currentView === 'projects' && selectedProjectId === null && selectedSpaceId === null
-                ? 'bg-stone-100 text-stone-900'
-                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
+                ? 'bg-surface-elevated text-text-primary'
+                : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -442,7 +442,7 @@ export default function DashboardPage() {
           </button>
           <a
             href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
+            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M11 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
@@ -452,7 +452,7 @@ export default function DashboardPage() {
           </a>
           <a
             href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
+            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -463,7 +463,7 @@ export default function DashboardPage() {
           </a>
           <a
             href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
+            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
@@ -473,10 +473,10 @@ export default function DashboardPage() {
 
           {/* My Projects Section */}
           <div className="pt-8 pb-2 px-3 flex items-center justify-between group">
-            <span className="text-xs font-semibold uppercase tracking-wider text-stone-500 group-hover:text-stone-700 transition-colors">My Projects</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary group-hover:text-text-secondary transition-colors">My Projects</span>
             <button
               onClick={() => setShowCreateProjectModal(true)}
-              className="text-stone-500 hover:text-stone-900 transition-colors"
+              className="text-text-tertiary hover:text-text-primary transition-colors duration-micro ease-apple"
               title="Create new project"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -492,8 +492,8 @@ export default function DashboardPage() {
                   key={project.id}
                   className={`group flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
                     selectedProjectId === project.id
-                      ? 'bg-stone-100 text-stone-900'
-                      : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
+                      ? 'bg-surface-elevated text-text-primary'
+                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
                   }`}
                 >
                   <button
@@ -543,7 +543,7 @@ export default function DashboardPage() {
                         })()
                       }
                     }}
-                    className="opacity-0 group-hover:opacity-100 text-stone-400 hover:text-red-600 transition-all p-1"
+                    className="opacity-0 group-hover:opacity-100 text-text-tertiary hover:text-error-400 transition-all duration-micro ease-apple p-1"
                     title="Delete project"
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -563,7 +563,7 @@ export default function DashboardPage() {
                 setSelectedProjectId(null)
                 setEditingCreation(null)
               }}
-              className="w-full px-3 py-2 text-xs font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors mt-2"
+              className="w-full px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple mt-2"
             >
               See all projects ({savedProjects.length})
             </button>
@@ -571,7 +571,7 @@ export default function DashboardPage() {
         </nav>
 
         {/* Bottom Actions */}
-        <div className="p-3 mt-auto space-y-1 border-t border-stone-200">
+        <div className="p-3 mt-auto space-y-1 border-t border-border">
           <button
             onClick={() => {
               setShowTrash(!showTrash)
@@ -585,8 +585,8 @@ export default function DashboardPage() {
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
               showTrash
-                ? 'bg-stone-100 text-stone-900'
-                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
+                ? 'bg-surface-elevated text-text-primary'
+                : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
             }`}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -596,7 +596,7 @@ export default function DashboardPage() {
             </svg>
             <span className="text-sm font-medium">Trash</span>
             {(trashedSpaces.length + trashedProjects.length) > 0 && (
-              <span className="ml-auto text-xs bg-stone-200 text-stone-700 px-2 py-0.5 rounded-full">
+              <span className="ml-auto text-xs bg-surface-elevated text-text-secondary px-2 py-0.5 rounded-full">
                 {trashedSpaces.length + trashedProjects.length}
               </span>
             )}
@@ -606,7 +606,7 @@ export default function DashboardPage() {
           {showTrash && (
             <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
               {(trashedSpaces.length === 0 && trashedProjects.length === 0) ? (
-                <p className="text-xs text-stone-500 px-3 py-2">Trash is empty</p>
+                <p className="text-xs text-text-tertiary px-3 py-2">Trash is empty</p>
               ) : (
                 <>
                   {trashedSpaces.map((space) => {

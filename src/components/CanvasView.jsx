@@ -177,9 +177,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [history, setHistory] = useState([]) // For undo
   const [historyIndex, setHistoryIndex] = useState(-1) // Current history position
   const [canvasState, setCanvasState] = useState({
-    zoom: 1, // Fixed zoom, no infinite canvas
-    panX: 0, // Fixed position, no panning
-    panY: 0, // Fixed position, no panning
+    zoom: 1,
+    panX: 0,
+    panY: 0,
     rulerEnabled: false,
     showMeasurements: true,
     backgroundColor: '#fafaf9',
@@ -187,6 +187,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     gridSize: 20,
   })
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  
+  // Canvas is 4x larger than viewport
+  const canvasWidth = dimensions.width * 4
+  const canvasHeight = dimensions.height * 4
   const [isGenerating, setIsGenerating] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -254,13 +258,28 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     return () => clearTimeout(timer)
   }, [sidebarOpen, selectedItem])
 
-  // Ensure stage is always at fixed position (0,0) and scale (1,1) - no infinite canvas
+  // Initialize stage position to center of 4x canvas (only if not already loaded from database)
   useEffect(() => {
-    if (stageRef.current) {
-      stageRef.current.position({ x: 0, y: 0 })
-      stageRef.current.scale({ x: 1, y: 1 })
+    if (stageRef.current && canvasWidth > 0 && canvasHeight > 0 && !loading) {
+      // Only initialize if stage is at default position (0,0) and scale (1,1)
+      const currentPos = stageRef.current.position()
+      const currentScale = stageRef.current.scaleX()
+      
+      if (currentPos.x === 0 && currentPos.y === 0 && currentScale === 1) {
+        // Center the viewport on the canvas
+        const initialX = (canvasWidth - dimensions.width) / 2
+        const initialY = (canvasHeight - dimensions.height) / 2
+        stageRef.current.position({ x: initialX, y: initialY })
+        stageRef.current.scale({ x: 1, y: 1 })
+        setCanvasState((prev) => ({
+          ...prev,
+          panX: initialX,
+          panY: initialY,
+          zoom: 1,
+        }))
+      }
     }
-  }, [dimensions.width, dimensions.height])
+  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height, loading])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -318,11 +337,25 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }
         setCanvasState(restoredState)
 
-        // Set stage to fixed position (no infinite canvas)
+        // Restore stage position and zoom
         setTimeout(() => {
-          if (stageRef.current) {
-            stageRef.current.position({ x: 0, y: 0 })
-            stageRef.current.scale({ x: 1, y: 1 })
+          if (stageRef.current && dimensions.width > 0 && dimensions.height > 0) {
+            // Clamp pan to canvas bounds (canvas is 4x larger than viewport)
+            const currentCanvasWidth = dimensions.width * 4
+            const currentCanvasHeight = dimensions.height * 4
+            const maxX = currentCanvasWidth - dimensions.width
+            const maxY = currentCanvasHeight - dimensions.height
+            const clampedX = Math.max(0, Math.min(maxX, restoredState.panX))
+            const clampedY = Math.max(0, Math.min(maxY, restoredState.panY))
+            
+            stageRef.current.position({ x: clampedX, y: clampedY })
+            stageRef.current.scale({ x: restoredState.zoom, y: restoredState.zoom })
+            
+            setCanvasState((prev) => ({
+              ...prev,
+              panX: clampedX,
+              panY: clampedY,
+            }))
           }
         }, 100)
       }
@@ -360,11 +393,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (!projectId || !userId) return
 
     try {
-      // Fixed canvas - always save zoom=1 and pan=0,0
+      const stage = stageRef.current
+      if (!stage) return
+
+      const position = stage.position()
+      const scale = stage.scaleX()
+
       await saveCanvasState(userId, projectId, {
-        zoom_level: 1,
-        pan_x: 0,
-        pan_y: 0,
+        zoom_level: scale,
+        pan_x: position.x,
+        pan_y: position.y,
         ruler_enabled: canvasState.rulerEnabled,
         show_measurements: canvasState.showMeasurements,
         background_color: canvasState.backgroundColor,
@@ -407,7 +445,108 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [userId, selectedItemId])
 
-  // Removed handleStageDragEnd, handleStageDrag, and handleWheel - no infinite canvas
+  const handleStageDragEnd = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    const position = stage.position()
+    const scale = stage.scaleX()
+    
+    // Clamp pan to canvas bounds (4x larger than viewport)
+    const maxX = canvasWidth - dimensions.width
+    const maxY = canvasHeight - dimensions.height
+    const clampedX = Math.max(0, Math.min(maxX, position.x))
+    const clampedY = Math.max(0, Math.min(maxY, position.y))
+    
+    stage.position({ x: clampedX, y: clampedY })
+    
+    setCanvasState((prev) => ({
+      ...prev,
+      panX: clampedX,
+      panY: clampedY,
+      zoom: scale,
+    }))
+    saveCanvasStateToServer()
+  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height, saveCanvasStateToServer])
+
+  const handleStageDrag = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    const position = stage.position()
+    const scale = stage.scaleX()
+    
+    // Clamp pan to canvas bounds during drag
+    const maxX = canvasWidth - dimensions.width
+    const maxY = canvasHeight - dimensions.height
+    const clampedX = Math.max(0, Math.min(maxX, position.x))
+    const clampedY = Math.max(0, Math.min(maxY, position.y))
+    
+    if (clampedX !== position.x || clampedY !== position.y) {
+      stage.position({ x: clampedX, y: clampedY })
+    }
+    
+    // Update state in real-time during drag for grid to update
+    setCanvasState((prev) => ({
+      ...prev,
+      panX: clampedX,
+      panY: clampedY,
+      zoom: scale,
+    }))
+  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height])
+
+  const handleWheel = useCallback((e) => {
+    e.evt.preventDefault()
+
+    const stage = stageRef.current
+    if (!stage) return
+
+    const oldScale = stage.scaleX()
+    const pointer = stage.getPointerPosition()
+    if (!pointer) return
+
+    // Use device-native scroll sensitivity
+    const deltaY = e.evt.deltaY
+    const absDelta = Math.abs(deltaY)
+    
+    // Calculate zoom factor based on scroll amount
+    const baseZoomFactor = 1.001
+    const sensitivity = Math.min(absDelta / 10, 50)
+    const zoomFactor = 1 + (baseZoomFactor * sensitivity)
+    
+    // Apply zoom in the correct direction
+    const proposedScale = deltaY > 0 
+      ? oldScale / zoomFactor  // Zoom out
+      : oldScale * zoomFactor  // Zoom in
+    
+    const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
+
+    const mousePointTo = {
+      x: (pointer.x - stage.x()) / oldScale,
+      y: (pointer.y - stage.y()) / oldScale,
+    }
+
+    const newPos = {
+      x: pointer.x - mousePointTo.x * clampedScale,
+      y: pointer.y - mousePointTo.y * clampedScale,
+    }
+
+    // Clamp pan to canvas bounds
+    const maxX = canvasWidth - dimensions.width
+    const maxY = canvasHeight - dimensions.height
+    const clampedX = Math.max(0, Math.min(maxX, newPos.x))
+    const clampedY = Math.max(0, Math.min(maxY, newPos.y))
+
+    stage.scale({ x: clampedScale, y: clampedScale })
+    stage.position({ x: clampedX, y: clampedY })
+
+    setCanvasState((prev) => ({
+      ...prev,
+      zoom: clampedScale,
+      panX: clampedX,
+      panY: clampedY,
+    }))
+  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height])
 
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
@@ -471,11 +610,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }
 
         // Add to canvas - use safe defaults if dimensions not ready
-        // Fixed canvas - center is always width/2, height/2
+        // Calculate center in world coordinates (accounting for pan/zoom)
         const width = dimensions?.width || window.innerWidth
         const height = dimensions?.height || window.innerHeight
-        const centerX = width / 2
-        const centerY = height / 2
+        const stage = stageRef.current
+        const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
+        const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
         const newItem = await createCanvasItem(userId, projectId, {
           image_url: imageUrl,
@@ -581,11 +721,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     setShowGenerateModal(false)
     
     try {
-      // Fixed canvas - center is always width/2, height/2
+      // Calculate center in world coordinates (accounting for pan/zoom)
+      const stage = stageRef.current
       const width = dimensions?.width || window.innerWidth
       const height = dimensions?.height || window.innerHeight
-      const centerX = width / 2
-      const centerY = height / 2
+      const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
+      const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
       const newItems = []
       
@@ -1037,19 +1178,31 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           style={{ backgroundColor: canvasState.backgroundColor }}
         >
           {/* Grid Background - CSS-based, fixed to viewport, behind Stage */}
-          {canvasState.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (
-            <div
-              className="absolute inset-0 pointer-events-none z-0"
-              style={{
-                backgroundImage: `
-                  linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                  linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-                `,
-                backgroundSize: `${canvasState.gridSize}px ${canvasState.gridSize}px`,
-                backgroundPosition: '0 0',
-              }}
-            />
-          )}
+          {canvasState.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
+            // Calculate grid spacing in screen pixels (scales with zoom)
+            const screenGridSize = canvasState.gridSize * canvasState.zoom
+            const effectiveGridSize = Math.max(10, screenGridSize)
+            
+            // Calculate grid offset based on pan position
+            const offsetX = canvasState.panX % effectiveGridSize
+            const offsetY = canvasState.panY % effectiveGridSize
+            const normalizedOffsetX = offsetX < 0 ? offsetX + effectiveGridSize : offsetX
+            const normalizedOffsetY = offsetY < 0 ? offsetY + effectiveGridSize : offsetY
+            
+            return (
+              <div
+                className="absolute inset-0 pointer-events-none z-0"
+                style={{
+                  backgroundImage: `
+                    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
+                    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
+                  `,
+                  backgroundSize: `${effectiveGridSize}px ${effectiveGridSize}px`,
+                  backgroundPosition: `${normalizedOffsetX}px ${normalizedOffsetY}px`,
+                }}
+              />
+            )
+          })()}
           
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
@@ -1058,11 +1211,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <p className="text-sm text-stone-500">Loading canvas...</p>
               </div>
             </div>
-          ) : dimensions.width > 0 && dimensions.height > 0 && (
+          ) : dimensions.width > 0 && dimensions.height > 0 && canvasWidth > 0 && canvasHeight > 0 && (
             <Stage
               ref={stageRef}
-              width={dimensions.width}
-              height={dimensions.height}
+              width={canvasWidth}
+              height={canvasHeight}
+              draggable
+              onDrag={handleStageDrag}
+              onDragEnd={handleStageDragEnd}
+              onWheel={handleWheel}
               onClick={(e) => {
                 if (e.target === e.target.getStage()) {
                   setSelectedItemId(null)
@@ -1075,12 +1232,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <Layer>
                 {(() => {
                   // Virtual rendering: only render items visible in viewport
-                  // Fixed canvas - viewport is always 0 to dimensions
+                  // Account for pan and zoom
+                  const stage = stageRef.current
+                  if (!stage) return items
+
                   const viewport = {
-                    left: 0,
-                    right: dimensions.width,
-                    top: 0,
-                    bottom: dimensions.height,
+                    left: -stage.x() / stage.scaleX(),
+                    right: (dimensions.width - stage.x()) / stage.scaleX(),
+                    top: -stage.y() / stage.scaleY(),
+                    bottom: (dimensions.height - stage.y()) / stage.scaleY(),
                   }
 
                   // Add padding for items partially visible
@@ -1244,9 +1404,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </button>
             )}
 
-            {/* Zoom Display - Fixed at 100% (no infinite canvas) */}
+            {/* Zoom Display */}
             <div className="px-3 py-1 text-xs text-stone-500 font-medium">
-              100%
+              {Math.round(canvasState.zoom * 100)}%
             </div>
 
             {/* Performance Indicator (dev mode) */}
@@ -1477,9 +1637,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     return
                   }
 
-                  // Fixed canvas - center is always width/2, height/2
-                  const centerX = dimensions.width / 2
-                  const centerY = dimensions.height / 2
+                  // Calculate center in world coordinates (accounting for pan/zoom)
+                  const stage = stageRef.current
+                  const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
+                  const centerY = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
                   try {
                     console.log('Adding asset to canvas:', { assetUrl: asset.url, projectId, userId })

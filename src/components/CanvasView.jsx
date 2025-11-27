@@ -335,6 +335,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId, isSignedIn } = useAuth()
   const stageRef = useRef(null)
   const containerRef = useRef(null)
+  const maskLayerRef = useRef(null)
+  const minimapCanvasRef = useRef(null)
   
   // Early return if essential props are missing
   if (!projectId || !userId || !isSignedIn) {
@@ -414,6 +416,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [history, setHistory] = useState([])
   const [historyIndex, setHistoryIndex] = useState(-1)
   
+  // Compare mode state
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareItems, setCompareItems] = useState([])
+  const [compareSplitPosition, setCompareSplitPosition] = useState(50) // Percentage
+  
+  // Style transfer state
+  const [showStyleTransfer, setShowStyleTransfer] = useState(false)
+  const [styleTransferTargetId, setStyleTransferTargetId] = useState(null)
+  
+  // Minimap and prompt history state
+  const [showMinimap, setShowMinimap] = useState(false)
+  const [showPromptHistory, setShowPromptHistory] = useState(false)
+  const [promptHistory, setPromptHistory] = useState([])
+  
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -446,6 +462,36 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (!items || !Array.isArray(items)) return []
     return items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
   }, [items, selectedItemIds, selectedItemId])
+  
+  // Calculate visible items count for performance indicator
+  const visibleItemsCount = useMemo(() => {
+    if (!items || !Array.isArray(items) || !stageRef.current || dimensions.width === 0 || dimensions.height === 0) {
+      return items?.length || 0
+    }
+    
+    const stage = stageRef.current
+    const viewport = {
+      left: -stage.x() / stage.scaleX(),
+      right: (dimensions.width - stage.x()) / stage.scaleX(),
+      top: -stage.y() / stage.scaleY(),
+      bottom: (dimensions.height - stage.y()) / stage.scaleY(),
+    }
+    
+    const padding = 200
+    return items.filter((item) => {
+      const itemLeft = item.x_position
+      const itemRight = item.x_position + (item.width || 0)
+      const itemTop = item.y_position
+      const itemBottom = item.y_position + (item.height || 0)
+      
+      return !(
+        itemRight < viewport.left - padding ||
+        itemLeft > viewport.right + padding ||
+        itemBottom < viewport.top - padding ||
+        itemTop > viewport.bottom + padding
+      )
+    }).length
+  }, [items, dimensions.width, dimensions.height, canvasState.panX, canvasState.panY, canvasState.zoom])
   
   // Show popup menu when item is selected and update position on pan/zoom
   useEffect(() => {
@@ -1084,15 +1130,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(false)
     }
   }, [userId, projectId, items])
-
-  // Compare mode state
-  const [compareMode, setCompareMode] = useState(false)
-  const [compareItems, setCompareItems] = useState([])
-  const [compareSplitPosition, setCompareSplitPosition] = useState(50) // Percentage
-
-  // Style transfer state
-  const [showStyleTransfer, setShowStyleTransfer] = useState(false)
-  const [styleTransferTargetId, setStyleTransferTargetId] = useState(null)
 
   // Handle context menu actions
   const handleContextMenuAction = useCallback((action, itemId) => {
@@ -1830,6 +1867,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       
       // Add dimension line to the list
       setDimensionLines(prev => [...prev, {
+        id: `dimension-${Date.now()}-${Math.random()}`,
         startX: dimensionStartPos.x,
         startY: dimensionStartPos.y,
         endX: worldX,
@@ -1854,6 +1892,39 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     setDimensionLines([])
     setDimensionMode(false)
   }, [dimensionLines])
+
+  // Minimap click handler
+  const handleMinimapClick = useCallback((e) => {
+    const canvas = minimapCanvasRef.current
+    const stage = stageRef.current
+    if (!canvas || !stage) return
+    
+    const rect = canvas.getBoundingClientRect()
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+    
+    // Convert minimap coordinates to canvas coordinates
+    const canvasWidth = dimensions.width * 4
+    const canvasHeight = dimensions.height * 4
+    const minimapScaleX = canvasWidth / rect.width
+    const minimapScaleY = canvasHeight / rect.height
+    
+    const canvasX = x * minimapScaleX - dimensions.width / 2
+    const canvasY = y * minimapScaleY - dimensions.height / 2
+    
+    // Clamp to canvas bounds
+    const maxX = canvasWidth - dimensions.width
+    const maxY = canvasHeight - dimensions.height
+    const clampedX = Math.max(0, Math.min(maxX, canvasX))
+    const clampedY = Math.max(0, Math.min(maxY, canvasY))
+    
+    stage.position({ x: clampedX, y: clampedY })
+    setCanvasState(prev => ({
+      ...prev,
+      panX: clampedX,
+      panY: clampedY,
+    }))
+  }, [dimensions.width, dimensions.height])
 
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault()
@@ -2940,12 +3011,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         <Text
                           x={length / 2}
                           y={-20}
-                          text={line.distance}
+                          text={`${line.distance}px`}
                           fontSize={12}
                           fill="#1f2937"
                           fontStyle="bold"
                           align="center"
-                          offsetX={line.distance.length * 3}
+                          offsetX={String(line.distance).length * 3}
                         />
                         {/* Arrow heads */}
                         <Line points={[0, 0, 10, -5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />

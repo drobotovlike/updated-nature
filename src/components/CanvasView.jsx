@@ -404,6 +404,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [textPosition, setTextPosition] = useState(null)
   const [textInput, setTextInput] = useState('')
   
+  // Budget stickers state
+  const [budgetStickers, setBudgetStickers] = useState([])
+  
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')

@@ -418,6 +418,23 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   
+  // Undo/Redo handlers - Define early to prevent scope issues
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setItems(history[newIndex] || [])
+    }
+  }, [history, historyIndex])
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      setItems(history[newIndex] || [])
+    }
+  }, [history, historyIndex])
+  
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
   const selectedItem = useMemo(() => {
@@ -1188,9 +1205,29 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [userId, projectId, items, handleItemUpdate])
 
-  // Style transfer keyboard shortcut
+  // Keyboard shortcuts handler
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // Don't handle shortcuts when typing in inputs
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return
+      }
+      
+      // Undo: Cmd/Ctrl+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault()
+        handleUndo()
+        return
+      }
+      
+      // Redo: Cmd/Ctrl+Shift+Z
+      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
+        e.preventDefault()
+        handleRedo()
+        return
+      }
+      
+      // Style transfer: Cmd/Ctrl+T
       if ((e.metaKey || e.ctrlKey) && e.key === 't' && !e.shiftKey && selectedItemId) {
         e.preventDefault()
         setStyleTransferTargetId(selectedItemId)
@@ -1199,7 +1236,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId])
+  }, [selectedItemId, handleUndo, handleRedo])
 
   // Remove background handler
   const handleRemoveBackground = useCallback(async (itemId) => {
@@ -1817,23 +1854,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     setDimensionLines([])
     setDimensionMode(false)
   }, [dimensionLines])
-
-  // Undo/Redo handlers
-  const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1
-      setHistoryIndex(newIndex)
-      setItems(history[newIndex] || [])
-    }
-  }, [history, historyIndex])
-
-  const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1
-      setHistoryIndex(newIndex)
-      setItems(history[newIndex] || [])
-    }
-  }, [history, historyIndex])
 
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault()

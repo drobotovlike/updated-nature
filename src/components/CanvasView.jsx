@@ -2374,6 +2374,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Get project assets and creations - memoized to prevent unnecessary recalculations
   const getProjectAssets = useCallback(() => {
+    if (!sharedAssets || !Array.isArray(sharedAssets)) return []
     return sharedAssets.map(asset => ({
       id: asset.id,
       name: asset.name,

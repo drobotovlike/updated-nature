@@ -209,11 +209,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
   const selectedItem = useMemo(() => {
-    if (!selectedItemId || !items.length) return null
+    if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return null
     return items.find((item) => item.id === selectedItemId) || null
   }, [selectedItemId, items])
   
   const selectedItems = useMemo(() => {
+    if (!items || !Array.isArray(items)) return []
     return items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
   }, [items, selectedItemIds, selectedItemId])
   
@@ -476,14 +477,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [userId, selectedItemId])
 
   const moveToFront = useCallback(async () => {
-    if (!selectedItemId) return
+    if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
     
     const maxZIndex = Math.max(...items.map(item => item.z_index || 0), 0)
     await handleItemUpdate(selectedItemId, { z_index: maxZIndex + 1 })
   }, [selectedItemId, items, handleItemUpdate])
 
   const moveToBack = useCallback(async () => {
-    if (!selectedItemId) return
+    if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
     
     const minZIndex = Math.min(...items.map(item => item.z_index || 0), 0)
     await handleItemUpdate(selectedItemId, { z_index: minZIndex - 1 })
@@ -492,8 +493,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleEdit = useCallback(() => {
     // Open edit modal - use regenerate functionality as "edit"
     setShowGenerateModal(true)
-    if (selectedItem) {
-      setGeneratePrompt(selectedItem.prompt || '')
+    if (selectedItem && selectedItem.prompt) {
+      setGeneratePrompt(selectedItem.prompt)
     }
   }, [selectedItem])
 
@@ -702,6 +703,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }
 
   const regenerateSelected = async (newPrompt) => {
+    if (!selectedItemId || !items || !Array.isArray(items)) return
     const selectedItem = items.find((item) => item.id === selectedItemId)
     if (!selectedItem) return
 
@@ -874,10 +876,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Alignment function
   const alignItems = useCallback((alignment) => {
     if (selectedItemIds.size === 0 && !selectedItemId) return
+    if (!items || !Array.isArray(items)) return
 
     const itemsToAlign = selectedItemIds.size > 0
       ? items.filter(item => selectedItemIds.has(item.id))
-      : [items.find(item => item.id === selectedItemId)]
+      : [items.find(item => item.id === selectedItemId)].filter(Boolean)
 
     if (itemsToAlign.length === 0) return
 
@@ -1075,7 +1078,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   // Virtual rendering: only render items visible in viewport
                   // Account for pan and zoom
                   const stage = stageRef.current
-                  if (!stage) return items
+                  if (!stage || !items || !Array.isArray(items)) return items || []
 
                   const viewport = {
                     left: -stage.x() / stage.scaleX(),

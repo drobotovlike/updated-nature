@@ -394,6 +394,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [isDrawingMask, setIsDrawingMask] = useState(false)
   const [maskPath, setMaskPath] = useState([]) // Store brush strokes
   
+  // Outpaint/Dimension/Text Mode State
+  const [outpaintMode, setOutpaintMode] = useState(false)
+  const [outpaintRect, setOutpaintRect] = useState(null)
+  const [dimensionMode, setDimensionMode] = useState(false)
+  const [dimensionStartPos, setDimensionStartPos] = useState(null)
+  const [dimensionEndPos, setDimensionEndPos] = useState(null)
+  const [textMode, setTextMode] = useState(false)
+  const [textPosition, setTextPosition] = useState(null)
+  const [textInput, setTextInput] = useState('')
+  
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -1696,6 +1706,77 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       zoom: scale,
     }))
   }, [dimensions.width, dimensions.height])
+
+  // Outpaint mode handlers
+  const handleOutpaintMouseDown = useCallback((e) => {
+    const stage = stageRef.current
+    if (!stage) return
+    
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    
+    const worldX = (pos.x - stage.x()) / stage.scaleX()
+    const worldY = (pos.y - stage.y()) / stage.scaleY()
+    
+    setOutpaintRect({ x: worldX, y: worldY, width: 0, height: 0 })
+  }, [])
+
+  const handleOutpaintMouseMove = useCallback((e) => {
+    if (!outpaintRect) return
+    
+    const stage = stageRef.current
+    if (!stage) return
+    
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    
+    const worldX = (pos.x - stage.x()) / stage.scaleX()
+    const worldY = (pos.y - stage.y()) / stage.scaleY()
+    
+    setOutpaintRect(prev => ({
+      ...prev,
+      width: worldX - prev.x,
+      height: worldY - prev.y,
+    }))
+  }, [outpaintRect])
+
+  const handleOutpaintMouseUp = useCallback(() => {
+    if (!outpaintRect || outpaintRect.width === 0 || outpaintRect.height === 0) {
+      setOutpaintRect(null)
+      return
+    }
+    // Outpaint will be triggered when user provides prompt
+  }, [outpaintRect])
+
+  // Dimension mode handler
+  const handleDimensionClick = useCallback((e) => {
+    const stage = stageRef.current
+    if (!stage) return
+    
+    const pos = stage.getPointerPosition()
+    if (!pos) return
+    
+    const worldX = (pos.x - stage.x()) / stage.scaleX()
+    const worldY = (pos.y - stage.y()) / stage.scaleY()
+    
+    if (!dimensionStartPos) {
+      setDimensionStartPos({ x: worldX, y: worldY })
+      setDimensionEndPos(null)
+    } else {
+      setDimensionEndPos({ x: worldX, y: worldY })
+      // Calculate and display distance
+      const dx = worldX - dimensionStartPos.x
+      const dy = worldY - dimensionStartPos.y
+      const distance = Math.sqrt(dx * dx + dy * dy)
+      setError(`Distance: ${Math.round(distance)}px`)
+      // Reset after a delay
+      setTimeout(() => {
+        setDimensionStartPos(null)
+        setDimensionEndPos(null)
+        setDimensionMode(false)
+      }, 2000)
+    }
+  }, [dimensionStartPos])
 
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault()

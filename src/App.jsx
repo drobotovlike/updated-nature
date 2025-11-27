@@ -4,6 +4,7 @@ import { useAuth, useUser } from '@clerk/clerk-react'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { saveProject, getProjects, addFileToProject, getSpaces } from './utils/projectManager'
+import AnimatedRoom from './components/AnimatedRoom'
 
 // Lazy load pages for code splitting and faster initial load
 const PricingPage = lazy(() => import('./pages/PricingPage'))
@@ -133,125 +134,261 @@ function HomePage() {
 
   return (
     <Layout>
-      <div>
-        {/* Hero Section */}
-        <section className="mb-12 md:mb-20 relative">
-          <div className="reveal-element text-center max-w-4xl mx-auto mb-10">
-            <h1 className="text-5xl md:text-7xl lg:text-8xl leading-[0.9] font-semibold tracking-tighter text-stone-950 mb-6">
-              Visualize interiors <br />
-              <span className="text-stone-400 font-light italic font-serif-ature">with</span> native intelligence.
-            </h1>
-            <p className="text-lg text-stone-500 max-w-xl mx-auto leading-relaxed mb-8">
-              Transform empty spaces into fully furnished sanctuaries in seconds. The AI copilot for professional interior designers and architects.
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
+      <div className="overflow-x-hidden">
+        {/* Hero Section - Modern Minimalist */}
+        <section className="min-h-screen flex flex-col justify-center relative pt-20 pb-32 px-4 md:px-8">
+          {/* Navigation Bar */}
+          <nav className="absolute top-0 left-0 right-0 z-50 px-6 md:px-12 py-6 flex items-center justify-between">
+            <div className="text-2xl font-bold tracking-tight text-stone-900">
+              ature studio.
+            </div>
+            <div className="hidden md:flex items-center gap-8">
+              <a href="#features" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
+                Features
+              </a>
+              <a href="#how-it-works" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
+                How It Works
+              </a>
+              <a href="#pricing" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
+                Pricing
+              </a>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="w-full md:w-auto px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm tracking-wide hover:bg-stone-800 transition-all shadow-xl shadow-stone-200 hover:translate-y-[-2px]"
+                className="px-6 py-2.5 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
               >
-                Start Designing Free
-              </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="w-full md:w-auto px-8 py-4 bg-white text-stone-900 border border-stone-200 rounded-full font-semibold text-sm tracking-wide hover:border-stone-400 transition-all flex items-center justify-center gap-2 group"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <polygon points="10 8 16 12 10 16" />
-                </svg>
-                Watch Demo
+                Get Started
               </button>
             </div>
-          </div>
+          </nav>
 
-          {/* Hero Visual */}
-          <div className="reveal-element delay-200 relative w-full aspect-[4/3] md:aspect-[21/9] bg-stone-200 rounded-[2rem] md:rounded-[3rem] overflow-hidden group shadow-2xl shadow-stone-200">
-            <img 
-              src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?q=80&w=2600&auto=format&fit=crop" 
-              alt="AI Designed Interior" 
-              loading="lazy"
-              className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105"
-            />
-            
-            {/* Hotspot 1 */}
-            <div className="absolute top-[55%] left-[20%] md:left-[25%] group/spot pointer-events-auto">
-              <div className="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/spot:opacity-100 transition-all duration-500 transform translate-y-2 group-hover/spot:translate-y-0 min-w-max">
-                <div className="bg-white/90 backdrop-blur-md text-stone-900 px-4 py-2 rounded-xl shadow-xl border border-white/50 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-stone-100 rounded-lg overflow-hidden">
-                    <img src="https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=100&q=80" loading="lazy" className="w-full h-full object-cover" alt="Chair" />
+          {/* Hero Content */}
+          <div className="max-w-7xl mx-auto w-full">
+            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+              {/* Left: Text Content */}
+              <div className="space-y-8">
+                <div className="space-y-6">
+                  <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-stone-900 leading-[1.1]">
+                    Luxurious Interior
+                    <br />
+                    <span className="text-stone-500 font-light">And Industrial Design</span>
+                  </h1>
+                  <p className="text-lg text-stone-600 leading-relaxed max-w-xl">
+                    Crafting spaces that harmonize modern aesthetics with timeless elegance. 
+                    Our AI-powered platform breathes life into every room, redefining the essence of chic living.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm tracking-wide hover:bg-stone-800 transition-all shadow-lg hover:shadow-xl hover:scale-105"
+                  >
+                    Start Creating
+                  </button>
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="px-8 py-4 bg-white text-stone-900 border-2 border-stone-900 rounded-full font-semibold text-sm tracking-wide hover:bg-stone-50 transition-all flex items-center gap-2"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <polygon points="10 8 16 12 10 16" />
+                    </svg>
+                    Watch Demo
+                  </button>
+                </div>
+
+                {/* Stats */}
+                <div className="flex items-center gap-8 pt-8 border-t border-stone-200">
+                  <div>
+                    <div className="text-3xl font-bold text-stone-900">6K+</div>
+                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Specializing In Luxury</div>
                   </div>
-                  <div className="text-left">
-                    <p className="text-[10px] uppercase tracking-wider text-stone-500 font-bold">Generated</p>
-                    <p className="text-xs font-semibold">Kasaya Chair Blend</p>
+                  <div className="w-px h-12 bg-stone-200" />
+                  <div>
+                    <div className="text-3xl font-bold text-stone-900">14</div>
+                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Progress Work</div>
+                  </div>
+                  <div className="w-px h-12 bg-stone-200" />
+                  <div>
+                    <div className="text-3xl font-bold text-stone-900">9</div>
+                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Total Work</div>
                   </div>
                 </div>
               </div>
-              <div className="relative w-4 h-4 md:w-6 md:h-6 bg-white rounded-full shadow-lg cursor-pointer hotspot-pulse flex items-center justify-center">
-                <div className="w-1.5 h-1.5 bg-stone-900 rounded-full"></div>
+
+              {/* Right: Animated Room */}
+              <div className="relative">
+                <AnimatedRoom />
+              </div>
+            </div>
+          </div>
+
+          {/* Scroll Indicator */}
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </div>
+        </section>
+
+        {/* Modern Style Section */}
+        <section className="py-32 px-4 md:px-8 bg-white">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              {/* Left: Large Image */}
+              <div className="relative">
+                <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=1200&q=80"
+                    alt="Modern Interior"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
+
+              {/* Right: Content */}
+              <div className="space-y-8">
+                <div className="inline-block px-4 py-2 bg-stone-100 rounded-full text-xs font-semibold text-stone-600 uppercase tracking-wider mb-4">
+                  Elegance • Timeless
+                </div>
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 leading-tight">
+                  Modern Style
+                  <br />
+                  <span className="text-stone-500 font-light">Timeless Charm</span>
+                </h2>
+                <p className="text-lg text-stone-600 leading-relaxed">
+                  Discover Ature's 2024 preview, featuring sofas, chairs, and armchairs embodying diverse lifestyle concepts, 
+                  alongside striking tables, coffee tables, and sideboards. Each piece tells a story of style and sophistication.
+                </p>
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="inline-flex items-center gap-2 px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm hover:bg-stone-800 transition-colors"
+                >
+                  About Us
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M5 12h14" />
+                    <path d="M12 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Social Proof Section */}
-        <section className="py-10 border-b border-stone-100 mb-20 overflow-hidden">
-          <p className="text-center text-xs font-bold uppercase tracking-widest text-stone-400 mb-8">Trusted by leading design firms</p>
-          <div className="relative w-full max-w-5xl mx-auto">
-            <div className="flex gap-16 md:gap-24 justify-center items-center opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-              <span className="text-xl font-bold tracking-tighter font-serif-ature">ARCHITECTURAL</span>
-              <span className="text-xl font-bold tracking-tight">dwell</span>
-              <span className="text-xl font-serif-ature italic">Vogue Living</span>
-              <span className="text-xl font-bold tracking-tighter">DEZEEN</span>
-              <span className="text-xl font-bold font-mono">HOUZZ</span>
+        {/* Features Section */}
+        <section id="features" className="py-32 px-4 md:px-8 bg-stone-50">
+          <div className="max-w-7xl mx-auto">
+            <div className="text-center max-w-3xl mx-auto mb-20">
+              <div className="inline-block px-4 py-2 bg-stone-200 rounded-full text-xs font-semibold text-stone-600 uppercase tracking-wider mb-6">
+                Features
+              </div>
+              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 mb-6">
+                Design Smarter,
+                <br />
+                <span className="text-stone-500 font-light">Not Harder</span>
+              </h2>
+              <p className="text-lg text-stone-600 leading-relaxed">
+                Eliminate the guesswork from interior staging. Ature gives you the tools to visualize outcomes before lifting a finger.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Feature 1 */}
+              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
+                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-stone-900">Instant Rendering</h3>
+                <p className="text-stone-600 leading-relaxed text-base">
+                  Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds with our GPU clusters.
+                </p>
+              </div>
+
+              {/* Feature 2 */}
+              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
+                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21.16 6.26a1 1 0 0 0-1.41-1.41l-2.4 2.4a2 2 0 0 1-2.24 2.24l-2.4 2.4a1 1 0 0 0 0 1.41l.7.7a1 1 0 0 0 1.41 0l2.4-2.4a2 2 0 0 1 2.24-2.24l2.4-2.4.7.7Z" />
+                    <path d="M11 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" />
+                    <path d="m11 5 8 8" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-stone-900">Intelligent Scale</h3>
+                <p className="text-stone-600 leading-relaxed text-base">
+                  Furniture that actually fits. Our AI analyzes room dimensions to suggest pieces that work within physical constraints.
+                </p>
+              </div>
+
+              {/* Feature 3 */}
+              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
+                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+                    <path d="M22 17.65v-4.26l-9 4.1" />
+                    <path d="M2 17.65v-4.26l9 4.1" />
+                  </svg>
+                </div>
+                <h3 className="text-2xl font-bold mb-4 text-stone-900">Style Consistency</h3>
+                <p className="text-stone-600 leading-relaxed text-base">
+                  Upload a moodboard and let Ature apply the texture, lighting, and vibe to your empty space automatically.
+                </p>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* Benefits Section */}
-        <section id="features" className="mb-32 max-w-7xl mx-auto">
-          <div className="text-center max-w-2xl mx-auto mb-16 reveal-element">
-            <h2 className="text-3xl md:text-5xl font-semibold tracking-tight text-stone-900 mb-4">Design smarter, not harder.</h2>
-            <p className="text-stone-500 text-lg">Eliminate the guesswork from interior staging. Ature gives you the tools to visualize outcomes before lifting a finger.</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Benefit 1 */}
-            <div className="p-8 rounded-[2rem] bg-white border border-stone-200 hover:shadow-lg transition-shadow reveal-element delay-100">
-              <div className="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
+        {/* Collection Section */}
+        <section className="py-32 px-4 md:px-8 bg-white">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col md:flex-row justify-between items-end mb-16">
+              <div>
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 mb-4">
+                  Explore Our
+                  <br />
+                  <span className="text-stone-500 font-light">Proudly Collection</span>
+                </h2>
               </div>
-              <h3 className="text-xl font-semibold mb-3">Instant Rendering</h3>
-              <p className="text-stone-500 leading-relaxed">Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds with our GPU clusters.</p>
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="px-6 py-3 bg-stone-900 text-white rounded-full font-semibold text-sm hover:bg-stone-800 transition-colors"
+              >
+                View More
+              </button>
             </div>
 
-            {/* Benefit 2 */}
-            <div className="p-8 rounded-[2rem] bg-white border border-stone-200 hover:shadow-lg transition-shadow reveal-element delay-200">
-              <div className="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
-                  <path d="M21.16 6.26a1 1 0 0 0-1.41-1.41l-2.4 2.4a2 2 0 0 1-2.24 2.24l-2.4 2.4a1 1 0 0 0 0 1.41l.7.7a1 1 0 0 0 1.41 0l2.4-2.4a2 2 0 0 1 2.24-2.24l2.4-2.4.7.7Z" />
-                  <path d="M11 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" />
-                  <path d="m11 5 8 8" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Intelligent Scale</h3>
-              <p className="text-stone-500 leading-relaxed">Furniture that actually fits. Our AI analyzes room dimensions to suggest pieces that work within physical constraints.</p>
-            </div>
-
-            {/* Benefit 3 */}
-            <div className="p-8 rounded-[2rem] bg-white border border-stone-200 hover:shadow-lg transition-shadow reveal-element delay-300">
-              <div className="w-12 h-12 bg-stone-100 rounded-xl flex items-center justify-center mb-6">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
-                  <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
-                  <path d="M22 17.65v-4.26l-9 4.1" />
-                  <path d="M2 17.65v-4.26l9 4.1" />
-                  <path d="M22 17.65v-4.26l-9 4.1" />
-                  <path d="M2 17.65v-4.26l9 4.1" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Style Consistency</h3>
-              <p className="text-stone-500 leading-relaxed">Upload a moodboard and let Ature apply the texture, lighting, and vibe to your empty space automatically.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[
+                { name: 'Contemporary Living', image: 'https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=800&q=80' },
+                { name: 'Modern Kitchen', image: 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e8?w=800&q=80' },
+                { name: 'Elegant Bedroom', image: 'https://images.unsplash.com/photo-1631889993954-1b985a6a890f?w=800&q=80' },
+              ].map((item, index) => (
+                <div
+                  key={index}
+                  className="group relative aspect-[4/3] rounded-3xl overflow-hidden cursor-pointer"
+                  onClick={() => navigate('/dashboard')}
+                >
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <h3 className="text-2xl font-bold text-white mb-2">{item.name}</h3>
+                    <div className="w-12 h-1 bg-white rounded-full" />
+                  </div>
+                  <div className="absolute top-6 right-6 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
+                      <path d="M5 12h14" />
+                      <path d="M12 5l7 7-7 7" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -430,36 +567,100 @@ function HomePage() {
         </section>
 
         {/* CTA Section */}
-        <section className="mb-20 reveal-element">
-          <div className="bg-stone-900 rounded-[3rem] py-20 px-6 text-center text-white relative overflow-hidden">
-            <div className="relative z-10 max-w-2xl mx-auto">
-              <h2 className="text-4xl md:text-6xl font-semibold tracking-tighter mb-6">Ready to transform your workflow?</h2>
-              <p className="text-stone-400 text-lg mb-10">Join 10,000+ designers using Ature to visualize the future of living spaces.</p>
-              
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="w-full sm:w-auto px-8 py-4 bg-white text-stone-900 rounded-full font-bold hover:bg-stone-100 transition-colors"
-                >
-                  Get Started Free
-                </button>
-                <button
-                  onClick={() => navigate('/pricing')}
-                  className="w-full sm:w-auto px-8 py-4 bg-stone-800 border border-stone-700 text-white rounded-full font-bold hover:bg-stone-700 transition-colors"
-                >
-                  Book a Demo
-                </button>
+        <section className="py-32 px-4 md:px-8 bg-stone-900 relative overflow-hidden">
+          <div className="max-w-7xl mx-auto relative z-10">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              {/* Left: Text */}
+              <div className="text-white">
+                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
+                  Engage with Us
+                  <br />
+                  <span className="text-stone-400 font-light">In Conversation</span>
+                </h2>
+                <p className="text-lg text-stone-300 leading-relaxed mb-8 max-w-xl">
+                  In a global world based on communication, a brand must look beyond its borders, open up to new experiences, 
+                  and dare to be different. Meeting the brightest minds of one's time is the most effective way to nurture creativity.
+                </p>
+                <div className="flex flex-col sm:flex-row items-start gap-4">
+                  <button
+                    onClick={() => navigate('/dashboard')}
+                    className="px-8 py-4 bg-white text-stone-900 rounded-full font-bold hover:bg-stone-100 transition-colors"
+                  >
+                    Get Started Free
+                  </button>
+                  <button
+                    onClick={() => navigate('/pricing')}
+                    className="px-8 py-4 bg-stone-800 border-2 border-stone-700 text-white rounded-full font-bold hover:bg-stone-700 transition-colors"
+                  >
+                    Book a Demo
+                  </button>
+                </div>
+                <p className="mt-6 text-sm text-stone-400">No credit card required for free tier.</p>
               </div>
-              <p className="mt-6 text-xs text-stone-500">No credit card required for free tier.</p>
-            </div>
-            
-            {/* Decorative Blurs */}
-            <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-              <div className="absolute top-[-10%] left-[-10%] w-96 h-96 bg-purple-500/20 rounded-full blur-3xl"></div>
-              <div className="absolute bottom-[-10%] right-[-10%] w-96 h-96 bg-orange-500/20 rounded-full blur-3xl"></div>
+
+              {/* Right: Image */}
+              <div className="relative">
+                <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
+                  <img
+                    src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=1200&q=80"
+                    alt="Interior Design"
+                    className="w-full h-full object-cover"
+                    loading="lazy"
+                  />
+                </div>
+              </div>
             </div>
           </div>
+
+          {/* Decorative Elements */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
         </section>
+
+        {/* Footer */}
+        <footer className="bg-black text-white py-20 px-4 md:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid md:grid-cols-4 gap-12 mb-12">
+              <div>
+                <h3 className="text-2xl font-bold mb-4">ature studio.</h3>
+                <p className="text-stone-400 text-sm leading-relaxed">
+                  The AI copilot for professional interior designers and architects.
+                </p>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">About</h4>
+                <ul className="space-y-2 text-stone-400 text-sm">
+                  <li><a href="#" className="hover:text-white transition-colors">Our Story</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Store Locator</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Sustainability</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">Customer Service</h4>
+                <ul className="space-y-2 text-stone-400 text-sm">
+                  <li><a href="#" className="hover:text-white transition-colors">Prices and Payments</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Shipping</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Return Policy</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+                </ul>
+              </div>
+              <div>
+                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">Social Media</h4>
+                <ul className="space-y-2 text-stone-400 text-sm">
+                  <li><a href="#" className="hover:text-white transition-colors">Instagram</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">Facebook</a></li>
+                  <li><a href="#" className="hover:text-white transition-colors">LinkedIn</a></li>
+                </ul>
+              </div>
+            </div>
+            <div className="pt-8 border-t border-stone-800 text-center">
+              <p className="text-stone-400 text-sm">© 2024 Ature Studio. All rights reserved.</p>
+            </div>
+          </div>
+        </footer>
 
       </div>
     </Layout>

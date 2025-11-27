@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { ClerkProvider } from '@clerk/clerk-react'
 import { Analytics } from '@vercel/analytics/react'
+import { FontPreload } from './components/ui/FontPreload'
 import './index.css'
 import App from './App.jsx'
 
@@ -151,6 +152,7 @@ try {
     // ClerkProvider must wrap the app for hooks like useAuth() to work
     root.render(
       <StrictMode>
+        <FontPreload />
         <ErrorBoundary>
           <ClerkProvider 
             publishableKey={PUBLISHABLE_KEY}

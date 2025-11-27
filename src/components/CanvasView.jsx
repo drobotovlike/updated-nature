@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
-import { Stage, Layer, Image, Group, Rect, Text, Circle } from 'react-konva'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { Stage, Layer, Image, Group, Rect, Line, Text, Circle } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
 import useImage from 'use-image'
@@ -11,6 +11,69 @@ import { uploadFileToCloud } from '../utils/cloudProjectManager'
 // Zoom constants
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
+
+// Dynamic Grid Component - Updates with zoom and pan for better navigation
+function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
+  const lines = useMemo(() => {
+    const gridLines = []
+    
+    // Calculate visible world area
+    const worldLeft = -panX / zoom
+    const worldRight = (width - panX) / zoom
+    const worldTop = -panY / zoom
+    const worldBottom = (height - panY) / zoom
+
+    // Adaptive grid size based on zoom level
+    // At low zoom, use larger grid spacing to reduce line count and improve performance
+    const effectiveGridSize = zoom < 0.5 ? gridSize * 4 : zoom < 1 ? gridSize * 2 : gridSize
+
+    // Calculate grid line positions in world space
+    const gridStartX = Math.floor(worldLeft / effectiveGridSize) * effectiveGridSize
+    const gridEndX = Math.ceil(worldRight / effectiveGridSize) * effectiveGridSize
+    const gridStartY = Math.floor(worldTop / effectiveGridSize) * effectiveGridSize
+    const gridEndY = Math.ceil(worldBottom / effectiveGridSize) * effectiveGridSize
+
+    // Draw vertical lines
+    for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
+      const screenX = worldX * zoom + panX
+      // Only draw if line is within viewport bounds (with padding for smooth scrolling)
+      if (screenX >= -100 && screenX <= width + 100) {
+        gridLines.push(
+          <Line
+            key={`v-${worldX}`}
+            points={[screenX, 0, screenX, height]}
+            stroke="#e5e7eb"
+            strokeWidth={Math.max(0.5, 1 / Math.max(0.25, zoom))}
+            listening={false}
+            perfect={false}
+          />
+        )
+      }
+    }
+
+    // Draw horizontal lines
+    for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
+      const screenY = worldY * zoom + panY
+      // Only draw if line is within viewport bounds
+      if (screenY >= -100 && screenY <= height + 100) {
+        gridLines.push(
+          <Line
+            key={`h-${worldY}`}
+            points={[0, screenY, width, screenY]}
+            stroke="#e5e7eb"
+            strokeWidth={Math.max(0.5, 1 / Math.max(0.25, zoom))}
+            listening={false}
+            perfect={false}
+          />
+        )
+      }
+    }
+
+    return gridLines
+  }, [gridSize, width, height, panX, panY, zoom])
+
+  return <Group>{lines}</Group>
+}
 
 // Canvas Item Component
 function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, showMeasurements, zoom }) {
@@ -183,6 +246,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     rulerEnabled: false,
     showMeasurements: true,
     backgroundColor: '#fafaf9',
+    gridEnabled: true,
+    gridSize: 20,
   })
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
   const [isGenerating, setIsGenerating] = useState(false)
@@ -303,6 +368,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           rulerEnabled: data.state.ruler_enabled || false,
           showMeasurements: data.state.show_measurements !== false,
           backgroundColor: data.state.background_color || '#fafaf9',
+          gridEnabled: data.state.grid_enabled !== false,
+          gridSize: data.state.grid_size || 20,
         }
         setCanvasState(restoredState)
 
@@ -361,6 +428,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         ruler_enabled: canvasState.rulerEnabled,
         show_measurements: canvasState.showMeasurements,
         background_color: canvasState.backgroundColor,
+        grid_enabled: canvasState.gridEnabled,
+        grid_size: canvasState.gridSize,
       })
     } catch (error) {
       console.error('Error saving canvas state:', error)
@@ -1131,6 +1200,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 }
               }}
             >
+              {/* Grid Layer - Must be first layer (behind items) */}
+              {canvasState.gridEnabled && (
+                <Layer
+                  key={`grid-${canvasState.panX}-${canvasState.panY}-${canvasState.zoom}-${dimensions.width}-${dimensions.height}`}
+                >
+                  <GridLayer
+                    gridSize={canvasState.gridSize}
+                    width={dimensions.width}
+                    height={dimensions.height}
+                    panX={canvasState.panX}
+                    panY={canvasState.panY}
+                    zoom={canvasState.zoom}
+                  />
+                </Layer>
+              )}
+
               {/* Canvas Items Layer - Virtual Rendering */}
               <Layer>
                 {(() => {
@@ -1215,6 +1300,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             {/* Canvas Controls */}
             <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1">
+              <button
+                onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
+                className={`p-1.5 rounded-full transition-colors ${
+                  canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                }`}
+                title="Toggle Grid"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="7" height="7" />
+                  <rect x="14" y="3" width="7" height="7" />
+                  <rect x="14" y="14" width="7" height="7" />
+                  <rect x="3" y="14" width="7" height="7" />
+                </svg>
+              </button>
               <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
                 className={`p-1.5 rounded-full transition-colors ${

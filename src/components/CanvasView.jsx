@@ -740,6 +740,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     loadStyles()
   }, [userId])
 
+  // Save history state - wrapper function for saveHistoryToDB
+  const saveToHistory = useCallback(async (itemsToSave) => {
+    if (!projectId || !itemsToSave) return
+    
+    try {
+      await saveHistoryToDB(projectId, {
+        items: itemsToSave,
+        timestamp: Date.now(),
+      })
+    } catch (error) {
+      console.error('Error saving history:', error)
+      // Don't throw - history is non-critical
+    }
+  }, [projectId])
+
   const saveCanvasStateToServer = useCallback(async () => {
     if (!projectId || !userId) return
 

@@ -407,6 +407,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Budget stickers state
   const [budgetStickers, setBudgetStickers] = useState([])
   
+  // Dimension lines state (for measurements)
+  const [dimensionLines, setDimensionLines] = useState([])
+  
+  // History state (for undo/redo)
+  const [history, setHistory] = useState([])
+  const [historyIndex, setHistoryIndex] = useState(-1)
+  
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -758,15 +765,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (!projectId || !itemsToSave) return
     
     try {
+      // Save to IndexedDB
       await saveHistoryToDB(projectId, {
         items: itemsToSave,
         timestamp: Date.now(),
       })
+      
+      // Also update in-memory history for undo/redo
+      const itemsArray = Array.isArray(itemsToSave) ? itemsToSave : []
+      setHistory(prev => {
+        const newHistory = prev.slice(0, historyIndex + 1)
+        newHistory.push(itemsArray)
+        // Keep only last 50 states
+        return newHistory.slice(-50)
+      })
+      setHistoryIndex(prev => Math.min(prev + 1, 49))
     } catch (error) {
       console.error('Error saving history:', error)
       // Don't throw - history is non-critical
     }
-  }, [projectId])
+  }, [projectId, historyIndex])
 
   const saveCanvasStateToServer = useCallback(async () => {
     if (!projectId || !userId) return
@@ -1772,6 +1790,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const dy = worldY - dimensionStartPos.y
       const distance = Math.sqrt(dx * dx + dy * dy)
       setError(`Distance: ${Math.round(distance)}px`)
+      
+      // Add dimension line to the list
+      setDimensionLines(prev => [...prev, {
+        startX: dimensionStartPos.x,
+        startY: dimensionStartPos.y,
+        endX: worldX,
+        endY: worldY,
+        distance: Math.round(distance),
+      }])
+      
       // Reset after a delay
       setTimeout(() => {
         setDimensionStartPos(null)
@@ -1780,6 +1808,32 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }, 2000)
     }
   }, [dimensionStartPos])
+
+  // Save dimension lines handler
+  const saveDimensionLines = useCallback(() => {
+    // Dimension lines are already saved in state
+    // This could be extended to save to database or export
+    console.log('Dimension lines saved:', dimensionLines)
+    setDimensionLines([])
+    setDimensionMode(false)
+  }, [dimensionLines])
+
+  // Undo/Redo handlers
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      const newIndex = historyIndex - 1
+      setHistoryIndex(newIndex)
+      setItems(history[newIndex] || [])
+    }
+  }, [history, historyIndex])
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      const newIndex = historyIndex + 1
+      setHistoryIndex(newIndex)
+      setItems(history[newIndex] || [])
+    }
+  }, [history, historyIndex])
 
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault()

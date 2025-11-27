@@ -2513,10 +2513,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               {activeTab === 'assets' && (
                 <AssetLibrary
                   userId={userId}
-                  onSelect={(asset) => {
-                    const file = { url: asset.url, name: asset.name }
-                    handleFileUpload(file, null)
-                    setSidebarOpen(false)
+                  onSelect={async (asset) => {
+                    try {
+                      // Fetch the image and create a File object
+                      const response = await fetch(asset.url)
+                      const blob = await response.blob()
+                      const file = new File([blob], asset.name || 'asset.png', { type: blob.type || 'image/png' })
+                      await handleFileUpload(file, null)
+                      setSidebarOpen(false)
+                    } catch (error) {
+                      console.error('Error loading asset:', error)
+                      setError('Failed to load asset. Please try again.')
+                    }
                   }}
                 />
               )}
@@ -2530,10 +2538,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         <div
                           key={creation.id}
                           className="aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary-400 transition-colors"
-                          onClick={() => {
-                            const file = { url: creation.url, name: creation.name }
-                            handleFileUpload(file, null)
-                            setSidebarOpen(false)
+                          onClick={async () => {
+                            try {
+                              // Fetch the image and create a File object
+                              const response = await fetch(creation.url)
+                              const blob = await response.blob()
+                              const file = new File([blob], creation.name || 'creation.png', { type: blob.type || 'image/png' })
+                              await handleFileUpload(file, null)
+                              setSidebarOpen(false)
+                            } catch (error) {
+                              console.error('Error loading creation:', error)
+                              setError('Failed to load creation. Please try again.')
+                            }
                           }}
                         >
                           <img src={creation.url} alt={creation.name} className="w-full h-full object-cover" />

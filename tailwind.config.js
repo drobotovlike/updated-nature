@@ -8,29 +8,28 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Dark-mode first palette
+        // Warm natural palette
         background: {
-          base: '#0A0A0A',
-          elevated: '#111111',
-          surface: '#1C1C1E',
+          base: '#F6F2EE', // warm paper
+          elevated: '#FFFFFF', // cards
+          surface: '#F1EBE4', // secondary surfaces
         },
         surface: {
-          base: '#1F1F1F',
-          elevated: '#242426',
-          raised: '#2C2C2E',
+          base: '#FFFFFF', // cards, buttons
+          elevated: '#F1EBE4', // secondary surfaces
+          raised: '#FFFFFF',
         },
-        primary: {
-          300: '#6EE7B7',
-          400: '#34D399',
-          500: '#10B981',
+        accent: {
+          clay: '#D97757', // CTA buttons
+          rattan: '#C5A26D', // subtle highlights
         },
         text: {
-          primary: '#F9FAFB',
-          secondary: '#9CA3AF',
-          tertiary: '#6B7280',
+          primary: '#2C2C2C', // almost-black
+          secondary: '#7C7C7C', // secondary text
+          tertiary: '#A8A8A8',
         },
         border: {
-          DEFAULT: 'rgba(55, 65, 81, 0.6)',
+          DEFAULT: 'rgba(44, 44, 44, 0.1)',
         },
         error: {
           400: '#FB7185',
@@ -43,7 +42,8 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Inter var', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['Inter', 'Inter var', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        display: ['Space Grotesk', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       fontSize: {
         xs: ['clamp(0.75rem, 0.7rem + 0.25vw, 0.8rem)', { lineHeight: '1.5', letterSpacing: '0.01em' }],
@@ -69,9 +69,11 @@ export default {
         '20': '20px', // For squircle
       },
       boxShadow: {
-        sm: '0 1px 2px 0 rgb(0 0 0 / 0.15)',
-        DEFAULT: '0 4px 6px -1px rgb(0 0 0 / 0.2)',
-        lg: '0 10px 15px -3px rgb(0 0 0 / 0.25)',
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.08)',
+        DEFAULT: '0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05)',
+        'oak': '0 4px 12px -2px rgba(44, 44, 44, 0.08), 0 2px 4px -1px rgba(44, 44, 44, 0.04)',
+        'clay-pressed': 'inset 0 1px 2px 0 rgba(217, 119, 87, 0.2)',
       },
       transitionTimingFunction: {
         'apple': 'cubic-bezier(0.25, 0.8, 0.25, 1)',

@@ -3,8 +3,8 @@ import { Routes, Route, Link, useNavigate } from 'react-router-dom'
 import { useAuth, useUser } from '@clerk/clerk-react'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
+import ScrollRoomAnimation from './components/ScrollRoomAnimation'
 import { saveProject, getProjects, addFileToProject, getSpaces } from './utils/projectManager'
-import AnimatedRoom from './components/AnimatedRoom'
 
 // Lazy load pages for code splitting and faster initial load
 const PricingPage = lazy(() => import('./pages/PricingPage'))
@@ -134,261 +134,102 @@ function HomePage() {
 
   return (
     <Layout>
-      <div className="overflow-x-hidden">
-        {/* Hero Section - Modern Minimalist */}
-        <section className="min-h-screen flex flex-col justify-center relative pt-20 pb-32 px-4 md:px-8">
-          {/* Navigation Bar */}
-          <nav className="absolute top-0 left-0 right-0 z-50 px-6 md:px-12 py-6 flex items-center justify-between">
-            <div className="text-2xl font-bold tracking-tight text-stone-900">
-              ature studio.
-            </div>
-            <div className="hidden md:flex items-center gap-8">
-              <a href="#features" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
-                Features
-              </a>
-              <a href="#how-it-works" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
-                How It Works
-              </a>
-              <a href="#pricing" className="text-sm font-medium text-stone-600 hover:text-stone-900 transition-colors">
-                Pricing
-              </a>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-2.5 bg-stone-900 text-white rounded-full text-sm font-semibold hover:bg-stone-800 transition-colors"
-              >
-                Get Started
-              </button>
-            </div>
-          </nav>
-
-          {/* Hero Content */}
-          <div className="max-w-7xl mx-auto w-full">
-            <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-              {/* Left: Text Content */}
-              <div className="space-y-8">
-                <div className="space-y-6">
-                  <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold tracking-tight text-stone-900 leading-[1.1]">
-                    Luxurious Interior
-                    <br />
-                    <span className="text-stone-500 font-light">And Industrial Design</span>
+      <div className="bg-[#F6F2EE]">
+        {/* Hero Section */}
+        <section className="relative min-h-screen flex flex-col items-center justify-center px-4 md:px-8 pt-20 pb-32">
+          <div className="text-center max-w-5xl mx-auto mb-16 reveal-element">
+            <h1 className="font-display text-6xl md:text-8xl lg:text-9xl leading-[0.9] font-semibold tracking-[-0.03em] text-[#2C2C2C] mb-8">
+              Let the room<br />
+              <span className="text-[#7C7C7C] font-light">grow around you.</span>
             </h1>
-                  <p className="text-lg text-stone-600 leading-relaxed max-w-xl">
-                    Crafting spaces that harmonize modern aesthetics with timeless elegance. 
-                    Our AI-powered platform breathes life into every room, redefining the essence of chic living.
+            <p className="text-xl md:text-2xl text-[#7C7C7C] max-w-2xl mx-auto leading-relaxed mb-12 font-medium">
+              Sketch, speak, see. We'll weave the rest.
             </p>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-start gap-4">
+            <div className="flex flex-col md:flex-row items-center justify-center gap-4">
               <button
                 onClick={() => navigate('/dashboard')}
-                    className="px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm tracking-wide hover:bg-stone-800 transition-all shadow-lg hover:shadow-xl hover:scale-105"
+                className="clay-button w-full md:w-auto px-10 py-4 text-white rounded-full font-semibold text-base tracking-wide hover:opacity-90 transition-all shadow-lg hover-lift"
               >
-                    Start Creating
+                Start sketching
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
-                    className="px-8 py-4 bg-white text-stone-900 border-2 border-stone-900 rounded-full font-semibold text-sm tracking-wide hover:bg-stone-50 transition-all flex items-center gap-2"
+                className="w-full md:w-auto px-10 py-4 bg-transparent text-[#C5A26D] border-2 border-[#C5A26D] rounded-full font-semibold text-base tracking-wide hover:bg-[#C5A26D]/10 transition-all flex items-center justify-center gap-2 group"
               >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polygon points="10 8 16 12 10 16" />
                 </svg>
-                Watch Demo
+                Watch 30s tour
               </button>
             </div>
-
-                {/* Stats */}
-                <div className="flex items-center gap-8 pt-8 border-t border-stone-200">
-                  <div>
-                    <div className="text-3xl font-bold text-stone-900">6K+</div>
-                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Specializing In Luxury</div>
-                  </div>
-                  <div className="w-px h-12 bg-stone-200" />
-                  <div>
-                    <div className="text-3xl font-bold text-stone-900">14</div>
-                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Progress Work</div>
-                  </div>
-                  <div className="w-px h-12 bg-stone-200" />
-                  <div>
-                    <div className="text-3xl font-bold text-stone-900">9</div>
-                    <div className="text-xs text-stone-500 uppercase tracking-wider mt-1">Total Work</div>
-                  </div>
-            </div>
-          </div>
-
-              {/* Right: Animated Room */}
-              <div className="relative">
-                <AnimatedRoom />
-              </div>
-            </div>
-          </div>
-
-          {/* Scroll Indicator */}
-          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
           </div>
         </section>
 
-        {/* Modern Style Section */}
-        <section className="py-32 px-4 md:px-8 bg-white">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              {/* Left: Large Image */}
-              <div className="relative">
-                <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
-                  <img
-                    src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=1200&q=80"
-                    alt="Modern Interior"
-                    className="w-full h-full object-cover"
-              loading="lazy"
-                  />
-                  </div>
-                  </div>
+        {/* Scroll Animation Section - Furniture Appearing */}
+        <section className="relative -mt-32 mb-32">
+          <ScrollRoomAnimation />
+        </section>
 
-              {/* Right: Content */}
-              <div className="space-y-8">
-                <div className="inline-block px-4 py-2 bg-stone-100 rounded-full text-xs font-semibold text-stone-600 uppercase tracking-wider mb-4">
-                  Elegance • Timeless
-                </div>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 leading-tight">
-                  Modern Style
-                  <br />
-                  <span className="text-stone-500 font-light">Timeless Charm</span>
-                </h2>
-                <p className="text-lg text-stone-600 leading-relaxed">
-                  Discover Ature's 2024 preview, featuring sofas, chairs, and armchairs embodying diverse lifestyle concepts, 
-                  alongside striking tables, coffee tables, and sideboards. Each piece tells a story of style and sophistication.
-                </p>
-                <button
-                  onClick={() => navigate('/dashboard')}
-                  className="inline-flex items-center gap-2 px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm hover:bg-stone-800 transition-colors"
-                >
-                  About Us
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14" />
-                    <path d="M12 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+        {/* Social Proof Section */}
+        <section className="py-16 border-b border-[#F1EBE4] mb-32 overflow-hidden">
+          <p className="text-center text-xs font-bold uppercase tracking-widest text-[#7C7C7C] mb-12">Trusted by leading design firms</p>
+          <div className="relative w-full max-w-5xl mx-auto">
+            <div className="flex gap-16 md:gap-24 justify-center items-center opacity-40 grayscale hover:grayscale-0 transition-all duration-500">
+              <span className="text-xl font-display font-bold tracking-tighter text-[#2C2C2C]">ARCHITECTURAL</span>
+              <span className="text-xl font-display font-bold tracking-tight text-[#2C2C2C]">dwell</span>
+              <span className="text-xl font-display italic text-[#2C2C2C]">Vogue Living</span>
+              <span className="text-xl font-display font-bold tracking-tighter text-[#2C2C2C]">DEZEEN</span>
+              <span className="text-xl font-display font-bold font-mono text-[#2C2C2C]">HOUZZ</span>
             </div>
           </div>
         </section>
 
-        {/* Features Section */}
-        <section id="features" className="py-32 px-4 md:px-8 bg-stone-50">
-          <div className="max-w-7xl mx-auto">
-            <div className="text-center max-w-3xl mx-auto mb-20">
-              <div className="inline-block px-4 py-2 bg-stone-200 rounded-full text-xs font-semibold text-stone-600 uppercase tracking-wider mb-6">
-                Features
-            </div>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 mb-6">
-                Design Smarter,
-                <br />
-                <span className="text-stone-500 font-light">Not Harder</span>
-              </h2>
-              <p className="text-lg text-stone-600 leading-relaxed">
-                Eliminate the guesswork from interior staging. Ature gives you the tools to visualize outcomes before lifting a finger.
-              </p>
+        {/* Benefits Section */}
+        <section id="features" className="mb-32 max-w-7xl mx-auto px-4 md:px-8">
+          <div className="text-center max-w-2xl mx-auto mb-20 reveal-element">
+            <h2 className="font-display text-4xl md:text-6xl font-semibold tracking-[-0.03em] text-[#2C2C2C] mb-6">Design smarter, not harder.</h2>
+            <p className="text-lg md:text-xl text-[#7C7C7C] font-medium">Eliminate the guesswork from interior staging. Ature gives you the tools to visualize outcomes before lifting a finger.</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Feature 1 */}
-              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
-                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Benefit 1 */}
+            <div className="p-10 rounded-3xl bg-white border border-[#F1EBE4] hover-lift oak-grain linen-texture reveal-element delay-100">
+              <div className="w-14 h-14 bg-[#F1EBE4] rounded-2xl flex items-center justify-center mb-8 rattan-pattern">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97757" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
               </div>
-                <h3 className="text-2xl font-bold mb-4 text-stone-900">Instant Rendering</h3>
-                <p className="text-stone-600 leading-relaxed text-base">
-                  Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds with our GPU clusters.
-                </p>
+              <h3 className="font-display text-2xl font-semibold mb-4 text-[#2C2C2C] tracking-[-0.02em]">Instant Rendering</h3>
+              <p className="text-[#7C7C7C] leading-relaxed font-medium">Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds with our GPU clusters.</p>
             </div>
 
-              {/* Feature 2 */}
-              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
-                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Benefit 2 */}
+            <div className="p-10 rounded-3xl bg-white border border-[#F1EBE4] hover-lift oak-grain linen-texture reveal-element delay-200">
+              <div className="w-14 h-14 bg-[#F1EBE4] rounded-2xl flex items-center justify-center mb-8 rattan-pattern">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97757" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21.16 6.26a1 1 0 0 0-1.41-1.41l-2.4 2.4a2 2 0 0 1-2.24 2.24l-2.4 2.4a1 1 0 0 0 0 1.41l.7.7a1 1 0 0 0 1.41 0l2.4-2.4a2 2 0 0 1 2.24-2.24l2.4-2.4.7.7Z" />
                   <path d="M11 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6" />
                   <path d="m11 5 8 8" />
                 </svg>
               </div>
-                <h3 className="text-2xl font-bold mb-4 text-stone-900">Intelligent Scale</h3>
-                <p className="text-stone-600 leading-relaxed text-base">
-                  Furniture that actually fits. Our AI analyzes room dimensions to suggest pieces that work within physical constraints.
-                </p>
+              <h3 className="font-display text-2xl font-semibold mb-4 text-[#2C2C2C] tracking-[-0.02em]">Intelligent Scale</h3>
+              <p className="text-[#7C7C7C] leading-relaxed font-medium">Furniture that actually fits. Our AI analyzes room dimensions to suggest pieces that work within physical constraints.</p>
             </div>
 
-              {/* Feature 3 */}
-              <div className="group p-10 rounded-3xl bg-white border-2 border-stone-200 hover:border-stone-900 transition-all hover:shadow-2xl">
-                <div className="w-16 h-16 bg-stone-900 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            {/* Benefit 3 */}
+            <div className="p-10 rounded-3xl bg-white border border-[#F1EBE4] hover-lift oak-grain linen-texture reveal-element delay-300">
+              <div className="w-14 h-14 bg-[#F1EBE4] rounded-2xl flex items-center justify-center mb-8 rattan-pattern">
+                <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D97757" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z" />
+                  <path d="M22 17.65v-4.26l-9 4.1" />
+                  <path d="M2 17.65v-4.26l9 4.1" />
                   <path d="M22 17.65v-4.26l-9 4.1" />
                   <path d="M2 17.65v-4.26l9 4.1" />
                 </svg>
               </div>
-                <h3 className="text-2xl font-bold mb-4 text-stone-900">Style Consistency</h3>
-                <p className="text-stone-600 leading-relaxed text-base">
-                  Upload a moodboard and let Ature apply the texture, lighting, and vibe to your empty space automatically.
-                </p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Collection Section */}
-        <section className="py-32 px-4 md:px-8 bg-white">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col md:flex-row justify-between items-end mb-16">
-              <div>
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-stone-900 mb-4">
-                  Explore Our
-                  <br />
-                  <span className="text-stone-500 font-light">Proudly Collection</span>
-                </h2>
-              </div>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-3 bg-stone-900 text-white rounded-full font-semibold text-sm hover:bg-stone-800 transition-colors"
-              >
-                View More
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {[
-                { name: 'Contemporary Living', image: 'https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=800&q=80' },
-                { name: 'Modern Kitchen', image: 'https://images.unsplash.com/photo-1556912172-45b7abe8b7e8?w=800&q=80' },
-                { name: 'Elegant Bedroom', image: 'https://images.unsplash.com/photo-1631889993954-1b985a6a890f?w=800&q=80' },
-              ].map((item, index) => (
-                <div
-                  key={index}
-                  className="group relative aspect-[4/3] rounded-3xl overflow-hidden cursor-pointer"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  <img
-                    src={item.image}
-                    alt={item.name}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  <div className="absolute bottom-6 left-6 right-6">
-                    <h3 className="text-2xl font-bold text-white mb-2">{item.name}</h3>
-                    <div className="w-12 h-1 bg-white rounded-full" />
-                  </div>
-                  <div className="absolute top-6 right-6 w-12 h-12 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
-                      <path d="M5 12h14" />
-                      <path d="M12 5l7 7-7 7" />
-                    </svg>
-                  </div>
-                </div>
-              ))}
+              <h3 className="font-display text-2xl font-semibold mb-4 text-[#2C2C2C] tracking-[-0.02em]">Style Consistency</h3>
+              <p className="text-[#7C7C7C] leading-relaxed font-medium">Upload a moodboard and let Ature apply the texture, lighting, and vibe to your empty space automatically.</p>
             </div>
           </div>
         </section>
@@ -449,27 +290,27 @@ function HomePage() {
             </div>
 
             {/* Step 2: Explore Mode */}
-            <div className="lg:col-span-5 bg-stone-100 rounded-[2.5rem] p-8 md:p-10 text-stone-900 relative overflow-hidden group reveal-element delay-100 border-2 border-stone-200">
+            <div className="lg:col-span-5 bg-stone-900 rounded-[2.5rem] p-8 md:p-10 text-white relative overflow-hidden group reveal-element delay-100">
               <div className="relative z-10">
                 <div className="flex items-center gap-3 mb-6">
                   <span className="w-8 h-8 rounded-full bg-white text-stone-900 flex items-center justify-center text-sm font-bold">2</span>
                   <h3 className="text-xl font-semibold">Experience in AR</h3>
                 </div>
-                <p className="text-stone-600 mb-8">Export your generated designs directly to .USDZ or .GLB formats for instant AR walkthroughs on iOS and Android.</p>
+                <p className="text-stone-400 mb-8">Export your generated designs directly to .USDZ or .GLB formats for instant AR walkthroughs on iOS and Android.</p>
                 
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="bg-white border-2 border-stone-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-stone-900 transition-colors cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
+                  <div className="bg-white/10 backdrop-blur p-4 rounded-xl border border-white/10 flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white">
                       <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                     </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-900">.GLB</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">.GLB</span>
                   </div>
-                  <div className="bg-white border-2 border-stone-200 p-4 rounded-xl flex flex-col items-center justify-center gap-2 hover:border-stone-900 transition-colors cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-900">
+                  <div className="bg-white/10 backdrop-blur p-4 rounded-xl border border-white/10 flex flex-col items-center justify-center gap-2 hover:bg-white/20 transition-colors cursor-pointer">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-white">
                       <rect x="5" y="2" width="14" height="20" rx="2" />
                       <path d="M12 18h.01" />
                     </svg>
-                    <span className="text-xs font-bold uppercase tracking-wider text-stone-900">.USDZ</span>
+                    <span className="text-xs font-bold uppercase tracking-wider">.USDZ</span>
                   </div>
                 </div>
               </div>
@@ -479,35 +320,35 @@ function HomePage() {
         </section>
 
         {/* Testimonial Section */}
-        <section className="mb-32 max-w-5xl mx-auto reveal-element">
-          <div className="relative bg-stone-100 rounded-[3rem] p-8 md:p-16 overflow-hidden">
-            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="absolute top-10 left-10 w-12 h-12 text-stone-300 rotate-180">
+        <section className="mb-32 max-w-5xl mx-auto px-4 md:px-8 reveal-element">
+          <div className="relative bg-[#F1EBE4] rounded-[3rem] p-10 md:p-20 overflow-hidden linen-texture">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#C5A26D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="absolute top-10 left-10 w-12 h-12 opacity-30 rotate-180">
               <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z" />
               <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z" />
             </svg>
             
             <div className="relative z-10 text-center">
-              <h3 className="text-2xl md:text-4xl font-serif-ature font-light italic text-stone-900 leading-tight mb-8">
+              <h3 className="font-display text-2xl md:text-4xl font-medium italic text-[#2C2C2C] leading-tight mb-10 tracking-[-0.02em]">
                 &quot;Ature has completely revolutionized our client presentations. We&apos;ve cut our staging time by 70% while increasing client approval rates on the first pitch.&quot;
               </h3>
               
-              <div className="flex flex-col items-center justify-center gap-3">
-                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" loading="lazy" alt="User" className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-md" />
+              <div className="flex flex-col items-center justify-center gap-4">
+                <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" loading="lazy" alt="User" className="w-14 h-14 rounded-full object-cover border-2 border-white shadow-lg" />
                 <div className="text-center">
-                  <p className="text-sm font-bold text-stone-900">Elena Rodriguez</p>
-                  <p className="text-xs font-medium text-stone-500 uppercase tracking-wide">Lead Architect at Studio Kōan</p>
+                  <p className="text-base font-semibold text-[#2C2C2C]">Elena Rodriguez</p>
+                  <p className="text-sm font-medium text-[#7C7C7C] uppercase tracking-wide">Lead Architect at Studio Kōan</p>
                 </div>
               </div>
 
-              <div className="mt-10 flex items-center justify-center gap-8 border-t border-stone-200 pt-8 w-full max-w-sm mx-auto">
+              <div className="mt-12 flex items-center justify-center gap-10 border-t border-[#D97757]/20 pt-10 w-full max-w-sm mx-auto">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-stone-900">70%</p>
-                  <p className="text-[10px] text-stone-500 uppercase font-bold">Faster Staging</p>
+                  <p className="font-display text-3xl font-semibold text-[#2C2C2C]">70%</p>
+                  <p className="text-xs text-[#7C7C7C] uppercase font-semibold mt-1">Faster Staging</p>
                 </div>
-                <div className="w-px h-8 bg-stone-200"></div>
+                <div className="w-px h-10 bg-[#C5A26D]/30"></div>
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-stone-900">2x</p>
-                  <p className="text-[10px] text-stone-500 uppercase font-bold">Win Rate</p>
+                  <p className="font-display text-3xl font-semibold text-[#2C2C2C]">2x</p>
+                  <p className="text-xs text-[#7C7C7C] uppercase font-semibold mt-1">Win Rate</p>
                 </div>
               </div>
             </div>
@@ -515,51 +356,51 @@ function HomePage() {
         </section>
 
         {/* FAQs Section */}
-        <section className="mb-32 max-w-3xl mx-auto px-4 reveal-element">
-          <h2 className="text-3xl font-semibold text-center mb-12 tracking-tight">Frequently Asked Questions</h2>
+        <section className="mb-32 max-w-3xl mx-auto px-4 md:px-8 reveal-element">
+          <h2 className="font-display text-4xl md:text-5xl font-semibold text-center mb-16 tracking-[-0.03em] text-[#2C2C2C]">Frequently Asked Questions</h2>
           
           <div className="space-y-4">
             {/* Q1 */}
-            <details className="group border border-stone-200 rounded-2xl bg-white open:shadow-md transition-all">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-6">
-                <span>Can I export models to Revit or SketchUp?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+            <details className="group border border-[#F1EBE4] rounded-3xl bg-white open:shadow-oak transition-all hover-lift oak-grain">
+              <summary className="flex justify-between items-center font-semibold cursor-pointer list-none p-8 text-[#2C2C2C]">
+                <span className="font-medium">Can I export models to Revit or SketchUp?</span>
+                <span className="transition group-open:rotate-180 text-[#C5A26D]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </span>
               </summary>
-              <div className="text-stone-600 px-6 pb-6 leading-relaxed text-sm">
+              <div className="text-[#7C7C7C] px-8 pb-8 leading-relaxed font-medium">
                 Yes! We support exports to .OBJ and .FBX formats which are compatible with most professional CAD software including Revit, SketchUp, and Rhino.
               </div>
             </details>
 
             {/* Q2 */}
-            <details className="group border border-stone-200 rounded-2xl bg-white open:shadow-md transition-all">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-6">
-                <span>Is the generated furniture commercially available?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+            <details className="group border border-[#F1EBE4] rounded-3xl bg-white open:shadow-oak transition-all hover-lift oak-grain">
+              <summary className="flex justify-between items-center font-semibold cursor-pointer list-none p-8 text-[#2C2C2C]">
+                <span className="font-medium">Is the generated furniture commercially available?</span>
+                <span className="transition group-open:rotate-180 text-[#C5A26D]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </span>
               </summary>
-              <div className="text-stone-600 px-6 pb-6 leading-relaxed text-sm">
+              <div className="text-[#7C7C7C] px-8 pb-8 leading-relaxed font-medium">
                 Our &quot;Market Mode&quot; matches generated items with real inventory from over 400 partner brands. You can generate a shopping list with one click.
               </div>
             </details>
 
             {/* Q3 */}
-            <details className="group border border-stone-200 rounded-2xl bg-white open:shadow-md transition-all">
-              <summary className="flex justify-between items-center font-medium cursor-pointer list-none p-6">
-                <span>How does the pricing work?</span>
-                <span className="transition group-open:rotate-180">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
+            <details className="group border border-[#F1EBE4] rounded-3xl bg-white open:shadow-oak transition-all hover-lift oak-grain">
+              <summary className="flex justify-between items-center font-semibold cursor-pointer list-none p-8 text-[#2C2C2C]">
+                <span className="font-medium">How does the pricing work?</span>
+                <span className="transition group-open:rotate-180 text-[#C5A26D]">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                     <polyline points="6 9 12 15 18 9" />
                   </svg>
                 </span>
               </summary>
-              <div className="text-stone-600 px-6 pb-6 leading-relaxed text-sm">
+              <div className="text-[#7C7C7C] px-8 pb-8 leading-relaxed font-medium">
                 We offer a free tier for hobbyists. Professional plans start at $29/month allowing for high-resolution exports and commercial licensing.
               </div>
             </details>
@@ -567,100 +408,36 @@ function HomePage() {
         </section>
 
         {/* CTA Section */}
-        <section className="py-32 px-4 md:px-8 bg-white relative overflow-hidden border-t border-stone-200">
-          <div className="max-w-7xl mx-auto relative z-10">
-            <div className="grid lg:grid-cols-2 gap-16 items-center">
-              {/* Left: Text */}
-              <div className="text-stone-900">
-                <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6 leading-tight">
-                  Engage with Us
-                  <br />
-                  <span className="text-stone-500 font-light">In Conversation</span>
-                </h2>
-                <p className="text-lg text-stone-600 leading-relaxed mb-8 max-w-xl">
-                  In a global world based on communication, a brand must look beyond its borders, open up to new experiences, 
-                  and dare to be different. Meeting the brightest minds of one's time is the most effective way to nurture creativity.
-                </p>
-                <div className="flex flex-col sm:flex-row items-start gap-4">
+        <section className="mb-20 px-4 md:px-8 reveal-element">
+          <div className="bg-[#2C2C2C] rounded-[3rem] py-24 px-6 text-center text-white relative overflow-hidden">
+            <div className="relative z-10 max-w-3xl mx-auto">
+              <h2 className="font-display text-5xl md:text-7xl font-semibold tracking-[-0.03em] mb-8">Ready to transform your workflow?</h2>
+              <p className="text-lg md:text-xl text-[#A8A8A8] mb-12 font-medium">Join 10,000+ designers using Ature to visualize the future of living spaces.</p>
+              
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                 <button
                   onClick={() => navigate('/dashboard')}
-                    className="px-8 py-4 bg-stone-900 text-white rounded-full font-bold hover:bg-stone-800 transition-colors"
+                  className="clay-button w-full sm:w-auto px-10 py-4 text-white rounded-full font-semibold text-base hover:opacity-90 transition-all shadow-lg hover-lift"
                 >
                   Get Started Free
                 </button>
                 <button
                   onClick={() => navigate('/pricing')}
-                    className="px-8 py-4 bg-white border-2 border-stone-900 text-stone-900 rounded-full font-bold hover:bg-stone-50 transition-colors"
+                  className="w-full sm:w-auto px-10 py-4 bg-transparent text-white border-2 border-white/30 rounded-full font-semibold text-base hover:border-white/50 hover:bg-white/5 transition-all"
                 >
                   Book a Demo
                 </button>
               </div>
-                <p className="mt-6 text-sm text-stone-500">No credit card required for free tier.</p>
+              <p className="mt-8 text-sm text-[#7C7C7C]">No credit card required for free tier.</p>
             </div>
             
-              {/* Right: Image */}
-              <div className="relative">
-                <div className="aspect-[4/3] rounded-3xl overflow-hidden shadow-2xl">
-                  <img
-                    src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?w=1200&q=80"
-                    alt="Interior Design"
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                  />
+            {/* Warm evening sun lighting effect */}
+            <div className="absolute top-0 right-0 w-full h-full overflow-hidden pointer-events-none">
+              <div className="absolute top-[-20%] right-[-20%] w-96 h-96 bg-[#D97757]/15 rounded-full blur-3xl"></div>
+              <div className="absolute bottom-[-20%] left-[-20%] w-96 h-96 bg-[#C5A26D]/10 rounded-full blur-3xl"></div>
             </div>
           </div>
-            </div>
-          </div>
-
-          {/* Decorative Elements */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-stone-100 rounded-full blur-3xl opacity-50" />
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-stone-100 rounded-full blur-3xl opacity-50" />
         </section>
-
-        {/* Footer */}
-        <footer className="bg-stone-50 text-stone-900 py-20 px-4 md:px-8 border-t border-stone-200">
-          <div className="max-w-7xl mx-auto">
-            <div className="grid md:grid-cols-4 gap-12 mb-12">
-              <div>
-                <h3 className="text-2xl font-bold mb-4">ature studio.</h3>
-                <p className="text-stone-600 text-sm leading-relaxed">
-                  The AI copilot for professional interior designers and architects.
-                </p>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">About</h4>
-                <ul className="space-y-2 text-stone-600 text-sm">
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Our Story</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Store Locator</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Sustainability</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Careers</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Contact</a></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">Customer Service</h4>
-                <ul className="space-y-2 text-stone-600 text-sm">
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Prices and Payments</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Shipping</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Return Policy</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Terms of Service</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Privacy Policy</a></li>
-                </ul>
-              </div>
-              <div>
-                <h4 className="font-semibold mb-4 uppercase tracking-wider text-sm">Social Media</h4>
-                <ul className="space-y-2 text-stone-600 text-sm">
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Instagram</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">Facebook</a></li>
-                  <li><a href="#" className="hover:text-stone-900 transition-colors">LinkedIn</a></li>
-                </ul>
-              </div>
-            </div>
-            <div className="pt-8 border-t border-stone-200 text-center">
-              <p className="text-stone-600 text-sm">© 2024 Ature Studio. All rights reserved.</p>
-            </div>
-          </div>
-        </footer>
 
       </div>
     </Layout>

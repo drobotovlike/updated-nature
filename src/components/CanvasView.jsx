@@ -2426,8 +2426,24 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [project])
 
   // Compute assets and creations - must be defined before return
-  const assets = useMemo(() => getProjectAssets(), [getProjectAssets])
-  const creations = useMemo(() => getCreations(), [getCreations])
+  // Ensure they always return arrays, never undefined
+  const assets = useMemo(() => {
+    try {
+      return getProjectAssets() || []
+    } catch (error) {
+      console.error('Error getting project assets:', error)
+      return []
+    }
+  }, [getProjectAssets])
+  
+  const creations = useMemo(() => {
+    try {
+      return getCreations() || []
+    } catch (error) {
+      console.error('Error getting creations:', error)
+      return []
+    }
+  }, [getCreations])
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>

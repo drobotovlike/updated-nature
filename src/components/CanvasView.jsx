@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Stage, Layer, Image, Group, Rect, Text, Circle } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
@@ -206,27 +206,34 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [chatInput, setChatInput] = useState('')
   const [popupMenuPosition, setPopupMenuPosition] = useState({ x: 0, y: 0, visible: false })
   
-  // Calculate selectedItem - must be defined before useEffects
-  const selectedItem = items.find((item) => item.id === selectedItemId)
-  const selectedItems = items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
+  // Calculate selectedItem - memoized to prevent unnecessary recalculations
+  // Use useMemo to ensure it's always either null or an object, never undefined
+  const selectedItem = useMemo(() => {
+    if (!selectedItemId || !items.length) return null
+    return items.find((item) => item.id === selectedItemId) || null
+  }, [selectedItemId, items])
+  
+  const selectedItems = useMemo(() => {
+    return items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
+  }, [items, selectedItemIds, selectedItemId])
   
   // Show popup menu when item is selected and update position on pan/zoom
   useEffect(() => {
-    if (selectedItem && stageRef.current) {
+    if (selectedItem && stageRef.current && selectedItemId) {
       const updateMenuPosition = () => {
         const stage = stageRef.current
-        if (!stage) return
+        if (!stage || !selectedItem) return
         
         // Calculate item position in screen coordinates
-        const itemX = selectedItem.x_position * stage.scaleX() + stage.x()
-        const itemY = selectedItem.y_position * stage.scaleY() + stage.y()
+        const itemX = (selectedItem.x_position || 0) * stage.scaleX() + stage.x()
+        const itemY = (selectedItem.y_position || 0) * stage.scaleY() + stage.y()
         const itemWidth = (selectedItem.width || 200) * stage.scaleX()
         
         // Position menu above the item, centered horizontally
         setPopupMenuPosition(prev => ({
           x: itemX + itemWidth / 2,
           y: itemY - 10, // Above the item
-          visible: prev.visible || true,
+          visible: true,
         }))
       }
       
@@ -238,7 +245,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } else {
       setPopupMenuPosition({ x: 0, y: 0, visible: false })
     }
-  }, [selectedItem, canvasState.panX, canvasState.panY, canvasState.zoom])
+  }, [selectedItemId, canvasState.panX, canvasState.panY, canvasState.zoom, selectedItem])
 
   // Close popup menu when clicking outside
   useEffect(() => {
@@ -700,7 +707,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     setIsGenerating(true)
     try {
-      let prompt = newPrompt || `${selectedItem.prompt || 'interior design'} ${newPrompt || 'with modifications'}`
+      const basePrompt = selectedItem.prompt || 'interior design'
+      let prompt = newPrompt || `${basePrompt}${newPrompt ? ' with modifications' : ''}`
       
       // Apply style if selected
       if (selectedStyle) {
@@ -708,7 +716,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }
 
       // Use selected item as reference if no reference image set
-      let refImage = referenceImage || selectedItem.image_url
+      let refImage = referenceImage || (selectedItem?.image_url || null)
       if (refImage && !refImage.startsWith('data:')) {
         try {
           const imgResponse = await fetch(refImage)

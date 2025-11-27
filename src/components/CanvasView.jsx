@@ -2805,6 +2805,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         >
           {/* Grid Background - CSS-based, fixed to viewport, behind Stage */}
           {canvasState.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
+            // Get current stage position in real-time for smooth grid updates
+            const stage = stageRef.current
+            const currentPanX = stage ? stage.x() : canvasState.panX
+            const currentPanY = stage ? stage.y() : canvasState.panY
+            const currentZoom = stage ? stage.scaleX() : canvasState.zoom
+            
             // Convert grid size based on unit
             let baseGridSize = canvasState.gridSize || 20
             if (canvasState.gridUnit === 'in') {
@@ -2814,18 +2820,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             }
             
             // Calculate grid spacing in screen pixels (scales with zoom)
-            const screenGridSize = baseGridSize * canvasState.zoom
+            const screenGridSize = baseGridSize * currentZoom
             const effectiveGridSize = Math.max(10, screenGridSize)
             
-            // Calculate grid offset based on pan position
-            const offsetX = canvasState.panX % effectiveGridSize
-            const offsetY = canvasState.panY % effectiveGridSize
+            // Calculate grid offset based on current pan position (real-time)
+            const offsetX = currentPanX % effectiveGridSize
+            const offsetY = currentPanY % effectiveGridSize
             const normalizedOffsetX = offsetX < 0 ? offsetX + effectiveGridSize : offsetX
             const normalizedOffsetY = offsetY < 0 ? offsetY + effectiveGridSize : offsetY
             
             return (
               <div
                 className="absolute inset-0 pointer-events-none z-0"
+                key={`grid-${currentPanX}-${currentPanY}-${currentZoom}`}
                 style={{
                   backgroundImage: `
                     linear-gradient(to right, #e5e7eb 1px, transparent 1px),
@@ -3047,10 +3054,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           })()}
         </div>
 
-        {/* Bottom Toolbar - Compact Design */}
-        <div className="absolute bottom-0 left-0 right-0 z-40 flex flex-col items-center pb-4">
-          {/* Toolbar Controls */}
-          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-stone-200">
+        {/* Unified Menu Bar */}
+        <div className="absolute bottom-0 left-0 right-0 z-40 flex items-center justify-center pb-4">
+          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-stone-200 max-w-[95vw] overflow-x-auto">
             {/* Back Button */}
             {onBack && (
               <button
@@ -3266,137 +3272,153 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </>
             )}
 
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
+
+            {/* Model & Style Selection */}
+            <select
+              value={selectedModel}
+              onChange={(e) => setSelectedModel(e.target.value)}
+              className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
+            >
+              <option value="gemini">Gemini 2.5 Flash</option>
+              <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
+              <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
+              <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
+            </select>
+
+            <select
+              value={selectedStyle?.id || ''}
+              onChange={(e) => {
+                const style = styles.find(s => s.id === e.target.value)
+                setSelectedStyle(style || null)
+              }}
+              className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[120px]"
+            >
+              <option value="">No Style</option>
+              {styles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.name} {style.is_public ? '(Public)' : ''}
+                </option>
+              ))}
+            </select>
+
+            <button
+              onClick={() => setShowStyleLibrary(true)}
+              className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors bg-white border border-stone-200 shadow-sm"
+              title="Style Library"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
+
+            {/* Budget Sticker Button */}
+            <button
+              onClick={(e) => {
+                const stage = stageRef.current
+                if (stage) {
+                  const pos = stage.getPointerPosition()
+                  if (pos) {
+                    const worldX = (pos.x - stage.x()) / stage.scaleX()
+                    const worldY = (pos.y - stage.y()) / stage.scaleY()
+                    createBudgetSticker({ x: worldX, y: worldY })
+                  } else {
+                    // Fallback to center
+                    const canvasWidth = dimensions.width * 4
+                    const canvasHeight = dimensions.height * 4
+                    createBudgetSticker({ x: canvasWidth / 2, y: canvasHeight / 2 })
+                  }
+                }
+              }}
+              className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+              title="Budget Sticker ($)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="12" y1="2" x2="12" y2="22" />
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
+
             {/* Zoom Display */}
-            <div className="px-3 py-1 text-xs text-stone-500 font-medium">
+            <div className="px-3 py-1 text-xs text-stone-500 font-medium whitespace-nowrap">
               {Math.round(canvasState.zoom * 100)}%
             </div>
 
             {/* Performance Indicator (dev mode) */}
             {process.env.NODE_ENV === 'development' && items.length > 10 && (
-              <div className="px-3 py-1 text-xs text-stone-400 font-medium">
+              <div className="px-3 py-1 text-xs text-stone-400 font-medium whitespace-nowrap">
                 {visibleItemsCount}/{items.length} visible
               </div>
             )}
-          </div>
 
-          {/* Generation Controls Panel */}
-          <div className="mt-3 w-full max-w-2xl mx-auto">
-            {/* Model & Style Selection */}
-            <div className="flex items-center gap-2 mb-2">
-              <select
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
-              >
-                <option value="gemini">Gemini 2.5 Flash</option>
-                <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
-                <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
-                <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
-              </select>
-
-              <select
-                value={selectedStyle?.id || ''}
-                onChange={(e) => {
-                  const style = styles.find(s => s.id === e.target.value)
-                  setSelectedStyle(style || null)
-                }}
-                className="flex-1 px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
-              >
-                <option value="">No Style</option>
-                {styles.map((style) => (
-                  <option key={style.id} value={style.id}>
-                    {style.name} {style.is_public ? '(Public)' : ''}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                onClick={() => setShowStyleLibrary(true)}
-                className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors bg-white border border-stone-200 shadow-sm"
-                title="Style Library"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Reference Image */}
-            {referenceImage && (
-              <div className="flex items-center gap-2 p-2 bg-white rounded-lg border border-stone-200 mb-2 shadow-sm">
-                <img src={referenceImage} alt="Reference" className="w-10 h-10 object-cover rounded" />
-                <span className="flex-1 text-xs text-stone-600 truncate">Using reference image</span>
-                <button
-                  onClick={() => setReferenceImage(null)}
-                  className="p-1 hover:bg-stone-200 rounded transition-colors"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-            )}
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
 
             {/* Chat Input */}
-            <form onSubmit={handleChatSubmit}>
-              <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-3 shadow-lg border border-stone-200">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="What would you like to create?"
-                  className="flex-1 bg-transparent border-none outline-none text-sm text-stone-900 placeholder:text-stone-400"
-                />
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      // Use selected item as reference if available
-                      if (selectedItem) {
-                        setReferenceImage(selectedItem.image_url)
-                      } else {
-                        // Open file picker
-                        const input = document.createElement('input')
-                        input.type = 'file'
-                        input.accept = 'image/*'
-                        input.onchange = (e) => {
-                          const file = e.target.files[0]
-                          if (file) {
-                            const reader = new FileReader()
-                            reader.onloadend = () => {
-                              setReferenceImage(reader.result)
-                            }
-                            reader.readAsDataURL(file)
+            <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="What would you like to create?"
+                className="px-4 py-1.5 bg-white border border-stone-200 rounded-full text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[200px]"
+              />
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    // Use selected item as reference if available
+                    if (selectedItem) {
+                      setReferenceImage(selectedItem.image_url)
+                    } else {
+                      // Open file picker
+                      const input = document.createElement('input')
+                      input.type = 'file'
+                      input.accept = 'image/*'
+                      input.onchange = (e) => {
+                        const file = e.target.files[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onloadend = () => {
+                            setReferenceImage(reader.result)
                           }
+                          reader.readAsDataURL(file)
                         }
-                        input.click()
                       }
-                    }}
-                    className={`p-1.5 hover:bg-stone-100 rounded-full transition-colors ${
-                      referenceImage ? 'bg-stone-100' : ''
-                    }`}
-                    title="Add Reference Image"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="9" cy="9" r="2" />
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                    </svg>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAssetLibrary(true)}
-                    className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
-                    title="Add Asset"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
-                    </svg>
-                  </button>
-                  <button
-                    type="submit"
+                      input.click()
+                    }
+                  }}
+                  className={`p-1.5 hover:bg-stone-100 rounded-full transition-colors ${
+                    referenceImage ? 'bg-stone-100' : ''
+                  }`}
+                  title="Add Reference Image"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAssetLibrary(true)}
+                  className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
+                  title="Add Asset"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 9h6v6H9z" />
+                  </svg>
+                </button>
+                <button
+                  type="submit"
                     disabled={!chatInput.trim() || isGenerating || generatingVariations}
                     className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title="Generate"
@@ -3410,7 +3432,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     )}
                   </button>
                 </div>
-              </div>
             </form>
           </div>
         </div>

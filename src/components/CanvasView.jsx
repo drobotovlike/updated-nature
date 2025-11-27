@@ -931,16 +931,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(true)
       
       // Call blend API
-      const response = await fetch('/api/blend', {
+      const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`,
         },
         body: JSON.stringify({
+          operation: 'blend',
           image1_url: sourceItem.image_url,
           image2_url: targetItem.image_url,
-          mask: 0.5, // 50% blend
+          mask_strength: 0.5, // 50% blend
         }),
       })
 
@@ -1065,13 +1066,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setShowStyleTransfer(false)
       
       // Call style transfer API
-      const response = await fetch('/api/style-transfer', {
+      const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`,
         },
         body: JSON.stringify({
+          operation: 'style-transfer',
           image_url: targetItem.image_url,
           style: styleName,
         }),
@@ -1150,13 +1152,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(true)
       
       // Call remove background API
-      const response = await fetch('/api/remove-bg', {
+      const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`,
         },
         body: JSON.stringify({
+          operation: 'remove-bg',
           image_url: targetItem.image_url,
         }),
       })
@@ -1219,15 +1222,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(true)
       
       // Call inpainting API
-      const response = await fetch('/api/inpaint', {
+      const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${userId}`,
         },
         body: JSON.stringify({
-          image_url: targetItem.image_url,
-          mask_url: maskDataUrl, // Base64 data URL of the mask
+          operation: 'inpaint',
+          base_image_url: targetItem.image_url,
+          mask_image_url: maskDataUrl, // Base64 data URL of the mask
           prompt: 'fill the erased area seamlessly', // Optional prompt for generation
         }),
       })
@@ -1282,6 +1286,305 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(false)
     }
   }, [userId, projectId, items, handleItemUpdate])
+
+  // Create loop handler
+  const handleCreateLoop = useCallback(async (itemId) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to process.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      const response = await fetch('/api/image-processing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          operation: 'loop',
+          image_url: targetItem.image_url,
+          motion_direction: 'zoom',
+        }),
+      })
+
+      if (!response.ok) throw new Error('Loop creation failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from loop')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `loop-${Date.now()}.gif`, { type: 'image/gif' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Update the item with the loop result
+      await handleItemUpdate(itemId, {
+        image_url: imageUrl,
+        name: `${targetItem.name || 'Image'} (Loop)`,
+      })
+
+      setError('')
+    } catch (error) {
+      console.error('Error creating loop:', error)
+      setError('Failed to create loop. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, handleItemUpdate])
+
+  // Text-to-vector handler
+  const handleTextToVector = useCallback(async (text, position) => {
+    if (!text.trim() || !userId || !projectId || !position) return
+
+    try {
+      setIsGenerating(true)
+      
+      const response = await fetch('/api/image-processing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          operation: 'text2svg',
+          text: text.trim(),
+        }),
+      })
+
+      if (!response.ok) throw new Error('Text-to-vector failed')
+
+      const data = await response.json()
+      if (!data.svg) throw new Error('No SVG returned from text-to-vector')
+
+      // Create canvas item with SVG
+      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      const newItem = await createCanvasItem(userId, projectId, {
+        image_url: `data:image/svg+xml,${encodeURIComponent(data.svg)}`,
+        x_position: position.x,
+        y_position: position.y,
+        width: 200,
+        height: 100,
+        name: `Text: ${text.substring(0, 30)}`,
+        metadata: {
+          is_text_vector: true,
+          original_text: text,
+        },
+        z_index: maxZIndex + 1,
+        is_visible: true,
+      })
+
+      const newItems = [...items, newItem]
+      setItems(newItems)
+      saveToHistory(items)
+      setTextMode(false)
+      setTextInput('')
+      setTextPosition(null)
+      setError('')
+    } catch (error) {
+      console.error('Error converting text to vector:', error)
+      setError('Failed to convert text to vector. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, saveToHistory])
+
+  // Extract palette handler
+  const handleExtractPalette = useCallback(async (itemId) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to process.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      // Load image and extract colors
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = targetItem.image_url
+      })
+
+      // Create canvas to analyze image
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width
+      canvas.height = img.height
+      const ctx = canvas.getContext('2d')
+      ctx.drawImage(img, 0, 0)
+
+      // Get image data and extract dominant colors
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const pixels = imageData.data
+      const colorMap = new Map()
+
+      // Sample pixels (every 10th pixel for performance)
+      for (let i = 0; i < pixels.length; i += 40) {
+        const r = pixels[i]
+        const g = pixels[i + 1]
+        const b = pixels[i + 2]
+        const a = pixels[i + 3]
+        
+        if (a < 128) continue // Skip transparent pixels
+
+        // Quantize colors to reduce palette size
+        const qr = Math.floor(r / 32) * 32
+        const qg = Math.floor(g / 32) * 32
+        const qb = Math.floor(b / 32) * 32
+        const key = `${qr},${qg},${qb}`
+        
+        colorMap.set(key, (colorMap.get(key) || 0) + 1)
+      }
+
+      // Get top 5 colors
+      const sortedColors = Array.from(colorMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([key]) => {
+          const [r, g, b] = key.split(',').map(Number)
+          return `rgb(${r},${g},${b})`
+        })
+
+      // Create color swatches as canvas items
+      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      const newItems = []
+
+      for (let i = 0; i < sortedColors.length; i++) {
+        const color = sortedColors[i]
+        const svg = `
+          <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" fill="${color}" />
+          </svg>
+        `
+
+        const swatchItem = await createCanvasItem(userId, projectId, {
+          image_url: `data:image/svg+xml,${encodeURIComponent(svg)}`,
+          x_position: targetItem.x_position + (targetItem.width || 400) + 20,
+          y_position: targetItem.y_position + i * 110,
+          width: 100,
+          height: 100,
+          name: `Color ${i + 1}`,
+          metadata: {
+            is_color_swatch: true,
+            color: color,
+          },
+          z_index: maxZIndex + i + 1,
+          is_visible: true,
+        })
+        newItems.push(swatchItem)
+      }
+
+      const updatedItems = [...items, ...newItems]
+      setItems(updatedItems)
+      saveToHistory(items)
+      setError('')
+    } catch (error) {
+      console.error('Error extracting palette:', error)
+      setError('Failed to extract color palette. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, saveToHistory])
+
+  // Outpaint handler
+  const handleOutpaintGenerate = useCallback(async (rect, prompt) => {
+    if (!userId || !projectId || !rect || !prompt) return
+
+    try {
+      setIsGenerating(true)
+      
+      // Get the base image (use selected item or first item)
+      const baseItem = selectedItem || items[0]
+      if (!baseItem) {
+        setError('No image found for outpainting.')
+        return
+      }
+
+      const response = await fetch('/api/image-processing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          operation: 'outpaint',
+          image_url: baseItem.image_url,
+          prompt: prompt,
+          crop_x: rect.x,
+          crop_y: rect.y,
+          crop_width: rect.width,
+          crop_height: rect.height,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Outpaint failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from outpaint')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `outpaint-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Create new outpainted item
+      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      const newItem = await createCanvasItem(userId, projectId, {
+        image_url: imageUrl,
+        x_position: rect.x,
+        y_position: rect.y,
+        width: img.width,
+        height: img.height,
+        name: `Outpaint: ${prompt.substring(0, 30)}`,
+        metadata: {
+          is_outpaint: true,
+          prompt: prompt,
+        },
+        z_index: maxZIndex + 1,
+        is_visible: true,
+      })
+
+      const newItems = [...items, newItem]
+      setItems(newItems)
+      saveToHistory(items)
+      setOutpaintMode(false)
+      setOutpaintRect(null)
+      setError('')
+    } catch (error) {
+      console.error('Error outpainting:', error)
+      setError('Failed to outpaint image. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, selectedItem, saveToHistory])
 
   // Close context menu when clicking outside
   useEffect(() => {

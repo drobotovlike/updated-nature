@@ -1106,25 +1106,24 @@ export default function DashboardPage() {
                             </div>
                           </div>
                         </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-16 text-center">
-                    <div className="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-stone-400">
-                        <rect width="7" height="7" x="3" y="3" rx="1" />
-                        <rect width="7" height="7" x="14" y="3" rx="1" />
-                        <rect width="7" height="7" x="14" y="14" rx="1" />
-                        <rect width="7" height="7" x="3" y="14" rx="1" />
+                  <div className="text-center py-16">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-base mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="9" cy="9" r="2" />
+                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
                       </svg>
                     </div>
-                    <h3 className="text-lg font-semibold text-stone-900 mb-2">No projects yet</h3>
-                    <p className="text-sm text-stone-500 mb-6">Create your first project to get started</p>
+                    <p className="text-text-secondary mb-4">No projects found</p>
                     <button
                       onClick={() => setShowCreateProjectModal(true)}
-                      className="px-6 py-3 bg-stone-900 hover:bg-stone-800 text-white rounded-full text-sm font-semibold transition-colors shadow-lg"
+                      className="px-4 py-2 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors duration-micro ease-apple focus-ring"
                     >
-                      Create Project
+                      Create your first project
                     </button>
                   </div>
                 )}

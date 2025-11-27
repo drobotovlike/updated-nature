@@ -6,7 +6,6 @@ import { getCanvasData } from '../utils/canvasManager'
 import WorkspaceView from '../components/WorkspaceView'
 import CanvasView from '../components/CanvasView'
 import AccountView from '../components/AccountView'
-import ProjectView from '../components/ProjectView'
 
 export default function DashboardPage() {
   const { user, isLoaded: userLoaded } = useUser()
@@ -14,7 +13,7 @@ export default function DashboardPage() {
   const { signOut } = useClerk()
   const navigate = useNavigate()
   
-  // View state: 'projects' | 'workspace' | 'account' | 'project-view' | 'my-projects'
+  // View state: 'projects' | 'workspace' | 'account' | 'my-projects'
   const [currentView, setCurrentView] = useState('projects')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [editingCreation, setEditingCreation] = useState(null)
@@ -177,11 +176,11 @@ export default function DashboardPage() {
     return () => clearInterval(interval)
   }, [userId, isSignedIn])
 
-  // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace, account, or my-projects view)
+  // Safeguard: Ensure workspace shows when a project is selected (unless explicitly in account or my-projects view)
   useEffect(() => {
-    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'my-projects' && currentView !== 'project-view' && currentView !== 'projects') {
-      console.log('🛡️ Safeguard: Switching to project-view for project:', selectedProjectId, 'Current view was:', currentView)
-      setCurrentView('project-view')
+    if (selectedProjectId && userId && currentView !== 'workspace' && currentView !== 'account' && currentView !== 'my-projects' && currentView !== 'projects') {
+      console.log('🛡️ Safeguard: Switching to workspace for project:', selectedProjectId, 'Current view was:', currentView)
+      setCurrentView('workspace')
       setEditingCreation(null)
     }
   }, [selectedProjectId, userId])
@@ -499,8 +498,8 @@ export default function DashboardPage() {
                 >
                   <button
                     onClick={() => {
-                      // IMPORTANT: Set view first, then project ID
-                      setCurrentView('project-view')
+                      // IMPORTANT: Set view first, then project ID - go directly to canvas
+                      setCurrentView('workspace')
                       setEditingCreation(null) // Clear any editing state
                       setSelectedProjectId(project.id)
                       // Set the spaceId if the project has one
@@ -739,9 +738,8 @@ export default function DashboardPage() {
         {/* Scrollable Content - Dynamic based on view */}
         <div className="flex-1 overflow-y-auto">
           {/* PRIORITY ORDER: 
-              1. If we have a selected project and view is NOT workspace/account, show ProjectView
-              2. If view is explicitly workspace, show WorkspaceView
-              3. Otherwise show projects list or account view
+              1. If view is explicitly workspace, show CanvasView
+              2. Otherwise show projects list or account view
           */}
           {currentView === 'workspace' && selectedProjectId && userId && isSignedIn ? (
             <div className="h-full">

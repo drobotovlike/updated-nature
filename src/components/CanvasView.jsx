@@ -2613,6 +2613,62 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           </div>
                         </div>
                       </div>
+
+                      {assets.length > 0 && (
+                        <div>
+                          <h2 className="text-sm font-semibold text-text-primary mb-3">Recent Assets</h2>
+                          <div className="grid grid-cols-2 gap-2">
+                            {assets.slice(0, 4).map((asset) => (
+                              <div
+                                key={asset.id}
+                                className="aspect-square rounded-lg overflow-hidden border border-border bg-surface-elevated group cursor-pointer hover:border-primary-400 transition-colors"
+                                onClick={() => {
+                                  setActiveTab('assets')
+                                }}
+                              >
+                                <img
+                                  src={asset.url}
+                                  alt={asset.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {creations.length > 0 && (
+                        <div>
+                          <h2 className="text-sm font-semibold text-text-primary mb-3">Recent Creations</h2>
+                          <div className="grid grid-cols-2 gap-2">
+                            {creations.slice(0, 4).map((creation) => (
+                              <div
+                                key={creation.id}
+                                className="aspect-square rounded-lg overflow-hidden border border-border bg-surface-elevated group cursor-pointer hover:border-primary-400 transition-colors"
+                                onClick={async () => {
+                                  try {
+                                    // Fetch the image and create a File object
+                                    const response = await fetch(creation.url)
+                                    const blob = await response.blob()
+                                    const file = new File([blob], creation.name || 'creation.png', { type: blob.type || 'image/png' })
+                                    await handleFileUpload(file, null)
+                                    setSidebarOpen(false)
+                                  } catch (error) {
+                                    console.error('Error loading creation:', error)
+                                    setError('Failed to load creation. Please try again.')
+                                  }
+                                }}
+                              >
+                                <img
+                                  src={creation.url}
+                                  alt={creation.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

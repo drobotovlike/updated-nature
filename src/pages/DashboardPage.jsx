@@ -33,6 +33,21 @@ export default function DashboardPage() {
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
 
+  const userName = user?.fullName || user?.firstName || 'User'
+
+  // Helper function to update all project lists (must be defined before useEffects that use it)
+  const updateProjectLists = (allProjects) => {
+    setSavedProjects(allProjects)
+    // Sort by updated_at (most recent first)
+    const sortedProjects = [...allProjects].sort((a, b) => {
+      const dateA = new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0)
+      const dateB = new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0)
+      return dateB - dateA // Most recent first
+    })
+    setRecentProjects(sortedProjects.slice(0, 4)) // Last 4 for home page
+    setSidebarProjects(sortedProjects.slice(0, 10)) // Last 10 for sidebar
+  }
+
   // Load spaces and projects on mount
   useEffect(() => {
     async function loadData() {
@@ -86,21 +101,6 @@ export default function DashboardPage() {
       setEditingCreation(null)
     }
   }, [selectedProjectId, userId])
-
-  const userName = user?.fullName || user?.firstName || 'User'
-
-  // Helper function to update all project lists
-  const updateProjectLists = (allProjects) => {
-    setSavedProjects(allProjects)
-    // Sort by updated_at (most recent first)
-    const sortedProjects = [...allProjects].sort((a, b) => {
-      const dateA = new Date(a.updatedAt || a.updated_at || a.createdAt || a.created_at || 0)
-      const dateB = new Date(b.updatedAt || b.updated_at || b.createdAt || b.created_at || 0)
-      return dateB - dateA // Most recent first
-    })
-    setRecentProjects(sortedProjects.slice(0, 4)) // Last 4 for home page
-    setSidebarProjects(sortedProjects.slice(0, 10)) // Last 10 for sidebar
-  }
 
   const handleCreateSpace = async () => {
     if (!newSpaceName.trim()) {

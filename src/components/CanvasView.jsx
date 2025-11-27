@@ -1,19 +1,175 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Stage, Layer, Image, Group, Rect, Text, Circle } from 'react-konva'
+import { Stage, Layer, Image, Group, Rect, Text, Circle, Line, Arrow } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
 import useImage from 'use-image'
 import AssetLibrary from './AssetLibrary'
 import ExportModal from './ExportModal'
+import CanvasExportModal from './CanvasExportModal'
+import LayersPanel from './LayersPanel'
 import { getCanvasData, createCanvasItem, updateCanvasItem, deleteCanvasItem, saveCanvasState } from '../utils/canvasManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
+import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
 
+// Mask Drawing Overlay Component - Returns mask layer ref and UI controls
+function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCancel, zoom, brushSize, setBrushSize }) {
+  const isDrawingRef = useRef(false)
+  const pathRef = useRef(null)
+  const pointsRef = useRef([])
+
+  useEffect(() => {
+    const stage = stageRef.current
+    const maskLayer = maskLayerRef.current
+    if (!stage || !maskLayer) return
+
+    const handleMouseDown = (e) => {
+      // Only draw if clicking on the stage or empty area
+      if (e.target === stage || e.target.getParent()?.name() === 'mask-layer') {
+        isDrawingRef.current = true
+        const pos = stage.getPointerPosition()
+        if (!pos) return
+
+        // Convert to item local coordinates
+        const itemX = (pos.x - stage.x()) / stage.scaleX() - item.x_position
+        const itemY = (pos.y - stage.y()) / stage.scaleY() - item.y_position
+
+        // Check if click is within item bounds
+        if (itemX < 0 || itemX > (item.width || 400) || itemY < 0 || itemY > (item.height || 400)) {
+          return
+        }
+
+        pointsRef.current = [[itemX, itemY]]
+
+        // Create new line for this stroke
+        const line = new Konva.Line({
+          points: [itemX, itemY],
+          stroke: 'rgba(255, 0, 0, 0.6)',
+          strokeWidth: brushSize / zoom,
+          lineCap: 'round',
+          lineJoin: 'round',
+          globalCompositeOperation: 'source-over',
+        })
+
+        maskLayer.add(line)
+        pathRef.current = line
+      }
+    }
+
+    const handleMouseMove = (e) => {
+      if (!isDrawingRef.current) return
+
+      const pos = stage.getPointerPosition()
+      if (!pos || !pathRef.current) return
+
+      const itemX = (pos.x - stage.x()) / stage.scaleX() - item.x_position
+      const itemY = (pos.y - stage.y()) / stage.scaleY() - item.y_position
+
+      // Check bounds
+      if (itemX < 0 || itemX > (item.width || 400) || itemY < 0 || itemY > (item.height || 400)) {
+        return
+      }
+
+      pointsRef.current.push([itemX, itemY])
+      pathRef.current.points(pointsRef.current.flat())
+      maskLayer.batchDraw()
+    }
+
+    const handleMouseUp = () => {
+      isDrawingRef.current = false
+      pathRef.current = null
+      pointsRef.current = []
+    }
+
+    const handleKeyPress = (e) => {
+      if (e.key === 'Enter' && !e.repeat) {
+        e.preventDefault()
+        // Export mask as image
+        const maskLayer = maskLayerRef.current
+        if (!maskLayer) return
+
+        // Create a temporary canvas to render the mask
+        const canvas = document.createElement('canvas')
+        const itemWidth = item.width || 400
+        const itemHeight = item.height || 400
+        canvas.width = itemWidth
+        canvas.height = itemHeight
+        const ctx = canvas.getContext('2d')
+
+        // Draw white background
+        ctx.fillStyle = 'white'
+        ctx.fillRect(0, 0, itemWidth, itemHeight)
+
+        // Draw mask strokes in black
+        const shapes = maskLayer.getChildren()
+        shapes.forEach((shape) => {
+          if (shape instanceof Konva.Line) {
+            ctx.strokeStyle = 'black'
+            ctx.lineWidth = shape.strokeWidth() * zoom
+            ctx.lineCap = 'round'
+            ctx.lineJoin = 'round'
+            ctx.beginPath()
+            const points = shape.points()
+            for (let i = 0; i < points.length; i += 2) {
+              if (i === 0) {
+                ctx.moveTo(points[i], points[i + 1])
+              } else {
+                ctx.lineTo(points[i], points[i + 1])
+              }
+            }
+            ctx.stroke()
+          }
+        })
+
+        const maskDataUrl = canvas.toDataURL('image/png')
+        onMaskComplete(maskDataUrl)
+      } else if (e.key === 'Escape' && !e.repeat) {
+        e.preventDefault()
+        onCancel()
+      }
+    }
+
+    stage.on('mousedown', handleMouseDown)
+    stage.on('mousemove', handleMouseMove)
+    stage.on('mouseup', handleMouseUp)
+    stage.on('mouseleave', handleMouseUp)
+    document.addEventListener('keydown', handleKeyPress)
+
+    return () => {
+      stage.off('mousedown', handleMouseDown)
+      stage.off('mousemove', handleMouseMove)
+      stage.off('mouseup', handleMouseUp)
+      stage.off('mouseleave', handleMouseUp)
+      document.removeEventListener('keydown', handleKeyPress)
+    }
+  }, [item, stageRef, maskLayerRef, onMaskComplete, onCancel, brushSize, zoom])
+
+  return (
+    <div className="fixed top-20 right-4 z-50 bg-white/95 backdrop-blur-sm rounded-lg px-4 py-3 shadow-lg border border-stone-200">
+      <label className="text-xs text-stone-600 mb-2 block font-medium">Brush Size</label>
+      <div className="flex items-center gap-3">
+        <input
+          type="range"
+          min="5"
+          max="100"
+          value={brushSize}
+          onChange={(e) => setBrushSize(parseInt(e.target.value))}
+          className="flex-1"
+        />
+        <span className="text-sm text-stone-700 font-mono w-12 text-right">{brushSize}px</span>
+      </div>
+      <div className="mt-2 text-xs text-stone-500">
+        Press <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Enter</kbd> to apply, <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Esc</kbd> to cancel
+      </div>
+    </div>
+  )
+}
+
 // Canvas Item Component
-function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, showMeasurements, zoom }) {
+function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, showMeasurements, zoom, blendMode }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
@@ -57,12 +213,13 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
   const brightness = (adjustments.brightness || 1) - 1 // Konva expects -1 to 1
   const contrast = (adjustments.contrast || 1) - 1 // Konva expects -1 to 1
   const saturation = (adjustments.saturation || 1) - 1 // Konva expects -1 to 1
+  const hue = (adjustments.hue || 0) / 180 // Konva HSL expects -1 to 1 (0-360 degrees -> -1 to 1)
 
   // Create filter array
   const filters = []
   if (brightness !== 0) filters.push(Konva.Filters.Brighten)
   if (contrast !== 0) filters.push(Konva.Filters.Contrast)
-  if (saturation !== 0) filters.push(Konva.Filters.HSL)
+  if (saturation !== 0 || hue !== 0) filters.push(Konva.Filters.HSL)
 
   return (
     <Group
@@ -87,7 +244,16 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
           onSelect(e, false)
         }
       }}
+      onContextMenu={(e) => {
+        e.evt.preventDefault()
+        if (onContextMenu) {
+          onContextMenu(e, item.id)
+        }
+      }}
+      onTransformEnd={handleTransformEnd}
+      visible={item.is_visible !== false}
       opacity={item.opacity || 1}
+      style={{ cursor: blendMode ? 'crosshair' : 'default' }}
     >
       <Image
         image={image}
@@ -98,6 +264,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
         brightness={brightness}
         contrast={contrast}
         saturation={saturation}
+        hue={hue}
         cache
       />
       {(isSelected || isMultiSelected) && (
@@ -174,8 +341,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [selectedItemId, setSelectedItemId] = useState(null)
   const [selectedItemIds, setSelectedItemIds] = useState(new Set()) // Multi-select
   const [clipboard, setClipboard] = useState(null) // For copy/paste
-  const [history, setHistory] = useState([]) // For undo
-  const [historyIndex, setHistoryIndex] = useState(-1) // Current history position
   const [canvasState, setCanvasState] = useState({
     zoom: 1,
     panX: 0,
@@ -201,10 +366,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [referenceImage, setReferenceImage] = useState(null)
   const [styles, setStyles] = useState([])
   const [showStyleLibrary, setShowStyleLibrary] = useState(false)
+  const [showLayersPanel, setShowLayersPanel] = useState(false)
   
   // UI State
   const [chatInput, setChatInput] = useState('')
-  const [popupMenuPosition, setPopupMenuPosition] = useState({ x: 0, y: 0, visible: false })
+  const [popupMenuPosition, setPopupMenuPosition] = useState({ x: 0, y: 0, visible: false, showAdjustments: false })
+  const [blendMode, setBlendMode] = useState(false) // Track if we're in blend mode
+  const [blendSourceId, setBlendSourceId] = useState(null) // First image to blend
+  const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0, visible: false, itemId: null })
+  
+  // Eraser/Inpaint State
+  const [eraserMode, setEraserMode] = useState(false)
+  const [eraserTargetId, setEraserTargetId] = useState(null)
+  const [maskCanvas, setMaskCanvas] = useState(null) // Canvas for drawing mask
+  const [isDrawingMask, setIsDrawingMask] = useState(false)
+  const [maskPath, setMaskPath] = useState([]) // Store brush strokes
   
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
@@ -262,6 +438,134 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [popupMenuPosition.visible])
+
+  // Handle file upload and add to canvas
+  const handleFileUpload = useCallback(async (file, dropPosition) => {
+    if (!userId || !projectId) {
+      setError('Missing user or project information. Please refresh the page.')
+      return
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setError('Please drop or paste an image file.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      // Upload file to cloud
+      const uploadResult = await uploadFileToCloud(file, userId)
+      const imageUrl = uploadResult.url
+
+      // Calculate position - use drop position or center of viewport
+      const stage = stageRef.current
+      let x, y
+      
+      if (dropPosition) {
+        // Convert screen coordinates to world coordinates
+        x = (dropPosition.x - stage.x()) / stage.scaleX()
+        y = (dropPosition.y - stage.y()) / stage.scaleY()
+      } else {
+        // Center of viewport
+        const width = dimensions?.width || window.innerWidth
+        const height = dimensions?.height || window.innerHeight
+        const canvasWidth = width * 4
+        const canvasHeight = height * 4
+        x = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
+        y = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Create canvas item
+      // Get max z_index for new items
+      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      
+      const newItem = await createCanvasItem(userId, projectId, {
+        image_url: imageUrl,
+        x_position: x - img.width / 2,
+        y_position: y - img.height / 2,
+        width: img.width,
+        height: img.height,
+        z_index: maxZIndex + 1,
+        is_visible: true,
+      })
+
+      setItems((prev) => [...prev, newItem])
+    } catch (error) {
+      console.error('Error uploading file:', error)
+      setError('Failed to upload image. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, dimensions])
+
+  // Handle drag and drop
+  const handleDrop = useCallback(async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const files = Array.from(e.dataTransfer.files)
+    const imageFiles = files.filter(file => file.type.startsWith('image/'))
+
+    if (imageFiles.length === 0) {
+      setError('Please drop image files only.')
+      return
+    }
+
+    // Get drop position in screen coordinates
+    const stage = stageRef.current
+    if (!stage) return
+
+    const pointer = stage.getPointerPosition()
+    if (!pointer) return
+
+    // Upload all dropped images
+    for (const file of imageFiles) {
+      await handleFileUpload(file, pointer)
+    }
+  }, [handleFileUpload])
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  // Handle paste from clipboard
+  useEffect(() => {
+    const handlePaste = async (e) => {
+      // Don't handle paste if user is typing in an input
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return
+      }
+
+      const items = e.clipboardData?.items
+      if (!items) return
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        if (item.type.indexOf('image') !== -1) {
+          e.preventDefault()
+          const file = item.getAsFile()
+          if (file) {
+            await handleFileUpload(file, null) // null = use center position
+          }
+          break
+        }
+      }
+    }
+
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [handleFileUpload])
 
   // Load canvas data
   useEffect(() => {
@@ -464,8 +768,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const handleItemDelete = useCallback(async (itemId) => {
     try {
+      // Save current state to history before delete
+      saveToHistory(items)
+      
       await deleteCanvasItem(userId, itemId)
-      setItems((prev) => prev.filter((item) => item.id !== itemId))
+      const newItems = items.filter((item) => item.id !== itemId)
+      setItems(newItems)
       if (selectedItemId === itemId) {
         setSelectedItemId(null)
       }
@@ -474,7 +782,116 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       console.error('Error deleting item:', error)
       setError('Failed to delete item. Please try again.')
     }
-  }, [userId, selectedItemId])
+  }, [userId, selectedItemId, items, saveToHistory])
+
+  // Layer panel handlers
+  const handleReorderLayers = useCallback(async (reorderedItems) => {
+    try {
+      // Update all items with new z_index values
+      const updatePromises = reorderedItems.map((item) =>
+        updateCanvasItem(userId, item.id, { z_index: item.z_index })
+      )
+      await Promise.all(updatePromises)
+      setItems(reorderedItems)
+    } catch (error) {
+      console.error('Error reordering layers:', error)
+      setError('Failed to reorder layers. Please try again.')
+    }
+  }, [userId])
+
+  const handleToggleVisibility = useCallback(async (itemId) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+    
+    const newVisibility = item.is_visible === false ? true : false
+    await handleItemUpdate(itemId, { is_visible: newVisibility })
+  }, [items, handleItemUpdate])
+
+  const handleToggleLock = useCallback(async (itemId) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+    
+    const newLockState = !item.is_locked
+    await handleItemUpdate(itemId, { is_locked: newLockState })
+  }, [items, handleItemUpdate])
+
+  const handleOpacityChange = useCallback(async (itemId, opacity) => {
+    await handleItemUpdate(itemId, { opacity })
+  }, [handleItemUpdate])
+
+  // Upscale handler
+  const handleUpscale = useCallback(async (itemId, scale) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to upscale.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      setPopupMenuPosition({ x: 0, y: 0, visible: false })
+      
+      // Call upscale API
+      const response = await fetch('/api/image-editing', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          operation: 'upscale',
+          image_url: targetItem.image_url,
+          scale: scale,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Upscale failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from upscale')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `upscale-${scale}x-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Update the item with the upscaled result
+      await handleItemUpdate(itemId, {
+        image_url: imageUrl,
+        width: img.width,
+        height: img.height,
+        name: `${targetItem.name || 'Image'} (${scale}x)`,
+        metadata: {
+          ...(targetItem.metadata || {}),
+          original_image_url: targetItem.image_url, // Backup original
+          upscaled_at: new Date().toISOString(),
+          upscale_factor: scale,
+        },
+      })
+
+      setError('')
+    } catch (error) {
+      console.error('Error upscaling:', error)
+      setError(`Failed to upscale image ${scale}x. Please try again.`)
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, handleItemUpdate])
 
   const moveToFront = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
@@ -497,6 +914,399 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setGeneratePrompt(selectedItem.prompt)
     }
   }, [selectedItem])
+
+  // Handle blend two images
+  const handleBlend = useCallback(async (sourceId, targetId) => {
+    if (!userId || !projectId || !sourceId || !targetId) return
+
+    const sourceItem = items.find(item => item.id === sourceId)
+    const targetItem = items.find(item => item.id === targetId)
+
+    if (!sourceItem || !targetItem) {
+      setError('Could not find images to blend.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      // Call blend API
+      const response = await fetch('/api/blend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          image1_url: sourceItem.image_url,
+          image2_url: targetItem.image_url,
+          mask: 0.5, // 50% blend
+        }),
+      })
+
+      if (!response.ok) throw new Error('Blend failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from blend')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `blend-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Calculate position (center between the two images)
+      const centerX = (sourceItem.x_position + targetItem.x_position + (sourceItem.width || 0) + (targetItem.width || 0)) / 2
+      const centerY = (sourceItem.y_position + targetItem.y_position + (sourceItem.height || 0) + (targetItem.height || 0)) / 2
+
+      // Create new blended item
+      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      const newItem = await createCanvasItem(userId, projectId, {
+        image_url: imageUrl,
+        x_position: centerX - img.width / 2,
+        y_position: centerY - img.height / 2,
+        width: img.width,
+        height: img.height,
+        name: `Blend: ${sourceItem.name || 'Image 1'} + ${targetItem.name || 'Image 2'}`,
+        z_index: maxZIndex + 1,
+        is_visible: true,
+      })
+
+      // Delete both original items
+      await deleteCanvasItem(userId, sourceId)
+      await deleteCanvasItem(userId, targetId)
+
+      // Update items list
+      setItems((prev) => prev.filter(item => item.id !== sourceId && item.id !== targetId).concat(newItem))
+      
+      // Clear selection and blend mode
+      setSelectedItemId(null)
+      setBlendMode(false)
+      setBlendSourceId(null)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } catch (error) {
+      console.error('Error blending images:', error)
+      setError('Failed to blend images. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items])
+
+  // Compare mode state
+  const [compareMode, setCompareMode] = useState(false)
+  const [compareItems, setCompareItems] = useState([])
+  const [compareSplitPosition, setCompareSplitPosition] = useState(50) // Percentage
+
+  // Style transfer state
+  const [showStyleTransfer, setShowStyleTransfer] = useState(false)
+  const [styleTransferTargetId, setStyleTransferTargetId] = useState(null)
+
+  // Handle context menu actions
+  const handleContextMenuAction = useCallback((action, itemId) => {
+    if (action === 'blend') {
+      setBlendMode(true)
+      setBlendSourceId(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+      setError('Blend mode: Click on another image to blend with this one')
+    } else if (action === 'erase') {
+      setEraserMode(true)
+      setEraserTargetId(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+      setError('Eraser mode: Paint over the area you want to erase/fill. Press Enter when done.')
+    } else if (action === 'removeBg') {
+      handleRemoveBackground(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'loop') {
+      handleCreateLoop(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'extractPalette') {
+      handleExtractPalette(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'compare') {
+      // Get selected items for comparison
+      const itemsToCompare = selectedItemIds.size > 0
+        ? items.filter(item => selectedItemIds.has(item.id))
+        : [items.find(item => item.id === itemId)].filter(Boolean)
+      
+      if (itemsToCompare.length >= 2) {
+        setCompareItems(itemsToCompare.slice(0, 2))
+        setCompareMode(true)
+        setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+      } else {
+        setError('Please select two images to compare. Use Shift+Click to select multiple.')
+      }
+    }
+  }, [selectedItemIds, items])
+
+  // Style transfer handler
+  const handleStyleTransfer = useCallback(async (itemId, styleName) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to process.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      setShowStyleTransfer(false)
+      
+      // Call style transfer API
+      const response = await fetch('/api/style-transfer', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          image_url: targetItem.image_url,
+          style: styleName,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Style transfer failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from style transfer')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `style-transfer-${styleName}-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Update the item with the styled result
+      await handleItemUpdate(itemId, {
+        image_url: imageUrl,
+        width: img.width,
+        height: img.height,
+        name: `${targetItem.name || 'Image'} (${styleName})`,
+        metadata: {
+          ...(targetItem.metadata || {}),
+          original_image_url: targetItem.image_url,
+          style_transferred_at: new Date().toISOString(),
+          style_name: styleName,
+        },
+      })
+
+      setError('')
+    } catch (error) {
+      console.error('Error applying style transfer:', error)
+      setError('Failed to apply style transfer. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, handleItemUpdate])
+
+  // Style transfer keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 't' && !e.shiftKey && selectedItemId) {
+        e.preventDefault()
+        setStyleTransferTargetId(selectedItemId)
+        setShowStyleTransfer(true)
+      }
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [selectedItemId])
+
+  // Remove background handler
+  const handleRemoveBackground = useCallback(async (itemId) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to process.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      // Call remove background API
+      const response = await fetch('/api/remove-bg', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          image_url: targetItem.image_url,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Remove background failed')
+
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from remove background')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `remove-bg-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Update the item with the result
+      await handleItemUpdate(itemId, {
+        image_url: imageUrl,
+        width: img.width,
+        height: img.height,
+        metadata: {
+          ...(targetItem.metadata || {}),
+          original_image_url: targetItem.image_url, // Backup original
+          background_removed_at: new Date().toISOString(),
+        },
+      })
+
+      setError('')
+    } catch (error) {
+      console.error('Error removing background:', error)
+      setError('Failed to remove background. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, handleItemUpdate])
+
+  // Handle inpainting with mask
+  const handleInpaint = useCallback(async (itemId, maskDataUrl) => {
+    if (!userId || !projectId || !itemId) return
+
+    const targetItem = items.find(item => item.id === itemId)
+    if (!targetItem) {
+      setError('Could not find image to inpaint.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      
+      // Call inpainting API
+      const response = await fetch('/api/inpaint', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${userId}`,
+        },
+        body: JSON.stringify({
+          image_url: targetItem.image_url,
+          mask_url: maskDataUrl, // Base64 data URL of the mask
+          prompt: 'fill the erased area seamlessly', // Optional prompt for generation
+        }),
+      })
+
+      if (!response.ok) throw new Error('Inpaint failed')
+
+      // Stream the result (for now, just get the final image)
+      const data = await response.json()
+      if (!data.image_url) throw new Error('No image returned from inpaint')
+
+      // Upload if needed
+      let imageUrl = data.image_url
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `inpaint-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, userId)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Update the item with the inpainted result
+      // Keep original as backup in metadata
+      await handleItemUpdate(itemId, {
+        image_url: imageUrl,
+        width: img.width,
+        height: img.height,
+        metadata: {
+          ...(targetItem.metadata || {}),
+          original_image_url: targetItem.image_url, // Backup original
+          inpainted_at: new Date().toISOString(),
+        },
+      })
+
+      // Clear eraser mode
+      setEraserMode(false)
+      setEraserTargetId(null)
+      setMaskCanvas(null)
+      setMaskPath([])
+      setError('')
+    } catch (error) {
+      console.error('Error inpainting:', error)
+      setError('Failed to inpaint image. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, handleItemUpdate])
+
+  // Close context menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (contextMenuPosition.visible && !e.target.closest('.context-menu')) {
+        setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [contextMenuPosition.visible])
+
+  // Handle click in blend mode
+  useEffect(() => {
+    if (!blendMode || !blendSourceId) return
+
+    // When an item is selected in blend mode, blend it with the source
+    if (selectedItemId && selectedItemId !== blendSourceId) {
+      handleBlend(blendSourceId, selectedItemId)
+    } else if (selectedItemId === blendSourceId) {
+      setError('Cannot blend an image with itself. Click on a different image.')
+      setBlendMode(false)
+      setBlendSourceId(null)
+    }
+  }, [blendMode, blendSourceId, selectedItemId, handleBlend])
 
   const handleStageDragEnd = useCallback(() => {
     const stage = stageRef.current
@@ -678,6 +1488,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
         const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
+        const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
         const newItem = await createCanvasItem(userId, projectId, {
           image_url: imageUrl,
           x_position: centerX - 200,
@@ -687,6 +1498,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           name: `Generated: ${prompt.substring(0, 30)}`,
           prompt: finalPrompt,
           description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''}`,
+          z_index: maxZIndex + 1,
+          is_visible: true,
         })
 
         setItems((prev) => [...prev, newItem])
@@ -837,6 +1650,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           const x = centerX - 200 + (i % 2) * spacing
           const y = centerY - 200 + Math.floor(i / 2) * spacing
 
+          const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
           const newItem = await createCanvasItem(userId, projectId, {
             image_url: imageUrl,
             x_position: x,
@@ -845,6 +1659,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             height: 400,
             name: `Variation ${i + 1}: ${prompt.substring(0, 30)}`,
             prompt: variationPrompt,
+            z_index: maxZIndex + i + 1,
+            is_visible: true,
           })
           
           newItems.push(newItem)
@@ -935,10 +1751,288 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+      {/* Context Menu - Right-click menu */}
+      {contextMenuPosition.visible && (
+        <div
+          className="context-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[160px]"
+          style={{
+            left: `${contextMenuPosition.x}px`,
+            top: `${contextMenuPosition.y}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              handleContextMenuAction('blend', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Blend with...
+          </button>
+          <div className="border-t border-stone-200 my-1" />
+          <button
+            onClick={() => {
+              handleContextMenuAction('erase', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
+              <path d="M22 21H7" />
+              <path d="m5 11 6 6" />
+            </svg>
+            Erase / Fill
+          </button>
+          <div className="border-t border-stone-200 my-1" />
+          <button
+            onClick={() => {
+              handleContextMenuAction('removeBg', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="2" width="20" height="20" rx="2" />
+              <path d="M12 8v8" />
+              <path d="M8 12h8" />
+            </svg>
+            Remove Background
+          </button>
+          <div className="border-t border-stone-200 my-1" />
+          <button
+            onClick={() => {
+              handleContextMenuAction('extractPalette', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+              <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+              <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+              <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.074 2.26-.21" />
+            </svg>
+            Extract Color Palette
+          </button>
+          <button
+            onClick={() => {
+              handleContextMenuAction('loop', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v4" />
+              <path d="M12 18v4" />
+              <path d="M4.93 4.93l2.83 2.83" />
+              <path d="M16.24 16.24l2.83 2.83" />
+              <path d="M2 12h4" />
+              <path d="M18 12h4" />
+              <path d="M4.93 19.07l2.83-2.83" />
+              <path d="M16.24 7.76l2.83-2.83" />
+            </svg>
+            Create Loop (GIF)
+          </button>
+          {selectedItemIds.size >= 1 && (
+            <>
+              <div className="border-t border-stone-200 my-1" />
+              <button
+                onClick={() => {
+                  handleContextMenuAction('compare', contextMenuPosition.itemId)
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                  <line x1="12" y1="3" x2="12" y2="21" />
+                </svg>
+                Compare Mode
+              </button>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Blend Mode Indicator */}
+      {blendMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-blue-50 border border-blue-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-blue-700">
+            Blend mode active: Click on another image to blend with the selected one
+            <button
+              onClick={() => {
+                setBlendMode(false)
+                setBlendSourceId(null)
+                setError('')
+              }}
+              className="ml-2 text-blue-500 hover:text-blue-700"
+            >
+              Cancel
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Eraser Mode Indicator */}
+      {eraserMode && eraserTargetId && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-orange-700">
+            Eraser mode: Paint over the area to erase/fill. Press <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Enter</kbd> to apply, <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Esc</kbd> to cancel
+            <button
+              onClick={() => {
+                setEraserMode(false)
+                setEraserTargetId(null)
+                setMaskCanvas(null)
+                setMaskPath([])
+                setError('')
+              }}
+              className="ml-2 text-orange-500 hover:text-orange-700"
+            >
+              Cancel
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Outpaint Mode Indicator */}
+      {outpaintMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-purple-700">
+            Outpaint mode: Draw a rectangle and describe the area. Press <kbd className="px-1.5 py-0.5 bg-white border border-purple-300 rounded text-xs">Esc</kbd> to cancel
+            <button
+              onClick={() => {
+                setOutpaintMode(false)
+                setOutpaintRect(null)
+                setError('')
+              }}
+              className="ml-2 text-purple-500 hover:text-purple-700"
+            >
+              Cancel
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Dimension Mode Indicator */}
+      {dimensionMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-green-50 border border-green-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-green-700">
+            Dimension mode: Click two points to measure distance. Press <kbd className="px-1.5 py-0.5 bg-white border border-green-300 rounded text-xs">M</kbd> to start, <kbd className="px-1.5 py-0.5 bg-white border border-green-300 rounded text-xs">Esc</kbd> to cancel
+            {dimensionLines.length > 0 && (
+              <button
+                onClick={saveDimensionLines}
+                className="ml-3 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Save {dimensionLines.length} measurement{dimensionLines.length > 1 ? 's' : ''}
+              </button>
+            )}
+            <button
+              onClick={() => {
+                setDimensionMode(false)
+                setDimensionStartPos(null)
+                setDimensionEndPos(null)
+                setDimensionLines([])
+                setError('')
+              }}
+              className="ml-2 text-green-500 hover:text-green-700"
+            >
+              Cancel
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Text Mode Indicator */}
+      {textMode && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-purple-50 border border-purple-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-purple-700">
+            Text mode: Click on canvas to place text, then type and press Enter. Press <kbd className="px-1.5 py-0.5 bg-white border border-purple-300 rounded text-xs">T</kbd> to start, <kbd className="px-1.5 py-0.5 bg-white border border-purple-300 rounded text-xs">Esc</kbd> to cancel
+            {textPosition && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && textInput.trim()) {
+                      handleTextToVector(textInput, textPosition)
+                    }
+                  }}
+                  placeholder="Enter text..."
+                  className="flex-1 px-3 py-1.5 text-sm border border-purple-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-300"
+                  autoFocus
+                />
+                <button
+                  onClick={() => {
+                    if (textInput.trim()) {
+                      handleTextToVector(textInput, textPosition)
+                    }
+                  }}
+                  disabled={!textInput.trim() || isGenerating}
+                  className="px-4 py-1.5 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Create
+                </button>
+              </div>
+            )}
+            <button
+              onClick={() => {
+                setTextMode(false)
+                setTextInput('')
+                setTextPosition(null)
+                setError('')
+              }}
+              className="ml-2 text-purple-500 hover:text-purple-700"
+            >
+              Cancel
+            </button>
+          </p>
+        </div>
+      )}
+
+      {/* Budget Mode Indicator */}
+      {budgetStickers.length > 0 && (
+        <div className="fixed top-4 right-4 z-50 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-2 shadow-lg">
+          <p className="text-sm text-yellow-700">
+            Budget stickers: {budgetStickers.length} active
+          </p>
+        </div>
+      )}
+
+      {/* Mask Drawing Overlay UI Controls */}
+      {eraserMode && eraserTargetId && (() => {
+        const targetItem = items.find(item => item.id === eraserTargetId)
+        if (!targetItem) return null
+
+        return (
+          <MaskDrawingOverlay
+            item={targetItem}
+            stageRef={stageRef}
+            maskLayerRef={maskLayerRef}
+            onMaskComplete={(maskDataUrl) => handleInpaint(eraserTargetId, maskDataUrl)}
+            onCancel={() => {
+              setEraserMode(false)
+              setEraserTargetId(null)
+              setMaskCanvas(null)
+              setMaskPath([])
+              // Clear mask layer
+              if (maskLayerRef.current) {
+                maskLayerRef.current.destroyChildren()
+                maskLayerRef.current.draw()
+              }
+            }}
+            zoom={canvasState.zoom}
+            brushSize={eraserBrushSize}
+            setBrushSize={setEraserBrushSize}
+          />
+        )
+      })()}
+
       {/* Popup Menu - Appears when item is selected */}
       {popupMenuPosition.visible && selectedItem && (
         <div
-          className="popup-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[140px]"
+          className="popup-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[200px]"
           style={{
             left: `${popupMenuPosition.x}px`,
             top: `${popupMenuPosition.y}px`,
@@ -946,48 +2040,174 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button
-            onClick={handleEdit}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-            </svg>
-            Edit
-          </button>
-          <button
-            onClick={moveToFront}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-            Move to Front
-          </button>
-          <button
-            onClick={moveToBack}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-            Move to Back
-          </button>
-          <div className="border-t border-stone-200 my-1" />
-          <button
-            onClick={() => handleItemDelete(selectedItemId)}
-            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-            Delete
-          </button>
+          {popupMenuPosition.showAdjustments ? (
+            <div className="px-4 py-3 space-y-3">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-sm font-medium text-stone-700">Color Adjustments</h3>
+                <button
+                  onClick={() => setPopupMenuPosition({ ...popupMenuPosition, showAdjustments: false })}
+                  className="text-stone-400 hover:text-stone-600"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
+              <div>
+                <label className="text-xs text-stone-600 mb-1 block">Brightness</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={selectedItem.adjustments?.brightness || 1}
+                  onChange={(e) => {
+                    const adjustments = { ...(selectedItem.adjustments || {}), brightness: parseFloat(e.target.value) }
+                    handleItemUpdate(selectedItem.id, { adjustments })
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-stone-600 mb-1 block">Contrast</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={selectedItem.adjustments?.contrast || 1}
+                  onChange={(e) => {
+                    const adjustments = { ...(selectedItem.adjustments || {}), contrast: parseFloat(e.target.value) }
+                    handleItemUpdate(selectedItem.id, { adjustments })
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-stone-600 mb-1 block">Saturation</label>
+                <input
+                  type="range"
+                  min="0"
+                  max="2"
+                  step="0.1"
+                  value={selectedItem.adjustments?.saturation || 1}
+                  onChange={(e) => {
+                    const adjustments = { ...(selectedItem.adjustments || {}), saturation: parseFloat(e.target.value) }
+                    handleItemUpdate(selectedItem.id, { adjustments })
+                  }}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <label className="text-xs text-stone-600 mb-1 block">Hue</label>
+                <input
+                  type="range"
+                  min="-180"
+                  max="180"
+                  step="1"
+                  value={selectedItem.adjustments?.hue || 0}
+                  onChange={(e) => {
+                    const adjustments = { ...(selectedItem.adjustments || {}), hue: parseInt(e.target.value) }
+                    handleItemUpdate(selectedItem.id, { adjustments })
+                  }}
+                  className="w-full"
+                />
+                <div className="text-xs text-stone-400 mt-1">{selectedItem.adjustments?.hue || 0}°</div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <button
+                onClick={handleEdit}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+                Edit
+              </button>
+              <button
+                onClick={moveToFront}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                Move to Front
+              </button>
+              <button
+                onClick={moveToBack}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+                Move to Back
+              </button>
+              <div className="border-t border-stone-200 my-1" />
+              <button
+                onClick={() => {
+                  setPopupMenuPosition({ ...popupMenuPosition, showAdjustments: true })
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+                  <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+                  <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+                  <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+                  <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.074 2.26-.21" />
+                  <path d="M19.79 10.27c.69-.38 1.21-1.12 1.21-2.02 0-1.24-1.01-2.25-2.25-2.25-.9 0-1.64.52-2.02 1.21" />
+                  <path d="M19.79 10.27c.69.38 1.21 1.12 1.21 2.02 0 1.24-1.01 2.25-2.25 2.25-.9 0-1.64-.52-2.02-1.21" />
+                </svg>
+                Color Adjustments
+              </button>
+              <button
+                onClick={async () => {
+                  if (!selectedItem) return
+                  await handleUpscale(selectedItem.id, 2)
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Upscale 2×
+              </button>
+              <button
+                onClick={async () => {
+                  if (!selectedItem) return
+                  await handleUpscale(selectedItem.id, 4)
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Upscale 4×
+              </button>
+              <div className="border-t border-stone-200 my-1" />
+              <button
+                onClick={() => handleItemDelete(selectedItemId)}
+                className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 6h18" />
+                  <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                  <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                </svg>
+                Delete
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -1016,11 +2236,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           ref={containerRef} 
           className="flex-1 relative w-full h-full overflow-hidden" 
           style={{ backgroundColor: canvasState.backgroundColor }}
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
         >
           {/* Grid Background - CSS-based, fixed to viewport, behind Stage */}
           {canvasState.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
+            // Convert grid size based on unit
+            let baseGridSize = canvasState.gridSize || 20
+            if (canvasState.gridUnit === 'in') {
+              baseGridSize = baseGridSize * 96 // 1 inch = 96px at 96 DPI
+            } else if (canvasState.gridUnit === 'cm') {
+              baseGridSize = baseGridSize * 37.8 // 1 cm ≈ 37.8px at 96 DPI
+            }
+            
             // Calculate grid spacing in screen pixels (scales with zoom)
-            const screenGridSize = canvasState.gridSize * canvasState.zoom
+            const screenGridSize = baseGridSize * canvasState.zoom
             const effectiveGridSize = Math.max(10, screenGridSize)
             
             // Calculate grid offset based on pan position
@@ -1059,14 +2289,35 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               ref={stageRef}
               width={canvasWidth}
               height={canvasHeight}
-              draggable
+              draggable={!outpaintMode && !dimensionMode && !textMode}
               onDrag={handleStageDrag}
               onDragEnd={handleStageDragEnd}
               onWheel={handleWheel}
+              onMouseDown={outpaintMode ? handleOutpaintMouseDown : dimensionMode ? handleDimensionClick : undefined}
+              onMouseMove={outpaintMode ? handleOutpaintMouseMove : undefined}
+              onMouseUp={outpaintMode ? handleOutpaintMouseUp : undefined}
               onClick={(e) => {
                 if (e.target === e.target.getStage()) {
-                  setSelectedItemId(null)
-                  setPopupMenuPosition({ x: 0, y: 0, visible: false })
+                  if (blendMode) {
+                    // Cancel blend mode if clicking on empty canvas
+                    setBlendMode(false)
+                    setBlendSourceId(null)
+                    setError('')
+                  }
+                  if (textMode) {
+                    const pos = stageRef.current?.getPointerPosition()
+                    if (pos) {
+                      const stage = stageRef.current
+                      const worldX = (pos.x - stage.x()) / stage.scaleX()
+                      const worldY = (pos.y - stage.y()) / stage.scaleY()
+                      setTextPosition({ x: worldX, y: worldY })
+                      setError('Enter text and press Enter to create vector text')
+                    }
+                  }
+                  if (!outpaintMode && !dimensionMode && !textMode) {
+                    setSelectedItemId(null)
+                    setPopupMenuPosition({ x: 0, y: 0, visible: false })
+                  }
                 }
               }}
               style={{ position: 'relative', zIndex: 1 }}
@@ -1110,6 +2361,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       isSelected={item.id === selectedItemId}
                       isMultiSelected={selectedItemIds.has(item.id)}
                       onSelect={(e, isMulti) => {
+                        if (blendMode && blendSourceId && !isMulti) {
+                          // In blend mode, clicking an item triggers blend
+                          if (item.id !== blendSourceId) {
+                            handleBlend(blendSourceId, item.id)
+                          } else {
+                            setError('Cannot blend an image with itself. Click on a different image.')
+                            setBlendMode(false)
+                            setBlendSourceId(null)
+                          }
+                          return
+                        }
+                        
                         if (isMulti) {
                           setSelectedItemIds(prev => {
                             const newSet = new Set(prev)
@@ -1127,12 +2390,94 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       }}
                       onUpdate={handleItemUpdate}
                       onDelete={handleItemDelete}
+                      onContextMenu={(e, itemId) => {
+                        e.evt.preventDefault()
+                        const stage = stageRef.current
+                        if (!stage) return
+                        const pointer = stage.getPointerPosition()
+                        if (pointer) {
+                          setContextMenuPosition({
+                            x: pointer.x,
+                            y: pointer.y,
+                            visible: true,
+                            itemId: itemId,
+                          })
+                        }
+                      }}
                       showMeasurements={canvasState.showMeasurements}
                       zoom={canvasState.zoom}
+                      blendMode={blendMode}
                     />
                   ))
                 })()}
               </Layer>
+
+              {/* Mask Drawing Layer - Only visible in eraser mode */}
+              {eraserMode && eraserTargetId && (
+                <Layer ref={maskLayerRef} name="mask-layer" listening={false} />
+              )}
+
+              {/* Dimension Lines Layer */}
+              {dimensionMode && (
+                <Layer>
+                  {dimensionStartPos && (
+                    <Circle
+                      x={dimensionStartPos.x}
+                      y={dimensionStartPos.y}
+                      radius={5}
+                      fill="#3b82f6"
+                      stroke="#fff"
+                      strokeWidth={2}
+                    />
+                  )}
+                  {dimensionLines.map((line) => {
+                    const dx = line.endX - line.startX
+                    const dy = line.endY - line.startY
+                    const length = Math.sqrt(dx * dx + dy * dy)
+                    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+
+                    return (
+                      <Group key={line.id} x={line.startX} y={line.startY} rotation={angle}>
+                        <Line
+                          points={[0, 0, length, 0]}
+                          stroke="#3b82f6"
+                          strokeWidth={2}
+                          lineCap="round"
+                        />
+                        <Text
+                          x={length / 2}
+                          y={-20}
+                          text={line.distance}
+                          fontSize={12}
+                          fill="#1f2937"
+                          fontStyle="bold"
+                          align="center"
+                          offsetX={line.distance.length * 3}
+                        />
+                        {/* Arrow heads */}
+                        <Line points={[0, 0, 10, -5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
+                        <Line points={[0, 0, 10, 5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
+                        <Line points={[length, 0, length - 10, -5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
+                        <Line points={[length, 0, length - 10, 5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
+                      </Group>
+                    )
+                  })}
+                </Layer>
+              )}
+
+              {/* Text Position Indicator */}
+              {textMode && textPosition && (
+                <Layer>
+                  <Circle
+                    x={textPosition.x}
+                    y={textPosition.y}
+                    radius={5}
+                    fill="#8b5cf6"
+                    stroke="#fff"
+                    strokeWidth={2}
+                  />
+                </Layer>
+              )}
             </Stage>
             )
           })()}
@@ -1188,6 +2533,101 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             {/* Divider */}
             <div className="w-px h-6 bg-stone-200" />
 
+            {/* Undo/Redo Buttons */}
+            <button
+              onClick={handleUndo}
+              disabled={historyIndex <= 0}
+              className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Undo (Cmd/Ctrl+Z)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <path d="M3 7v6h6" />
+                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+              </svg>
+            </button>
+            <button
+              onClick={handleRedo}
+              disabled={historyIndex >= history.length - 1}
+              className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Redo (Cmd/Ctrl+Shift+Z)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <path d="M21 7v6h-6" />
+                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+              </svg>
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
+
+            {/* Tool Buttons */}
+            <button
+              onClick={() => {
+                setDimensionMode(true)
+                setError('Dimension mode: Click two points to measure distance. Press M to start.')
+              }}
+              className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
+                dimensionMode ? 'bg-stone-100' : ''
+              }`}
+              title="Dimension Tool (M)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="3" y1="12" x2="21" y2="12" />
+                <path d="M3 12l4-4" />
+                <path d="M3 12l4 4" />
+                <path d="M21 12l-4-4" />
+                <path d="M21 12l-4 4" />
+                <line x1="12" y1="3" x2="12" y2="21" />
+              </svg>
+            </button>
+            <button
+              onClick={() => {
+                setTextMode(true)
+                setError('Text mode: Click on canvas to place text, then type and press Enter')
+              }}
+              className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
+                textMode ? 'bg-stone-100' : ''
+              }`}
+              title="Text Tool (T)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 20h16" />
+                <path d="M6 4v8a6 6 0 0 0 12 0V4" />
+                <line x1="6" y1="4" x2="6" y2="20" />
+              </svg>
+            </button>
+            <button
+              onClick={(e) => {
+                const stage = stageRef.current
+                if (stage) {
+                  const pos = stage.getPointerPosition()
+                  if (pos) {
+                    const worldX = (pos.x - stage.x()) / stage.scaleX()
+                    const worldY = (pos.y - stage.y()) / stage.scaleY()
+                    createBudgetSticker({ x: worldX, y: worldY })
+                  } else {
+                    // Fallback to center
+                    const canvasWidth = dimensions.width * 4
+                    const canvasHeight = dimensions.height * 4
+                    createBudgetSticker({ x: canvasWidth / 2, y: canvasHeight / 2 })
+                  }
+                }
+              }}
+              className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+              title="Budget Sticker (B)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+                <path d="M16 13H8" />
+                <path d="M16 17H8" />
+                <path d="M10 9H8" />
+              </svg>
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-6 bg-stone-200" />
+
             {/* Action Buttons */}
             <button
               onClick={() => {
@@ -1236,17 +2676,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </button>
             
             {items.length > 0 && (
-              <button
-                onClick={() => setShowExportModal(true)}
-                className="p-2 hover:bg-stone-100 rounded-full transition-colors"
-                title="Export"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
+              <>
+                <button
+                  onClick={() => setShowLayersPanel(!showLayersPanel)}
+                  className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+                  title="Layers"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
+                    <path d="M2 17l10 5 10-5" />
+                    <path d="M2 12l10 5 10-5" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setShowExportModal(true)}
+                  className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+                  title="Export"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                </button>
+              </>
             )}
 
             {/* Zoom Display */}
@@ -1491,6 +2944,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
                   try {
                     console.log('Adding asset to canvas:', { assetUrl: asset.url, projectId, userId })
+                    const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
                     const newItem = await createCanvasItem(userId, projectId, {
                       image_url: asset.url,
                       x_position: centerX - 200,
@@ -1499,9 +2953,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       height: 400,
                       name: asset.name || 'Asset',
                       description: asset.description,
+                      z_index: maxZIndex + 1,
+                      is_visible: true,
                     })
                     console.log('Asset added successfully:', newItem)
-                    setItems((prev) => [...prev, newItem])
+                    const newItems = [...items, newItem]
+                    setItems(newItems)
+                    saveToHistory(items) // Save state before adding asset
                     setShowAssetLibrary(false)
                     setError('')
                   } catch (error) {
@@ -1526,13 +2984,109 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </div>
       )}
 
-      {/* Export Modal */}
+      {/* Canvas Export Modal */}
       {showExportModal && (
-        <ExportModal
-          projectId={projectId}
-          projectName="Canvas"
+        <CanvasExportModal
+          items={items}
+          selectedItemIds={selectedItemIds}
+          stageRef={stageRef}
+          dimensions={dimensions}
+          canvasState={canvasState}
           onClose={() => setShowExportModal(false)}
         />
+      )}
+
+      {/* Layers Panel */}
+      <LayersPanel
+        items={items}
+        selectedItemId={selectedItemId}
+        onSelectItem={(itemId) => setSelectedItemId(itemId)}
+        onReorderItems={handleReorderLayers}
+        onToggleVisibility={handleToggleVisibility}
+        onToggleLock={handleToggleLock}
+        onOpacityChange={handleOpacityChange}
+        onDeleteItem={handleItemDelete}
+        isOpen={showLayersPanel}
+        onClose={() => setShowLayersPanel(false)}
+      />
+
+      {/* Mini-map */}
+      {showMinimap && dimensions.width > 0 && (
+        <div className="fixed bottom-4 right-4 z-40 bg-white/95 backdrop-blur-sm rounded-lg border border-stone-200 shadow-lg p-2">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs font-medium text-stone-600">Mini-map</span>
+            <button
+              onClick={() => setShowMinimap(false)}
+              className="text-stone-400 hover:text-stone-600"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <canvas
+            ref={minimapCanvasRef}
+            onClick={handleMinimapClick}
+            className="cursor-pointer border border-stone-200 rounded"
+            style={{ width: '150px', height: '150px' }}
+          />
+        </div>
+      )}
+
+      {/* Prompt History Drawer */}
+      {showPromptHistory && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setShowPromptHistory(false)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-stone-200">
+              <h2 className="text-xl font-semibold text-stone-800">Prompt History</h2>
+              <p className="text-sm text-stone-500 mt-1">Press Cmd/Ctrl + P to open</p>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {promptHistory.length === 0 ? (
+                <div className="text-center py-12 text-stone-500">
+                  <p className="text-sm">No prompt history yet</p>
+                  <p className="text-xs mt-1">Your prompts will appear here</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {promptHistory.map((prompt, index) => (
+                    <button
+                      key={index}
+                      onClick={() => {
+                        setGeneratePrompt(prompt)
+                        setChatInput(prompt)
+                        setShowPromptHistory(false)
+                        setShowGenerateModal(true)
+                      }}
+                      className="w-full text-left px-4 py-3 rounded-lg border border-stone-200 hover:bg-stone-50 hover:border-stone-300 transition-colors"
+                    >
+                      <p className="text-sm text-stone-700 line-clamp-2">{prompt}</p>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-stone-200 flex items-center justify-end">
+              <button
+                onClick={() => {
+                  setPromptHistory([])
+                  localStorage.removeItem('ature-prompt-history')
+                }}
+                className="px-4 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                disabled={promptHistory.length === 0}
+              >
+                Clear History
+              </button>
+              <button
+                onClick={() => setShowPromptHistory(false)}
+                className="ml-3 px-4 py-2 text-sm bg-stone-600 text-white rounded-lg hover:bg-stone-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

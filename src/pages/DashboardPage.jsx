@@ -8,7 +8,7 @@ import AccountView from '../components/AccountView'
 import ProjectView from '../components/ProjectView'
 
 export default function DashboardPage() {
-  const { user } = useUser()
+  const { user, isLoaded: userLoaded } = useUser()
   const { userId, isSignedIn } = useAuth()
   const { signOut } = useClerk()
   const navigate = useNavigate()
@@ -32,11 +32,30 @@ export default function DashboardPage() {
   // New project creation state
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
-
-  const userName = user?.fullName || user?.firstName || 'User'
+  
+  // Early return if user data is not loaded yet to prevent accessing uninitialized variables
+  // Must be after all hooks are called to follow Rules of Hooks
+  if (!userLoaded) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-stone-50">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-stone-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Helper function to update all project lists (memoized to prevent infinite loops)
+  // Define this BEFORE useEffect to prevent TDZ issues
   const updateProjectLists = useCallback((allProjects) => {
+    if (!allProjects || !Array.isArray(allProjects)) {
+      setSavedProjects([])
+      setRecentProjects([])
+      setSidebarProjects([])
+      return
+    }
+    
     setSavedProjects(allProjects)
     // Sort by updated_at (most recent first)
     const sortedProjects = [...allProjects].sort((a, b) => {
@@ -48,34 +67,54 @@ export default function DashboardPage() {
     setSidebarProjects(sortedProjects.slice(0, 10)) // Last 10 for sidebar
   }, [])
 
+  // Compute userName safely
+  const userName = user?.fullName || user?.firstName || 'User'
+
   // Load spaces and projects on mount
   useEffect(() => {
     if (!userId || !isSignedIn) return
     
+    // Ensure updateProjectLists is available before using it
+    if (typeof updateProjectLists !== 'function') {
+      console.warn('updateProjectLists not available yet')
+      return
+    }
+    
     async function loadData() {
-      // Clean up trash on every load - each item is checked individually
-      // Items are deleted only when their own 1-week period has passed
-      cleanupTrash(userId)
-      
-      const userSpaces = await getSpaces(userId)
-      const trashed = getTrashedSpaces(userId)
-      const trashedProjs = getTrashedProjects(userId)
-      setSpaces(userSpaces)
-      setTrashedSpaces(trashed)
-      setTrashedProjects(trashedProjs)
-      
-      // Load all projects for sidebar menu (regardless of space)
-      const allProjects = await getProjects(userId, null)
-      updateProjectLists(allProjects)
-      
-      // Auto-select first space if none selected and spaces exist
-      if (!selectedSpaceId && userSpaces.length > 0) {
-        const firstSpaceId = userSpaces[0].id
-        setSelectedSpaceId(firstSpaceId)
+      try {
+        // Clean up trash on every load - each item is checked individually
+        // Items are deleted only when their own 1-week period has passed
+        cleanupTrash(userId)
+        
+        const userSpaces = await getSpaces(userId)
+        const trashed = getTrashedSpaces(userId)
+        const trashedProjs = getTrashedProjects(userId)
+        setSpaces(userSpaces || [])
+        setTrashedSpaces(trashed || [])
+        setTrashedProjects(trashedProjs || [])
+        
+        // Load all projects for sidebar menu (regardless of space)
+        const allProjects = await getProjects(userId, null)
+        if (updateProjectLists && typeof updateProjectLists === 'function') {
+          updateProjectLists(allProjects || [])
+        }
+        
+        // Auto-select first space if none selected and spaces exist
+        // Use functional update to avoid dependency on selectedSpaceId
+        setSelectedSpaceId(prev => {
+          if (!prev && userSpaces && userSpaces.length > 0) {
+            return userSpaces[0].id
+          }
+          return prev
+        })
+      } catch (error) {
+        console.error('Error loading dashboard data:', error)
       }
     }
     loadData()
-  }, [userId, isSignedIn, selectedSpaceId, updateProjectLists])
+    // Remove selectedSpaceId from dependencies to prevent infinite loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isSignedIn, updateProjectLists])
   
   // Auto-cleanup trash every 5 minutes to check individual items
   // Each item is deleted independently when its own 1-week period expires
@@ -118,7 +157,9 @@ export default function DashboardPage() {
       setSelectedSpaceId(newSpace.id)
       // Load all projects (for sidebar) and update recent projects
       const allProjects = await getProjects(userId, null)
-      updateProjectLists(allProjects)
+      if (updateProjectLists && typeof updateProjectLists === 'function') {
+        updateProjectLists(allProjects || [])
+      }
     } catch (error) {
       console.error('Error creating space:', error)
       alert('Failed to create space')
@@ -148,7 +189,9 @@ export default function DashboardPage() {
         }
         // Always load all projects for sidebar (regardless of space)
         const allProjects = await getProjects(userId, null)
-        updateProjectLists(allProjects)
+        if (updateProjectLists && typeof updateProjectLists === 'function') {
+          updateProjectLists(allProjects || [])
+        }
       }
     } catch (error) {
       console.error('Error deleting space:', error)
@@ -193,7 +236,9 @@ export default function DashboardPage() {
       restoreProject(userId, projectId)
       const allProjects = await getProjects(userId, null)
       const trashedProjs = getTrashedProjects(userId)
-      updateProjectLists(allProjects)
+      if (updateProjectLists && typeof updateProjectLists === 'function') {
+        updateProjectLists(allProjects || [])
+      }
       setTrashedProjects(trashedProjs)
     } catch (error) {
       console.error('Error restoring project:', error)
@@ -227,7 +272,9 @@ export default function DashboardPage() {
     
     try {
       await deleteAllProjects(userId)
-      updateProjectLists([])
+      if (updateProjectLists && typeof updateProjectLists === 'function') {
+        updateProjectLists([])
+      }
       alert('All projects deleted successfully')
     } catch (error) {
       console.error('Error deleting all projects:', error)
@@ -270,7 +317,9 @@ export default function DashboardPage() {
       
       // Refresh all projects (for sidebar) and update recent projects
       const allProjects = await getProjects(userId, null)
-      updateProjectLists(allProjects)
+      if (updateProjectLists && typeof updateProjectLists === 'function') {
+        updateProjectLists(allProjects || [])
+      }
       
       // Refresh spaces to update project counts in sidebar
       const userSpaces = await getSpaces(userId)
@@ -303,7 +352,9 @@ export default function DashboardPage() {
               // Refresh recent projects when going to home
               if (userId) {
                 const allProjects = await getProjects(userId, null)
-                updateProjectLists(allProjects)
+                if (updateProjectLists && typeof updateProjectLists === 'function') {
+                  updateProjectLists(allProjects || [])
+                }
               }
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
@@ -326,7 +377,9 @@ export default function DashboardPage() {
               setSelectedSpaceId(null) // Clear space selection
               setCurrentView('my-projects')
               const allProjects = await getProjects(userId, null) // null = all projects
-              updateProjectLists(allProjects)
+              if (updateProjectLists && typeof updateProjectLists === 'function') {
+                updateProjectLists(allProjects || [])
+              }
             }}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
               currentView === 'my-projects'
@@ -429,7 +482,9 @@ export default function DashboardPage() {
                             // Refresh projects list
                             const allProjects = await getProjects(userId, null)
                             const trashedProjs = getTrashedProjects(userId)
-                            updateProjectLists(allProjects)
+                            if (updateProjectLists && typeof updateProjectLists === 'function') {
+                              updateProjectLists(allProjects || [])
+                            }
                             setTrashedProjects(trashedProjs)
                             // If deleted project was selected, clear selection
                             if (selectedProjectId === project.id) {

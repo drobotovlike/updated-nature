@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Stage, Layer, Image, Group, Rect, Text, Circle, Line, Arrow } from 'react-konva'
+import { Stage, Layer, Image, Group, Rect, Text, Circle, Line, Arrow, Transformer } from 'react-konva'
 import { useAuth } from '@clerk/clerk-react'
 import Konva from 'konva'
 import useImage from 'use-image'
@@ -175,7 +175,7 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
 }
 
 // Canvas Item Component
-function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, showMeasurements, zoom, blendMode }) {
+function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, showMeasurements, zoom, blendMode, transformerRef }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
@@ -230,6 +230,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
   return (
     <Group
       ref={shapeRef}
+      id={`item-${item.id}`}
       x={item.x_position}
       y={item.y_position}
       draggable={!item.is_locked}
@@ -281,7 +282,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
             y={-5}
             width={(item.width || image.width) + 10}
             height={(item.height || image.height) + 10}
-            stroke={isMultiSelected ? "#10b981" : "#3b82f6"}
+            stroke={isMultiSelected ? "#34D399" : "#D97757"}
             strokeWidth={2 / zoom}
             dash={[5, 5]}
             listening={false}
@@ -292,11 +293,11 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
               <Text
                 text={`${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`}
                 fontSize={12 / zoom}
-                fill="#3b82f6"
+                fill="#D97757"
                 x={5}
                 y={-20 / zoom}
                 padding={4 / zoom}
-                background="#ffffff"
+                background="#F6F2EE"
                 cornerRadius={4 / zoom}
               />
             </Group>
@@ -343,6 +344,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const containerRef = useRef(null)
   const maskLayerRef = useRef(null)
   const minimapCanvasRef = useRef(null)
+  const transformerRef = useRef(null)
   
   // Early return if essential props are missing
   if (!projectId || !userId || !isSignedIn) {
@@ -367,7 +369,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     panY: 0,
     rulerEnabled: false,
     showMeasurements: true,
-    backgroundColor: '#fafaf9',
+    backgroundColor: '#F6F2EE',
     gridEnabled: true,
     gridSize: 20,
   })
@@ -836,6 +838,28 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     
     loadStyles()
   }, [userId])
+
+  // Attach Transformer to selected item
+  useEffect(() => {
+    if (transformerRef.current && selectedItemId && !blendMode) {
+      const stage = stageRef.current
+      if (!stage) return
+      
+      // Find the shape node by ID
+      const itemsLayer = stage.findOne('.items-layer') || stage.findOne('Layer')
+      if (itemsLayer) {
+        const shapeNode = itemsLayer.findOne(`#item-${selectedItemId}`)
+        if (shapeNode) {
+          transformerRef.current.nodes([shapeNode])
+          transformerRef.current.getLayer().batchDraw()
+        }
+      }
+    } else if (transformerRef.current && !selectedItemId) {
+      // Clear transformer when nothing is selected
+      transformerRef.current.nodes([])
+      transformerRef.current.getLayer()?.batchDraw()
+    }
+  }, [selectedItemId, items, blendMode])
 
   // Save history state - wrapper function for saveHistoryToDB
   const saveToHistory = useCallback(async (itemsToSave) => {
@@ -2450,7 +2474,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}
       <div 
-        className={`absolute left-0 top-0 bottom-0 z-50 bg-surface-base border-r border-border transition-all duration-macro ease-apple ${
+        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${
           sidebarOpen ? 'w-80' : 'w-0'
         } overflow-hidden`}
       >
@@ -2460,19 +2484,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <div className="p-6 border-b border-border">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h1 className="text-xl font-semibold text-text-primary mb-1">
+                  <h1 className="text-xl font-display font-semibold text-[#2C2C2C] mb-1 tracking-[-0.02em]">
                     {project?.name || 'Untitled'}
                   </h1>
-                  <p className="text-xs text-text-tertiary">
+                  <p className="text-xs text-[#7C7C7C] font-medium">
                     {project?.createdAt ? `Created ${new Date(project.createdAt).toLocaleDateString()}` : 'Loading...'}
                   </p>
                 </div>
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="p-2 hover:bg-surface-elevated rounded-lg transition-colors"
+                  className="p-2 hover:bg-[#F1EBE4] rounded-lg transition-colors"
                   aria-label="Hide sidebar"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-secondary">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                     <path d="M18 6L6 18" />
                     <path d="M6 6l12 12" />
                   </svg>
@@ -2483,7 +2507,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={() => setShowShareModal(true)}
-                  className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors flex items-center gap-2"
+                  className="px-3 py-1.5 text-sm font-medium text-[#7C7C7C] hover:text-[#2C2C2C] hover:bg-[#F1EBE4] rounded-lg transition-colors flex items-center gap-2"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
@@ -2494,7 +2518,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </button>
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="px-3 py-1.5 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors"
+                  className="clay-button px-3 py-1.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all shadow-sm"
                 >
                   Start Creating
                 </button>
@@ -2737,7 +2761,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       {!sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="absolute left-4 top-4 z-50 p-2 bg-surface-base hover:bg-surface-elevated rounded-lg border border-border shadow-lg transition-colors"
+          className="absolute left-4 top-4 z-50 p-2 bg-white hover:bg-[#F1EBE4] rounded-lg border border-[#F1EBE4] shadow-oak transition-colors"
           aria-label="Show sidebar"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-primary">
@@ -2751,7 +2775,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       {/* Context Menu - Right-click menu */}
       {contextMenuPosition.visible && (
         <div
-          className="context-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[160px]"
+          className="context-menu fixed z-50 bg-white rounded-lg shadow-oak border border-[#F1EBE4] py-1 min-w-[160px] linen-texture"
           style={{
             left: `${contextMenuPosition.x}px`,
             top: `${contextMenuPosition.y}px`,
@@ -2762,7 +2786,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             onClick={() => {
               handleContextMenuAction('blend', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20" />
@@ -2770,12 +2794,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </svg>
             Blend with...
           </button>
-          <div className="border-t border-stone-200 my-1" />
+          <div className="border-t border-[#F1EBE4] my-1" />
           <button
             onClick={() => {
               handleContextMenuAction('erase', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
@@ -2784,12 +2808,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </svg>
             Erase / Fill
           </button>
-          <div className="border-t border-stone-200 my-1" />
+          <div className="border-t border-[#F1EBE4] my-1" />
           <button
             onClick={() => {
               handleContextMenuAction('removeBg', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <rect x="2" y="2" width="20" height="20" rx="2" />
@@ -2798,12 +2822,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </svg>
             Remove Background
           </button>
-          <div className="border-t border-stone-200 my-1" />
+          <div className="border-t border-[#F1EBE4] my-1" />
           <button
             onClick={() => {
               handleContextMenuAction('extractPalette', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
@@ -2818,7 +2842,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             onClick={() => {
               handleContextMenuAction('loop', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v4" />
@@ -2834,12 +2858,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           </button>
           {selectedItemIds.size >= 1 && (
             <>
-              <div className="border-t border-stone-200 my-1" />
+              <div className="border-t border-[#F1EBE4] my-1" />
               <button
                 onClick={() => {
                   handleContextMenuAction('compare', contextMenuPosition.itemId)
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -3117,7 +3141,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <>
               <button
                 onClick={handleEdit}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -3127,7 +3151,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </button>
               <button
                 onClick={moveToFront}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v20" />
@@ -3137,7 +3161,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </button>
               <button
                 onClick={moveToBack}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 2v20" />
@@ -3145,12 +3169,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </svg>
                 Move to Back
               </button>
-              <div className="border-t border-stone-200 my-1" />
+              <div className="border-t border-[#F1EBE4] my-1" />
               <button
                 onClick={() => {
                   setPopupMenuPosition({ ...popupMenuPosition, showAdjustments: true })
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
@@ -3168,7 +3192,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   if (!selectedItem) return
                   await handleUpscale(selectedItem.id, 2)
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -3182,7 +3206,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   if (!selectedItem) return
                   await handleUpscale(selectedItem.id, 4)
                 }}
-                className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -3191,7 +3215,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </svg>
                 Upscale 4×
               </button>
-              <div className="border-t border-stone-200 my-1" />
+              <div className="border-t border-[#F1EBE4] my-1" />
               <button
                 onClick={() => handleItemDelete(selectedItemId)}
                 className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
@@ -3329,7 +3353,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             >
 
               {/* Canvas Items Layer - Virtual Rendering */}
-              <Layer>
+              <Layer name="items-layer">
                 {(() => {
                   // Virtual rendering: only render items visible in viewport
                   // Account for pan and zoom
@@ -3417,6 +3441,49 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 })()}
               </Layer>
 
+              {/* Transformer Layer - Resize handles for selected items */}
+              {selectedItemId && !blendMode && (
+                <Layer>
+                  <Transformer
+                    ref={transformerRef}
+                    boundBoxFunc={(oldBox, newBox) => {
+                      // Limit minimum size
+                      if (Math.abs(newBox.width) < 50 || Math.abs(newBox.height) < 50) {
+                        return oldBox
+                      }
+                      return newBox
+                    }}
+                    borderEnabled={true}
+                    anchorFill="#D97757"
+                    anchorStroke="#FFFFFF"
+                    anchorStrokeWidth={2}
+                    anchorSize={10}
+                    borderStroke="#D97757"
+                    borderStrokeWidth={2}
+                    borderDash={[5, 5]}
+                    rotateEnabled={true}
+                    enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
+                    onTransformEnd={(e) => {
+                      const node = e.target
+                      const selectedItem = items.find(item => item.id === selectedItemId)
+                      if (selectedItem && node) {
+                        const scaleX = node.scaleX()
+                        const scaleY = node.scaleY()
+                        node.scaleX(1)
+                        node.scaleY(1)
+                        handleItemUpdate(selectedItemId, {
+                          x_position: node.x(),
+                          y_position: node.y(),
+                          width: Math.max(50, (selectedItem.width || 200) * scaleX),
+                          height: Math.max(50, (selectedItem.height || 200) * scaleY),
+                          rotation: node.rotation(),
+                        })
+                      }
+                    }}
+                  />
+                </Layer>
+              )}
+
               {/* Mask Drawing Layer - Only visible in eraser mode */}
               {eraserMode && eraserTargetId && (
                 <Layer ref={maskLayerRef} name="mask-layer" listening={false} />
@@ -3430,7 +3497,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       x={dimensionStartPos.x}
                       y={dimensionStartPos.y}
                       radius={5}
-                      fill="#3b82f6"
+                      fill="#D97757"
                       stroke="#fff"
                       strokeWidth={2}
                     />
@@ -3445,7 +3512,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       <Group key={line.id} x={line.startX} y={line.startY} rotation={angle}>
                         <Line
                           points={[0, 0, length, 0]}
-                          stroke="#3b82f6"
+                          stroke="#D97757"
                           strokeWidth={2}
                           lineCap="round"
                         />
@@ -3454,16 +3521,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           y={-20}
                           text={`${line.distance}px`}
                           fontSize={12}
-                          fill="#1f2937"
+                          fill="#2C2C2C"
                           fontStyle="bold"
                           align="center"
                           offsetX={String(line.distance).length * 3}
                         />
                         {/* Arrow heads */}
-                        <Line points={[0, 0, 10, -5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
-                        <Line points={[0, 0, 10, 5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
-                        <Line points={[length, 0, length - 10, -5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
-                        <Line points={[length, 0, length - 10, 5]} stroke="#3b82f6" strokeWidth={2} lineCap="round" />
+                        <Line points={[0, 0, 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                        <Line points={[0, 0, 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                        <Line points={[length, 0, length - 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                        <Line points={[length, 0, length - 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
                       </Group>
                     )
                   })}
@@ -3477,7 +3544,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     x={textPosition.x}
                     y={textPosition.y}
                     radius={5}
-                    fill="#8b5cf6"
+                    fill="#D97757"
                     stroke="#fff"
                     strokeWidth={2}
                   />
@@ -3490,15 +3557,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
         {/* Unified Menu Bar */}
         <div className="absolute bottom-0 left-0 right-0 z-40 flex items-center justify-center pb-4">
-          <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg border border-stone-200 max-w-[95vw] overflow-x-auto">
+          <div className="flex items-center gap-2 bg-[#FFFFFF]/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-oak border border-[#F1EBE4] max-w-[95vw] overflow-x-auto linen-texture">
             {/* Back Button */}
             {onBack && (
               <button
                 onClick={onBack}
-                className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+                className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
                 title="Go back to dashboard"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                   <path d="m12 19-7-7 7-7" />
                   <path d="M19 12H5" />
                 </svg>
@@ -3506,11 +3573,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             )}
 
             {/* Canvas Controls */}
-            <div className="flex items-center gap-1 bg-stone-100 rounded-full p-1">
+            <div className="flex items-center gap-1 bg-[#F1EBE4] rounded-full p-1">
               <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
                 className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                  canvasState.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
                 }`}
                 title="Toggle grid overlay - Show/hide alignment grid on canvas"
               >
@@ -3524,7 +3591,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
                 className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.rulerEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
+                  canvasState.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
                 }`}
                 title="Toggle ruler - Show/hide measurement ruler on canvas edges"
               >
@@ -3535,16 +3602,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </div>
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Undo/Redo Buttons */}
             <button
               onClick={handleUndo}
               disabled={historyIndex <= 0}
-              className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Undo last action - Revert the last change you made (Keyboard: Cmd/Ctrl+Z)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                 <path d="M3 7v6h6" />
                 <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
               </svg>
@@ -3552,17 +3619,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <button
               onClick={handleRedo}
               disabled={historyIndex >= history.length - 1}
-              className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               title="Redo action - Restore the change you just undid (Keyboard: Cmd/Ctrl+Shift+Z)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                 <path d="M21 7v6h-6" />
                 <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
               </svg>
             </button>
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Tool Buttons */}
             <button
@@ -3570,8 +3637,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 setDimensionMode(true)
                 setError('Dimension mode: Click two points to measure distance. Press M to start.')
               }}
-              className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
-                dimensionMode ? 'bg-stone-100' : ''
+              className={`p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors ${
+                dimensionMode ? 'bg-[#F1EBE4]' : ''
               }`}
               title="Dimension tool - Measure distances between two points on the canvas (Keyboard: M)"
             >
@@ -3589,8 +3656,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 setTextMode(true)
                 setError('Text mode: Click on canvas to place text, then type and press Enter')
               }}
-              className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
-                textMode ? 'bg-stone-100' : ''
+              className={`p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors ${
+                textMode ? 'bg-[#F1EBE4]' : ''
               }`}
               title="Text tool - Add text labels to your canvas (Keyboard: T)"
             >
@@ -3617,7 +3684,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   }
                 }
               }}
-              className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+              className="p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors"
               title="Budget sticker - Add a budget tracking sticker to your design (Keyboard: B)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3630,7 +3697,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </button>
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Action Buttons */}
             <button
@@ -3656,12 +3723,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   input.click()
                 }
               }}
-              className={`p-2 hover:bg-stone-100 rounded-full transition-colors ${
-                referenceImage ? 'bg-stone-100' : ''
+              className={`p-2 hover:bg-[#F1EBE4] rounded-full transition-colors ${
+                referenceImage ? 'bg-[#F1EBE4]' : ''
               }`}
               title="Add reference image - Use an image as a style reference for AI generation"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <circle cx="9" cy="9" r="2" />
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
@@ -3670,10 +3737,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             
             <button
               onClick={() => setShowAssetLibrary(true)}
-              className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
               title="Asset library - Browse and add furniture, decor, and design assets to your canvas"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
                 <path d="M9 9h6v6H9z" />
               </svg>
@@ -3683,7 +3750,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <>
                 <button
                   onClick={() => setShowLayersPanel(!showLayersPanel)}
-                  className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+                  className="p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors"
                   title="Layers panel - View and manage all layers in your design"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3694,10 +3761,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </button>
                 <button
                   onClick={() => setShowExportModal(true)}
-                  className="p-2 hover:bg-stone-100 rounded-full transition-colors"
+                  className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
                   title="Export design - Save your canvas as an image file"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                     <polyline points="7 10 12 15 17 10" />
                     <line x1="12" y1="15" x2="12" y2="3" />
@@ -3707,13 +3774,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             )}
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Model & Style Selection */}
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
+              className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm font-medium"
               title="AI model selection - Choose which AI model to use for image generation"
             >
                 <option value="gemini">Gemini 2.5 Flash</option>
@@ -3728,7 +3795,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 const style = styles.find(s => s.id === e.target.value)
                 setSelectedStyle(style || null)
               }}
-              className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[120px]"
+              className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[120px] font-medium"
               title="Style selection - Apply a design style to your generated images"
             >
                 <option value="">No Style</option>
@@ -3741,31 +3808,31 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             <button
               onClick={() => setShowStyleLibrary(true)}
-              className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors bg-white border border-stone-200 shadow-sm"
+              className="p-1.5 hover:bg-[#F1EBE4] rounded-lg transition-colors bg-white border border-[#F1EBE4] shadow-sm"
               title="Style library - Browse and manage design styles for AI generation"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                   <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
               </button>
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Zoom Display */}
-            <div className="px-3 py-1 text-xs text-stone-500 font-medium whitespace-nowrap" title="Current zoom level - Use mouse wheel to zoom in/out">
+            <div className="px-3 py-1 text-xs text-[#7C7C7C] font-medium whitespace-nowrap" title="Current zoom level - Use mouse wheel to zoom in/out">
               {Math.round(canvasState.zoom * 100)}%
             </div>
 
             {/* Performance Indicator (dev mode) */}
             {process.env.NODE_ENV === 'development' && items.length > 10 && (
-              <div className="px-3 py-1 text-xs text-stone-400 font-medium whitespace-nowrap" title="Performance indicator - Shows how many items are currently visible in the viewport">
+              <div className="px-3 py-1 text-xs text-[#A8A8A8] font-medium whitespace-nowrap" title="Performance indicator - Shows how many items are currently visible in the viewport">
                 {visibleItemsCount}/{items.length} visible
               </div>
             )}
 
             {/* Divider */}
-            <div className="w-px h-6 bg-stone-200" />
+            <div className="w-px h-6 bg-[#F1EBE4]" />
 
             {/* Chat Input */}
             <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
@@ -3774,7 +3841,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder="What would you like to create?"
-                className="px-4 py-1.5 bg-white border border-stone-200 rounded-full text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[200px]"
+                className="px-4 py-1.5 bg-white border border-[#F1EBE4] rounded-full text-sm text-[#2C2C2C] placeholder:text-[#A8A8A8] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[200px] font-medium"
                 />
                 <div className="flex items-center gap-1">
                 <button
@@ -3801,12 +3868,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       input.click()
                     }
                   }}
-                  className={`p-1.5 hover:bg-stone-100 rounded-full transition-colors ${
-                    referenceImage ? 'bg-stone-100' : ''
+                  className={`p-1.5 hover:bg-[#F1EBE4] rounded-full transition-colors ${
+                    referenceImage ? 'bg-[#F1EBE4]' : ''
                   }`}
                   title="Add reference image - Use an image as a style reference for AI generation"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                       <rect x="3" y="3" width="18" height="18" rx="2" />
                       <circle cx="9" cy="9" r="2" />
                       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
@@ -3815,10 +3882,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <button
                   type="button"
                   onClick={() => setShowAssetLibrary(true)}
-                  className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
+                  className="p-1.5 hover:bg-[#F1EBE4] rounded-full transition-colors"
                   title="Add asset - Browse and add furniture, decor, and design assets to your canvas"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
                       <rect x="3" y="3" width="18" height="18" rx="2" />
                       <path d="M9 9h6v6H9z" />
                     </svg>
@@ -3826,7 +3893,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <button
                   type="submit"
                     disabled={!chatInput.trim() || isGenerating || generatingVariations}
-                    className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="clay-button p-2 text-white rounded-full hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
                     title="Generate image - Create a new image based on your prompt using the selected AI model and style"
                   >
                     {isGenerating || generatingVariations ? (

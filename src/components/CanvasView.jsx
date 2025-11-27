@@ -3074,7 +3074,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <button
                 onClick={onBack}
                 className="p-2 hover:bg-stone-100 rounded-full transition-colors"
-                title="Back"
+                title="Go back to dashboard"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                   <path d="m12 19-7-7 7-7" />
@@ -3090,7 +3090,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 className={`p-1.5 rounded-full transition-colors ${
                   canvasState.gridEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
                 }`}
-                title="Toggle Grid"
+                title="Toggle grid overlay - Show/hide alignment grid on canvas"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="3" y="3" width="7" height="7" />
@@ -3104,7 +3104,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 className={`p-1.5 rounded-full transition-colors ${
                   canvasState.rulerEnabled ? 'bg-white text-stone-900 shadow-sm' : 'text-stone-600 hover:bg-stone-50'
                 }`}
-                title="Toggle Ruler"
+                title="Toggle ruler - Show/hide measurement ruler on canvas edges"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -3120,7 +3120,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               onClick={handleUndo}
               disabled={historyIndex <= 0}
               className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Undo (Cmd/Ctrl+Z)"
+              title="Undo last action - Revert the last change you made (Keyboard: Cmd/Ctrl+Z)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                 <path d="M3 7v6h6" />
@@ -3131,7 +3131,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               onClick={handleRedo}
               disabled={historyIndex >= history.length - 1}
               className="p-2 hover:bg-stone-100 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Redo (Cmd/Ctrl+Shift+Z)"
+              title="Redo action - Restore the change you just undid (Keyboard: Cmd/Ctrl+Shift+Z)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                 <path d="M21 7v6h-6" />
@@ -3151,7 +3151,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
                 dimensionMode ? 'bg-stone-100' : ''
               }`}
-              title="Dimension Tool (M)"
+              title="Dimension tool - Measure distances between two points on the canvas (Keyboard: M)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="3" y1="12" x2="21" y2="12" />
@@ -3170,7 +3170,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               className={`p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors ${
                 textMode ? 'bg-stone-100' : ''
               }`}
-              title="Text Tool (T)"
+              title="Text tool - Add text labels to your canvas (Keyboard: T)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 20h16" />
@@ -3196,7 +3196,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 }
               }}
               className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
-              title="Budget Sticker (B)"
+              title="Budget sticker - Add a budget tracking sticker to your design (Keyboard: B)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
@@ -3237,7 +3237,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               className={`p-2 hover:bg-stone-100 rounded-full transition-colors ${
                 referenceImage ? 'bg-stone-100' : ''
               }`}
-              title="Add Reference Image"
+              title="Add reference image - Use an image as a style reference for AI generation"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -3249,7 +3249,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <button
               onClick={() => setShowAssetLibrary(true)}
               className="p-2 hover:bg-stone-100 rounded-full transition-colors"
-              title="Asset Library"
+              title="Asset library - Browse and add furniture, decor, and design assets to your canvas"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
@@ -3262,7 +3262,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <button
                   onClick={() => setShowLayersPanel(!showLayersPanel)}
                   className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
-                  title="Layers"
+                  title="Layers panel - View and manage all layers in your design"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M12 2L2 7l10 5 10-5-10-5z" />
@@ -3273,7 +3273,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <button
                   onClick={() => setShowExportModal(true)}
                   className="p-2 hover:bg-stone-100 rounded-full transition-colors"
-                  title="Export"
+                  title="Export design - Save your canvas as an image file"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -3292,12 +3292,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
               className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm"
+              title="AI model selection - Choose which AI model to use for image generation"
             >
-              <option value="gemini">Gemini 2.5 Flash</option>
-              <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
-              <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
-              <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
-            </select>
+                <option value="gemini">Gemini 2.5 Flash</option>
+                <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
+                <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
+                <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
+              </select>
 
             <select
               value={selectedStyle?.id || ''}
@@ -3306,66 +3307,47 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 setSelectedStyle(style || null)
               }}
               className="px-3 py-1.5 text-xs bg-white border border-stone-200 rounded-lg text-stone-700 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[120px]"
+              title="Style selection - Apply a design style to your generated images"
             >
-              <option value="">No Style</option>
-              {styles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.name} {style.is_public ? '(Public)' : ''}
-                </option>
-              ))}
-            </select>
+                <option value="">No Style</option>
+                {styles.map((style) => (
+                  <option key={style.id} value={style.id}>
+                    {style.name} {style.is_public ? '(Public)' : ''}
+                  </option>
+                ))}
+              </select>
 
             <button
               onClick={() => setShowStyleLibrary(true)}
               className="p-1.5 hover:bg-stone-100 rounded-lg transition-colors bg-white border border-stone-200 shadow-sm"
-              title="Style Library"
+              title="Style library - Browse and manage design styles for AI generation"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </button>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              </button>
 
             {/* Divider */}
             <div className="w-px h-6 bg-stone-200" />
 
-            {/* Budget Sticker Button */}
-            <button
-              onClick={(e) => {
-                const stage = stageRef.current
-                if (stage) {
-                  const pos = stage.getPointerPosition()
-                  if (pos) {
-                    const worldX = (pos.x - stage.x()) / stage.scaleX()
-                    const worldY = (pos.y - stage.y()) / stage.scaleY()
-                    createBudgetSticker({ x: worldX, y: worldY })
-                  } else {
-                    // Fallback to center
-                    const canvasWidth = dimensions.width * 4
-                    const canvasHeight = dimensions.height * 4
-                    createBudgetSticker({ x: canvasWidth / 2, y: canvasHeight / 2 })
-                  }
-                }
-              }}
-              className="p-2 rounded-full hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
-              title="Budget Sticker ($)"
-            >
+            {/* Budget Sticker Button - Duplicate removed, keeping only one */}
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <line x1="12" y1="2" x2="12" y2="22" />
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </button>
+                  </svg>
+                </button>
 
             {/* Divider */}
             <div className="w-px h-6 bg-stone-200" />
 
             {/* Zoom Display */}
-            <div className="px-3 py-1 text-xs text-stone-500 font-medium whitespace-nowrap">
+            <div className="px-3 py-1 text-xs text-stone-500 font-medium whitespace-nowrap" title="Current zoom level - Use mouse wheel to zoom in/out">
               {Math.round(canvasState.zoom * 100)}%
             </div>
 
             {/* Performance Indicator (dev mode) */}
             {process.env.NODE_ENV === 'development' && items.length > 10 && (
-              <div className="px-3 py-1 text-xs text-stone-400 font-medium whitespace-nowrap">
+              <div className="px-3 py-1 text-xs text-stone-400 font-medium whitespace-nowrap" title="Performance indicator - Shows how many items are currently visible in the viewport">
                 {visibleItemsCount}/{items.length} visible
               </div>
             )}
@@ -3375,14 +3357,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             {/* Chat Input */}
             <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
-              <input
-                type="text"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                placeholder="What would you like to create?"
+                <input
+                  type="text"
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  placeholder="What would you like to create?"
                 className="px-4 py-1.5 bg-white border border-stone-200 rounded-full text-sm text-stone-900 placeholder:text-stone-400 focus:outline-none focus:ring-2 focus:ring-stone-300 shadow-sm min-w-[200px]"
-              />
-              <div className="flex items-center gap-1">
+                />
+                <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -3410,30 +3392,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   className={`p-1.5 hover:bg-stone-100 rounded-full transition-colors ${
                     referenceImage ? 'bg-stone-100' : ''
                   }`}
-                  title="Add Reference Image"
+                  title="Add reference image - Use an image as a style reference for AI generation"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <circle cx="9" cy="9" r="2" />
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                  </svg>
-                </button>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <circle cx="9" cy="9" r="2" />
+                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                    </svg>
+                  </button>
                 <button
                   type="button"
                   onClick={() => setShowAssetLibrary(true)}
                   className="p-1.5 hover:bg-stone-100 rounded-full transition-colors"
-                  title="Add Asset"
+                  title="Add asset - Browse and add furniture, decor, and design assets to your canvas"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M9 9h6v6H9z" />
-                  </svg>
-                </button>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                      <rect x="3" y="3" width="18" height="18" rx="2" />
+                      <path d="M9 9h6v6H9z" />
+                    </svg>
+                  </button>
                 <button
                   type="submit"
                     disabled={!chatInput.trim() || isGenerating || generatingVariations}
                     className="p-2 bg-stone-900 text-white rounded-full hover:bg-stone-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Generate"
+                    title="Generate image - Create a new image based on your prompt using the selected AI model and style"
                   >
                     {isGenerating || generatingVariations ? (
                       <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -3443,7 +3425,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       </svg>
                     )}
                   </button>
-                </div>
+              </div>
             </form>
           </div>
         </div>

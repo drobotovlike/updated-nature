@@ -135,7 +135,7 @@ export default function AnimatedRoom() {
             </div>
             {isVisible && (
               <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                <div className="bg-black/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-medium shadow-lg">
+                <div className="bg-white/95 backdrop-blur-sm text-stone-900 px-3 py-1.5 rounded-full text-xs font-medium shadow-lg border border-stone-200">
                   {piece.name}
                 </div>
               </div>

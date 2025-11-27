@@ -2339,6 +2339,96 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     })
   }, [selectedItemIds, selectedItemId, items, handleItemUpdate])
 
+  // Load project data for sidebar
+  useEffect(() => {
+    async function loadProjectData() {
+      if (projectId && userId) {
+        try {
+          const projectData = await getProject(userId, projectId)
+          setProject(projectData)
+        } catch (error) {
+          console.error('Error loading project:', error)
+        }
+      }
+    }
+    loadProjectData()
+  }, [projectId, userId])
+
+  // Load assets for sidebar
+  useEffect(() => {
+    async function loadAssets() {
+      if (userId) {
+        setLoadingAssets(true)
+        try {
+          const assets = await getAssets(userId)
+          setSharedAssets(assets)
+        } catch (error) {
+          console.error('Error loading assets:', error)
+        } finally {
+          setLoadingAssets(false)
+        }
+      }
+    }
+    loadAssets()
+  }, [userId])
+
+  // Get project assets and creations - memoized to prevent unnecessary recalculations
+  const getProjectAssets = useCallback(() => {
+    return sharedAssets.map(asset => ({
+      id: asset.id,
+      name: asset.name,
+      url: asset.url,
+      type: asset.type || 'image',
+      description: asset.description,
+      createdAt: asset.created_at || asset.createdAt,
+    }))
+  }, [sharedAssets])
+
+  const getCreations = useCallback(() => {
+    if (!project?.workflow) return []
+    const creations = []
+    
+    if (project.workflow.result?.url) {
+      creations.push({
+        id: 'result-main',
+        name: project.workflow.result.description || project.name || 'Generated Design',
+        url: project.workflow.result.url,
+        description: project.workflow.result.description,
+        createdAt: project.updatedAt || project.createdAt,
+      })
+    }
+    
+    if (project.workflow.resultUrl) {
+      creations.push({
+        id: 'result-url',
+        name: project.name || 'Generated Design',
+        url: project.workflow.resultUrl,
+        description: project.workflow.description,
+        createdAt: project.updatedAt || project.createdAt,
+      })
+    }
+    
+    if (project.workflow.files && Array.isArray(project.workflow.files)) {
+      project.workflow.files.forEach(file => {
+        if (file.type === 'image' && file.url && file.generated) {
+          creations.push({
+            id: file.id,
+            name: file.name,
+            url: file.url,
+            description: file.description,
+            createdAt: file.createdAt,
+          })
+        }
+      })
+    }
+    
+    return creations
+  }, [project])
+
+  // Compute assets and creations - must be defined before return
+  const assets = useMemo(() => getProjectAssets(), [getProjectAssets])
+  const creations = useMemo(() => getCreations(), [getCreations])
+
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}

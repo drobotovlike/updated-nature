@@ -1893,6 +1893,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     setDimensionMode(false)
   }, [dimensionLines])
 
+  // Create budget sticker handler
+  const createBudgetSticker = useCallback((position) => {
+    // Add a budget sticker at the specified position
+    // This is a placeholder - implement actual sticker creation logic
+    setBudgetStickers(prev => [...prev, {
+      id: `budget-${Date.now()}`,
+      x: position.x,
+      y: position.y,
+      amount: 0,
+    }])
+  }, [])
+
   // Minimap click handler
   const handleMinimapClick = useCallback((e) => {
     const canvas = minimapCanvasRef.current

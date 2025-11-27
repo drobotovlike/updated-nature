@@ -624,7 +624,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     
     const loadStyles = async () => {
       try {
-        const response = await fetch('/api/styles', {
+        const response = await fetch('/api/generate?action=styles', {
           headers: {
             'Authorization': `Bearer ${userId}`,
           },

@@ -16,7 +16,7 @@ export default function VariationsComparisonView({ projectId, onSelectVariation 
 
   const loadVariations = async () => {
     try {
-      const response = await fetch(`/api/variations?projectId=${projectId}`, {
+      const response = await fetch(`/api/projects?action=variations&projectId=${projectId}`, {
         headers: {
           'Authorization': `Bearer ${userId}`,
         },
@@ -45,7 +45,7 @@ export default function VariationsComparisonView({ projectId, onSelectVariation 
 
   const markAsSelected = async (variationId) => {
     try {
-      const response = await fetch(`/api/variations?variationId=${variationId}`, {
+      const response = await fetch(`/api/projects?action=variations&variationId=${variationId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',

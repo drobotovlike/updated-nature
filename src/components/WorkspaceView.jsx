@@ -499,7 +499,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
 
       // Save all variations to database
       if (variations.length > 0) {
-        const response = await fetch('/api/variations', {
+        const response = await fetch('/api/projects?action=variations', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

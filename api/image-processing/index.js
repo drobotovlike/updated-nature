@@ -31,8 +31,12 @@ export default async function handler(req, res) {
         return handleLoop(req, res)
       case 'text2svg':
         return handleText2Svg(req, res)
+      case 'upscale':
+        return handleUpscale(req, res)
+      case 'retouch':
+        return handleRetouch(req, res)
       default:
-        return res.status(400).json({ error: 'Invalid operation. Must be one of: blend, inpaint, outpaint, remove-bg, style-transfer, loop, text2svg' })
+        return res.status(400).json({ error: 'Invalid operation. Must be one of: blend, inpaint, outpaint, remove-bg, style-transfer, loop, text2svg, upscale, retouch' })
     }
   } catch (error) {
     console.error('Error in image-processing API:', error)

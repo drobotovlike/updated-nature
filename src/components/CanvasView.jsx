@@ -12,61 +12,58 @@ import { uploadFileToCloud } from '../utils/cloudProjectManager'
 const MIN_ZOOM = 0.25
 const MAX_ZOOM = 3
 
-// Dynamic Grid Component - Updates with zoom and pan for better navigation
+// Dynamic Grid Component - Fixed to viewport borders (screen space, not world space)
 function GridLayer({ gridSize, width, height, panX, panY, zoom }) {
   const lines = useMemo(() => {
     const gridLines = []
     
-    // Calculate visible world area
-    const worldLeft = -panX / zoom
-    const worldRight = (width - panX) / zoom
-    const worldTop = -panY / zoom
-    const worldBottom = (height - panY) / zoom
-
-    // Adaptive grid size based on zoom level
-    // At low zoom, use larger grid spacing to reduce line count and improve performance
-    const effectiveGridSize = zoom < 0.5 ? gridSize * 4 : zoom < 1 ? gridSize * 2 : gridSize
-
-    // Calculate grid line positions in world space
-    const gridStartX = Math.floor(worldLeft / effectiveGridSize) * effectiveGridSize
-    const gridEndX = Math.ceil(worldRight / effectiveGridSize) * effectiveGridSize
-    const gridStartY = Math.floor(worldTop / effectiveGridSize) * effectiveGridSize
-    const gridEndY = Math.ceil(worldBottom / effectiveGridSize) * effectiveGridSize
-
-    // Draw vertical lines
-    for (let worldX = gridStartX; worldX <= gridEndX; worldX += effectiveGridSize) {
-      const screenX = worldX * zoom + panX
-      // Only draw if line is within viewport bounds (with padding for smooth scrolling)
-      if (screenX >= -100 && screenX <= width + 100) {
-        gridLines.push(
-          <Line
-            key={`v-${worldX}`}
-            points={[screenX, 0, screenX, height]}
-            stroke="#e5e7eb"
-            strokeWidth={Math.max(0.5, 1 / Math.max(0.25, zoom))}
-            listening={false}
-            perfect={false}
-          />
-        )
-      }
+    // Grid is rendered in SCREEN SPACE (viewport coordinates), not world space
+    // This ensures it always stays fixed to the viewport borders
+    
+    // Calculate grid spacing in screen pixels
+    // As you zoom in, grid gets denser (more lines visible)
+    // As you zoom out, grid gets sparser (fewer lines visible)
+    const screenGridSize = gridSize * zoom
+    
+    // Ensure minimum grid size for visibility (at least 10px spacing)
+    const effectiveGridSize = Math.max(10, screenGridSize)
+    
+    // Calculate grid offset based on pan position
+    // This makes the grid appear to move as you pan, but it's actually just offset
+    // The modulo operation creates a repeating pattern that shifts with pan
+    const offsetX = panX % effectiveGridSize
+    const offsetY = panY % effectiveGridSize
+    
+    // Ensure offset is positive for proper rendering
+    const normalizedOffsetX = offsetX < 0 ? offsetX + effectiveGridSize : offsetX
+    const normalizedOffsetY = offsetY < 0 ? offsetY + effectiveGridSize : offsetY
+    
+    // Draw vertical lines - always from top to bottom of viewport (0 to height)
+    for (let x = normalizedOffsetX - effectiveGridSize; x <= width + effectiveGridSize; x += effectiveGridSize) {
+      gridLines.push(
+        <Line
+          key={`v-${x}`}
+          points={[x, 0, x, height]}
+          stroke="#e5e7eb"
+          strokeWidth={1}
+          listening={false}
+          perfect={false}
+        />
+      )
     }
 
-    // Draw horizontal lines
-    for (let worldY = gridStartY; worldY <= gridEndY; worldY += effectiveGridSize) {
-      const screenY = worldY * zoom + panY
-      // Only draw if line is within viewport bounds
-      if (screenY >= -100 && screenY <= height + 100) {
-        gridLines.push(
-          <Line
-            key={`h-${worldY}`}
-            points={[0, screenY, width, screenY]}
-            stroke="#e5e7eb"
-            strokeWidth={Math.max(0.5, 1 / Math.max(0.25, zoom))}
-            listening={false}
-            perfect={false}
-          />
-        )
-      }
+    // Draw horizontal lines - always from left to right of viewport (0 to width)
+    for (let y = normalizedOffsetY - effectiveGridSize; y <= height + effectiveGridSize; y += effectiveGridSize) {
+      gridLines.push(
+        <Line
+          key={`h-${y}`}
+          points={[0, y, width, y]}
+          stroke="#e5e7eb"
+          strokeWidth={1}
+          listening={false}
+          perfect={false}
+        />
+      )
     }
 
     return gridLines

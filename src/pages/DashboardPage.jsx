@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
 import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject } from '../utils/projectManager'
@@ -35,8 +35,8 @@ export default function DashboardPage() {
 
   const userName = user?.fullName || user?.firstName || 'User'
 
-  // Helper function to update all project lists (must be defined before useEffects that use it)
-  const updateProjectLists = (allProjects) => {
+  // Helper function to update all project lists (memoized to prevent infinite loops)
+  const updateProjectLists = useCallback((allProjects) => {
     setSavedProjects(allProjects)
     // Sort by updated_at (most recent first)
     const sortedProjects = [...allProjects].sort((a, b) => {
@@ -46,51 +46,51 @@ export default function DashboardPage() {
     })
     setRecentProjects(sortedProjects.slice(0, 4)) // Last 4 for home page
     setSidebarProjects(sortedProjects.slice(0, 10)) // Last 10 for sidebar
-  }
+  }, [])
 
   // Load spaces and projects on mount
   useEffect(() => {
+    if (!userId || !isSignedIn) return
+    
     async function loadData() {
-      if (userId && isSignedIn) {
-        // Clean up trash on every load - each item is checked individually
-        // Items are deleted only when their own 1-week period has passed
-        cleanupTrash(userId)
-        
-        const userSpaces = await getSpaces(userId)
-        const trashed = getTrashedSpaces(userId)
-        const trashedProjs = getTrashedProjects(userId)
-        setSpaces(userSpaces)
-        setTrashedSpaces(trashed)
-        setTrashedProjects(trashedProjs)
-        
-        // Load all projects for sidebar menu (regardless of space)
-        const allProjects = await getProjects(userId, null)
-        updateProjectLists(allProjects)
-        
-        // Auto-select first space if none selected and spaces exist
-        if (!selectedSpaceId && userSpaces.length > 0) {
-          const firstSpaceId = userSpaces[0].id
-          setSelectedSpaceId(firstSpaceId)
-        }
+      // Clean up trash on every load - each item is checked individually
+      // Items are deleted only when their own 1-week period has passed
+      cleanupTrash(userId)
+      
+      const userSpaces = await getSpaces(userId)
+      const trashed = getTrashedSpaces(userId)
+      const trashedProjs = getTrashedProjects(userId)
+      setSpaces(userSpaces)
+      setTrashedSpaces(trashed)
+      setTrashedProjects(trashedProjs)
+      
+      // Load all projects for sidebar menu (regardless of space)
+      const allProjects = await getProjects(userId, null)
+      updateProjectLists(allProjects)
+      
+      // Auto-select first space if none selected and spaces exist
+      if (!selectedSpaceId && userSpaces.length > 0) {
+        const firstSpaceId = userSpaces[0].id
+        setSelectedSpaceId(firstSpaceId)
       }
     }
     loadData()
-  }, [userId, isSignedIn, selectedSpaceId])
+  }, [userId, isSignedIn, selectedSpaceId, updateProjectLists])
   
   // Auto-cleanup trash every 5 minutes to check individual items
   // Each item is deleted independently when its own 1-week period expires
   useEffect(() => {
-    if (userId && isSignedIn) {
-      const interval = setInterval(() => {
-        cleanupTrash(userId)
-        const trashed = getTrashedSpaces(userId)
-        const trashedProjs = getTrashedProjects(userId)
-        setTrashedSpaces(trashed)
-        setTrashedProjects(trashedProjs)
-      }, 5 * 60 * 1000) // Every 5 minutes to catch items as soon as they expire
-      
-      return () => clearInterval(interval)
-    }
+    if (!userId || !isSignedIn) return
+    
+    const interval = setInterval(() => {
+      cleanupTrash(userId)
+      const trashed = getTrashedSpaces(userId)
+      const trashedProjs = getTrashedProjects(userId)
+      setTrashedSpaces(trashed)
+      setTrashedProjects(trashedProjs)
+    }, 5 * 60 * 1000) // Every 5 minutes to catch items as soon as they expire
+    
+    return () => clearInterval(interval)
   }, [userId, isSignedIn])
 
   // Safeguard: Ensure ProjectView shows when a project is selected (unless explicitly in workspace, account, or my-projects view)

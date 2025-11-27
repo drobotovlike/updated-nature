@@ -187,10 +187,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     gridSize: 20,
   })
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
-  
-  // Canvas is 4x larger than viewport
-  const canvasWidth = dimensions.width * 4
-  const canvasHeight = dimensions.height * 4
   const [isGenerating, setIsGenerating] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -284,13 +280,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Initialize stage position to center of 4x canvas (only if not already loaded from database)
   useEffect(() => {
-    if (stageRef.current && canvasWidth > 0 && canvasHeight > 0 && !loading) {
+    if (stageRef.current && dimensions.width > 0 && dimensions.height > 0 && !loading) {
       // Only initialize if stage is at default position (0,0) and scale (1,1)
       const currentPos = stageRef.current.position()
       const currentScale = stageRef.current.scaleX()
       
       if (currentPos.x === 0 && currentPos.y === 0 && currentScale === 1) {
-        // Center the viewport on the canvas
+        // Center the viewport on the canvas (4x larger)
+        const canvasWidth = dimensions.width * 4
+        const canvasHeight = dimensions.height * 4
         const initialX = (canvasWidth - dimensions.width) / 2
         const initialY = (canvasHeight - dimensions.height) / 2
         stageRef.current.position({ x: initialX, y: initialY })
@@ -303,7 +301,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }))
       }
     }
-  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height, loading])
+  }, [dimensions.width, dimensions.height, loading])
 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -494,12 +492,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const handleStageDragEnd = useCallback(() => {
     const stage = stageRef.current
-    if (!stage) return
+    if (!stage || dimensions.width === 0 || dimensions.height === 0) return
 
     const position = stage.position()
     const scale = stage.scaleX()
     
     // Clamp pan to canvas bounds (4x larger than viewport)
+    const canvasWidth = dimensions.width * 4
+    const canvasHeight = dimensions.height * 4
     const maxX = canvasWidth - dimensions.width
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, position.x))
@@ -514,16 +514,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       zoom: scale,
     }))
     saveCanvasStateToServer()
-  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height, saveCanvasStateToServer])
+  }, [dimensions.width, dimensions.height, saveCanvasStateToServer])
 
   const handleStageDrag = useCallback(() => {
     const stage = stageRef.current
-    if (!stage) return
+    if (!stage || dimensions.width === 0 || dimensions.height === 0) return
 
     const position = stage.position()
     const scale = stage.scaleX()
     
     // Clamp pan to canvas bounds during drag
+    const canvasWidth = dimensions.width * 4
+    const canvasHeight = dimensions.height * 4
     const maxX = canvasWidth - dimensions.width
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, position.x))
@@ -540,13 +542,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       panY: clampedY,
       zoom: scale,
     }))
-  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height])
+  }, [dimensions.width, dimensions.height])
 
   const handleWheel = useCallback((e) => {
     e.evt.preventDefault()
 
     const stage = stageRef.current
-    if (!stage) return
+    if (!stage || dimensions.width === 0 || dimensions.height === 0) return
 
     const oldScale = stage.scaleX()
     const pointer = stage.getPointerPosition()
@@ -579,6 +581,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
 
     // Clamp pan to canvas bounds
+    const canvasWidth = dimensions.width * 4
+    const canvasHeight = dimensions.height * 4
     const maxX = canvasWidth - dimensions.width
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, newPos.x))
@@ -593,7 +597,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       panX: clampedX,
       panY: clampedY,
     }))
-  }, [canvasWidth, canvasHeight, dimensions.width, dimensions.height])
+  }, [dimensions.width, dimensions.height])
 
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
@@ -661,6 +665,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const width = dimensions?.width || window.innerWidth
         const height = dimensions?.height || window.innerHeight
         const stage = stageRef.current
+        const canvasWidth = width * 4
+        const canvasHeight = height * 4
         const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
         const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
@@ -772,6 +778,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const stage = stageRef.current
       const width = dimensions?.width || window.innerWidth
       const height = dimensions?.height || window.innerHeight
+      const canvasWidth = width * 4
+      const canvasHeight = height * 4
       const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
       const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
@@ -1032,7 +1040,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <p className="text-sm text-stone-500">Loading canvas...</p>
               </div>
             </div>
-          ) : dimensions.width > 0 && dimensions.height > 0 && canvasWidth > 0 && canvasHeight > 0 && (
+          ) : dimensions.width > 0 && dimensions.height > 0 && (() => {
+            const canvasWidth = dimensions.width * 4
+            const canvasHeight = dimensions.height * 4
+            return (
             <Stage
               ref={stageRef}
               width={canvasWidth}
@@ -1112,7 +1123,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 })()}
               </Layer>
             </Stage>
-          )}
+            )
+          })()}
         </div>
 
         {/* Bottom Toolbar - Compact Design */}
@@ -1461,6 +1473,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
                   // Calculate center in world coordinates (accounting for pan/zoom)
                   const stage = stageRef.current
+                  const canvasWidth = dimensions.width * 4
+                  const canvasHeight = dimensions.height * 4
                   const centerX = stage ? (dimensions.width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
                   const centerY = stage ? (dimensions.height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 

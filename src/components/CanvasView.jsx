@@ -207,19 +207,57 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [showStyleLibrary, setShowStyleLibrary] = useState(false)
   
   // UI State
-  const [sidebarOpen, setSidebarOpen] = useState(false)
   const [chatInput, setChatInput] = useState('')
+  const [popupMenuPosition, setPopupMenuPosition] = useState({ x: 0, y: 0, visible: false })
   
   // Calculate selectedItem - must be defined before useEffects
   const selectedItem = items.find((item) => item.id === selectedItemId)
   const selectedItems = items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
   
-  // Auto-open sidebar when item is selected
+  // Show popup menu when item is selected and update position on pan/zoom
   useEffect(() => {
-    if (selectedItem) {
-      setSidebarOpen(true)
+    if (selectedItem && stageRef.current) {
+      const updateMenuPosition = () => {
+        const stage = stageRef.current
+        if (!stage) return
+        
+        // Calculate item position in screen coordinates
+        const itemX = selectedItem.x_position * stage.scaleX() + stage.x()
+        const itemY = selectedItem.y_position * stage.scaleY() + stage.y()
+        const itemWidth = (selectedItem.width || 200) * stage.scaleX()
+        
+        // Position menu above the item, centered horizontally
+        setPopupMenuPosition(prev => ({
+          x: itemX + itemWidth / 2,
+          y: itemY - 10, // Above the item
+          visible: prev.visible || true,
+        }))
+      }
+      
+      updateMenuPosition()
+      
+      // Update position when canvas state changes (pan/zoom)
+      const interval = setInterval(updateMenuPosition, 100)
+      return () => clearInterval(interval)
+    } else {
+      setPopupMenuPosition({ x: 0, y: 0, visible: false })
     }
-  }, [selectedItem])
+  }, [selectedItem, canvasState.panX, canvasState.panY, canvasState.zoom])
+
+  // Close popup menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (popupMenuPosition.visible && !e.target.closest('.popup-menu')) {
+        // Don't close if clicking on canvas items
+        if (e.target.closest('canvas')) {
+          return
+        }
+        setPopupMenuPosition({ x: 0, y: 0, visible: false })
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [popupMenuPosition.visible])
 
   // Load canvas data
   useEffect(() => {
@@ -232,10 +270,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   useEffect(() => {
     const updateDimensions = () => {
       // Always use full viewport size, not container size
-      const sidebarWidth = (sidebarOpen && selectedItem) ? 320 : 0
       const toolbarHeight = 120 // Account for bottom toolbar
       setDimensions({
-        width: window.innerWidth - sidebarWidth,
+        width: window.innerWidth,
         height: window.innerHeight - toolbarHeight,
       })
     }
@@ -243,20 +280,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     updateDimensions()
     window.addEventListener('resize', updateDimensions)
     return () => window.removeEventListener('resize', updateDimensions)
-  }, [sidebarOpen, selectedItem])
-  
-  // Update dimensions when sidebar toggles or item selection changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      const sidebarWidth = (sidebarOpen && selectedItem) ? 320 : 0
-      const toolbarHeight = 120
-      setDimensions({
-        width: window.innerWidth - sidebarWidth,
-        height: window.innerHeight - toolbarHeight,
-      })
-    }, 300) // Wait for animation
-    return () => clearTimeout(timer)
-  }, [sidebarOpen, selectedItem])
+  }, [])
 
   // Initialize stage position to center of 4x canvas (only if not already loaded from database)
   useEffect(() => {
@@ -439,11 +463,34 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (selectedItemId === itemId) {
         setSelectedItemId(null)
       }
+      setPopupMenuPosition({ x: 0, y: 0, visible: false })
     } catch (error) {
       console.error('Error deleting item:', error)
       setError('Failed to delete item. Please try again.')
     }
   }, [userId, selectedItemId])
+
+  const moveToFront = useCallback(async () => {
+    if (!selectedItemId) return
+    
+    const maxZIndex = Math.max(...items.map(item => item.z_index || 0), 0)
+    await handleItemUpdate(selectedItemId, { z_index: maxZIndex + 1 })
+  }, [selectedItemId, items, handleItemUpdate])
+
+  const moveToBack = useCallback(async () => {
+    if (!selectedItemId) return
+    
+    const minZIndex = Math.min(...items.map(item => item.z_index || 0), 0)
+    await handleItemUpdate(selectedItemId, { z_index: minZIndex - 1 })
+  }, [selectedItemId, items, handleItemUpdate])
+
+  const handleEdit = useCallback(() => {
+    // Open edit modal - use regenerate functionality as "edit"
+    setShowGenerateModal(true)
+    if (selectedItem) {
+      setGeneratePrompt(selectedItem.prompt || '')
+    }
+  }, [selectedItem])
 
   const handleStageDragEnd = useCallback(() => {
     const stage = stageRef.current
@@ -869,291 +916,65 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
-      {/* Collapsible Left Sidebar - Only show when item is selected */}
-      {selectedItem && (
-        <div className={`fixed left-0 top-0 h-full bg-white border-r border-stone-200 z-30 transition-transform duration-300 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`} style={{ width: '320px' }}>
-          <div className="h-full flex flex-col">
-            <div className="p-4 border-b border-stone-200 flex items-center justify-between">
-              <div>
-                <h3 className="font-semibold text-stone-900 mb-1">Selected Item</h3>
-                <p className="text-sm text-stone-600 truncate">{selectedItem.name || 'Untitled'}</p>
-              </div>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-2 hover:bg-stone-100 rounded-lg transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="m18 6-12 12" />
-                  <path d="m6 6 12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {/* Art Director Mode */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                  Art Director
-                </label>
-                <textarea
-                  value={generatePrompt}
-                  onChange={(e) => setGeneratePrompt(e.target.value)}
-                  placeholder="Describe changes to regenerate..."
-                  className="w-full p-3 bg-stone-50 rounded-lg border border-stone-100 text-xs text-stone-600 resize-none focus:outline-none focus:ring-2 focus:ring-stone-200 min-h-[60px]"
-                />
-                <button
-                  onClick={() => regenerateSelected(generatePrompt)}
-                  disabled={isGenerating}
-                  className="w-full mt-2 px-4 py-2.5 bg-stone-900 text-white rounded-lg text-xs font-semibold hover:bg-stone-800 transition-colors disabled:opacity-50"
-                >
-                  {isGenerating ? 'Regenerating...' : 'Regenerate'}
-                </button>
-              </div>
-
-              {/* Transform Controls */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                  Transform
-                </label>
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-xs text-stone-600 mb-1 block">Opacity</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.1"
-                      value={selectedItem.opacity || 1}
-                      onChange={(e) => handleItemUpdate(selectedItemId, { opacity: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-stone-600 mb-1 block">Rotation</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="1"
-                      value={selectedItem.rotation || 0}
-                      onChange={(e) => handleItemUpdate(selectedItemId, { rotation: parseFloat(e.target.value) })}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Image Editing Tools */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                  Edit Image
-                </label>
-                <div className="space-y-2">
-                  <button
-                    onClick={async () => {
-                      if (!selectedItem) return
-                      setIsGenerating(true)
-                      try {
-                        const response = await fetch('/api/image-editing', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            operation: 'upscale',
-                            image_url: selectedItem.image_url,
-                            scale: 2,
-                          }),
-                        })
-                        const data = await response.json()
-                        if (data.image_url) {
-                          // Get original dimensions
-                          const img = new Image()
-                          img.onload = async () => {
-                            await handleItemUpdate(selectedItemId, {
-                              image_url: data.image_url,
-                              width: img.width * 2,
-                              height: img.height * 2,
-                            })
-                          }
-                          img.src = selectedItem.image_url
-                        }
-                      } catch (error) {
-                        console.error('Error upscaling:', error)
-                        setError('Failed to upscale image. Please try again.')
-                      } finally {
-                        setIsGenerating(false)
-                      }
-                    }}
-                    disabled={isGenerating}
-                    className="w-full px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
-                  >
-                    {isGenerating ? 'Upscaling...' : 'Upscale 2x'}
-                  </button>
-                  <button
-                    onClick={() => {
-                      // TODO: Open retouch tool with mask selection
-                      setError('Retouch tool coming soon!')
-                    }}
-                    className="w-full px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    Retouch (Coming Soon)
-                  </button>
-                </div>
-              </div>
-
-              {/* Color Adjustments */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                  Adjustments
-                </label>
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-xs text-stone-600 mb-1 block">Brightness</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={selectedItem.adjustments?.brightness || 1}
-                      onChange={(e) => {
-                        const adjustments = { ...(selectedItem.adjustments || {}), brightness: parseFloat(e.target.value) }
-                        handleItemUpdate(selectedItemId, { adjustments })
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-stone-600 mb-1 block">Contrast</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={selectedItem.adjustments?.contrast || 1}
-                      onChange={(e) => {
-                        const adjustments = { ...(selectedItem.adjustments || {}), contrast: parseFloat(e.target.value) }
-                        handleItemUpdate(selectedItemId, { adjustments })
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs text-stone-600 mb-1 block">Saturation</label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={selectedItem.adjustments?.saturation || 1}
-                      onChange={(e) => {
-                        const adjustments = { ...(selectedItem.adjustments || {}), saturation: parseFloat(e.target.value) }
-                        handleItemUpdate(selectedItemId, { adjustments })
-                      }}
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Alignment Tools */}
-              {(selectedItemIds.size > 0 || selectedItemId) && (
-                <div>
-                  <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                    Align {selectedItemIds.size > 0 ? `${selectedItemIds.size + (selectedItemId ? 1 : 0)} Items` : ''}
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      onClick={() => alignItems('left')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Left"
-                    >
-                      ←
-                    </button>
-                    <button
-                      onClick={() => alignItems('center')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Center"
-                    >
-                      ↔
-                    </button>
-                    <button
-                      onClick={() => alignItems('right')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Right"
-                    >
-                      →
-                    </button>
-                    <button
-                      onClick={() => alignItems('top')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Top"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      onClick={() => alignItems('middle')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Middle"
-                    >
-                      ↕
-                    </button>
-                    <button
-                      onClick={() => alignItems('bottom')}
-                      className="px-2 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded text-xs font-medium transition-colors"
-                      title="Align Bottom"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Quick Actions */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-400 tracking-wider uppercase mb-2">
-                  Actions
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleItemUpdate(selectedItemId, { is_locked: !selectedItem.is_locked })}
-                    className="px-3 py-2 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    {selectedItem.is_locked ? 'Unlock' : 'Lock'}
-                  </button>
-                  <button
-                    onClick={() => handleItemDelete(selectedItemId)}
-                    className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-700 rounded-lg text-xs font-medium transition-colors"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Sidebar Toggle Button (when closed and item selected) */}
-      {!sidebarOpen && selectedItem && (
-        <button
-          onClick={() => setSidebarOpen(true)}
-          className="fixed left-4 top-1/2 -translate-y-1/2 z-30 p-2 bg-white border border-stone-200 rounded-lg shadow-lg hover:bg-stone-50 transition-colors"
+      {/* Popup Menu - Appears when item is selected */}
+      {popupMenuPosition.visible && selectedItem && (
+        <div
+          className="popup-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[140px]"
+          style={{
+            left: `${popupMenuPosition.x}px`,
+            top: `${popupMenuPosition.y}px`,
+            transform: 'translate(-50%, -100%)',
+          }}
+          onClick={(e) => e.stopPropagation()}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </button>
+          <button
+            onClick={handleEdit}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+            </svg>
+            Edit
+          </button>
+          <button
+            onClick={moveToFront}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Move to Front
+          </button>
+          <button
+            onClick={moveToBack}
+            className="w-full px-4 py-2 text-left text-sm text-stone-700 hover:bg-stone-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Move to Back
+          </button>
+          <div className="border-t border-stone-200 my-1" />
+          <button
+            onClick={() => handleItemDelete(selectedItemId)}
+            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Delete
+          </button>
+        </div>
       )}
 
       {/* Main Canvas Area - Full Screen */}
       <div 
-        className="flex-1 flex flex-col w-full h-full" 
-        style={{ 
-          marginLeft: (sidebarOpen && selectedItem) ? '320px' : '0', 
-          transition: 'margin-left 300ms',
-          width: (sidebarOpen && selectedItem) ? 'calc(100% - 320px)' : '100%'
-        }}
+        className="flex-1 flex flex-col w-full h-full"
       >
         {/* Error Message */}
         {error && (
@@ -1223,6 +1044,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               onClick={(e) => {
                 if (e.target === e.target.getStage()) {
                   setSelectedItemId(null)
+                  setPopupMenuPosition({ x: 0, y: 0, visible: false })
                 }
               }}
               style={{ position: 'relative', zIndex: 1 }}

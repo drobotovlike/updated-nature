@@ -236,6 +236,11 @@ export default function DashboardPage() {
   }
 
   const handleCreateProject = async () => {
+    if (!userId || !isSignedIn) {
+      alert('Please sign in to create projects')
+      return
+    }
+    
     if (!newProjectName.trim()) {
       alert('Please enter a project name')
       return
@@ -692,12 +697,17 @@ export default function DashboardPage() {
                   setEditingCreation(null)
                 }}
                 onEdit={(creation) => {
+                  // Ensure we have userId and projectId before switching to workspace
+                  if (!userId || !selectedProjectId) {
+                    console.error('Cannot edit: missing userId or projectId', { userId, selectedProjectId })
+                    return
+                  }
                   setEditingCreation(creation)
                   setCurrentView('workspace')
                 }}
               />
             </div>
-          ) : currentView === 'workspace' && selectedProjectId && userId ? (
+          ) : currentView === 'workspace' && selectedProjectId && userId && isSignedIn ? (
             <div className="h-full">
               <CanvasView
                 projectId={selectedProjectId}
@@ -706,6 +716,7 @@ export default function DashboardPage() {
                   setEditingCreation(null)
                 }}
                 onSave={async () => {
+                  if (!userId) return
                   // Refresh all projects (for sidebar) and update recent projects
                   const allProjects = await getProjects(userId, null)
                   updateProjectLists(allProjects)

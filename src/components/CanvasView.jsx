@@ -332,9 +332,21 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 
 
 export default function CanvasView({ projectId, onBack, onSave }) {
-  const { userId } = useAuth()
+  const { userId, isSignedIn } = useAuth()
   const stageRef = useRef(null)
   const containerRef = useRef(null)
+  
+  // Early return if essential props are missing
+  if (!projectId || !userId || !isSignedIn) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="w-8 h-8 border-4 border-stone-200 border-t-stone-900 rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-sm text-stone-600">Loading canvas...</p>
+        </div>
+      </div>
+    )
+  }
 
   // Canvas state
   const [items, setItems] = useState([])
@@ -381,6 +393,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [maskCanvas, setMaskCanvas] = useState(null) // Canvas for drawing mask
   const [isDrawingMask, setIsDrawingMask] = useState(false)
   const [maskPath, setMaskPath] = useState([]) // Store brush strokes
+  
+  // Initialize loading and error states early to prevent TDZ issues
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
@@ -567,81 +583,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     return () => document.removeEventListener('paste', handlePaste)
   }, [handleFileUpload])
 
-  // Load canvas data
-  useEffect(() => {
-    if (projectId && userId) {
-      loadCanvas()
-    }
-  }, [projectId, userId])
-
-  // Update dimensions on resize - fixed size, always full screen
-  useEffect(() => {
-    const updateDimensions = () => {
-      // Always use full viewport size, not container size
-      const toolbarHeight = 120 // Account for bottom toolbar
-      setDimensions({
-        width: window.innerWidth,
-        height: window.innerHeight - toolbarHeight,
-      })
-    }
-
-    updateDimensions()
-    window.addEventListener('resize', updateDimensions)
-    return () => window.removeEventListener('resize', updateDimensions)
-  }, [])
-
-  // Initialize stage position to center of 4x canvas (only if not already loaded from database)
-  useEffect(() => {
-    if (stageRef.current && dimensions.width > 0 && dimensions.height > 0 && !loading) {
-      // Only initialize if stage is at default position (0,0) and scale (1,1)
-      const currentPos = stageRef.current.position()
-      const currentScale = stageRef.current.scaleX()
-      
-      if (currentPos.x === 0 && currentPos.y === 0 && currentScale === 1) {
-        // Center the viewport on the canvas (4x larger)
-        const canvasWidth = dimensions.width * 4
-        const canvasHeight = dimensions.height * 4
-        const initialX = (canvasWidth - dimensions.width) / 2
-        const initialY = (canvasHeight - dimensions.height) / 2
-        stageRef.current.position({ x: initialX, y: initialY })
-        stageRef.current.scale({ x: 1, y: 1 })
-        setCanvasState((prev) => ({
-          ...prev,
-          panX: initialX,
-          panY: initialY,
-          zoom: 1,
-        }))
-      }
-    }
-  }, [dimensions.width, dimensions.height, loading])
-
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  // Load styles on mount
-  useEffect(() => {
-    if (!userId) return
-    
-    const loadStyles = async () => {
-      try {
-        const response = await fetch('/api/generate?action=styles', {
-          headers: {
-            'Authorization': `Bearer ${userId}`,
-          },
-        })
-        if (response.ok) {
-          const data = await response.json()
-          setStyles(data || [])
-        }
-      } catch (error) {
-        console.error('Error loading styles:', error)
-      }
-    }
-    
-    loadStyles()
-  }, [userId])
-
-  const loadCanvas = async () => {
+  // Define loadCanvas before it's used
+  const loadCanvas = useCallback(async () => {
     if (!projectId || !userId) {
       console.warn('Cannot load canvas: missing projectId or userId', { projectId, userId })
       setError('Missing project or user information. Please refresh the page.')
@@ -724,7 +667,78 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setLoading(false)
     }
-  }
+  }, [projectId, userId, dimensions.width, dimensions.height])
+
+  // Load canvas data
+  useEffect(() => {
+    if (projectId && userId) {
+      loadCanvas()
+    }
+  }, [projectId, userId, loadCanvas])
+
+  // Update dimensions on resize - fixed size, always full screen
+  useEffect(() => {
+    const updateDimensions = () => {
+      // Always use full viewport size, not container size
+      const toolbarHeight = 120 // Account for bottom toolbar
+      setDimensions({
+        width: window.innerWidth,
+        height: window.innerHeight - toolbarHeight,
+      })
+    }
+
+    updateDimensions()
+    window.addEventListener('resize', updateDimensions)
+    return () => window.removeEventListener('resize', updateDimensions)
+  }, [])
+
+  // Initialize stage position to center of 4x canvas (only if not already loaded from database)
+  useEffect(() => {
+    if (stageRef.current && dimensions.width > 0 && dimensions.height > 0 && !loading) {
+      // Only initialize if stage is at default position (0,0) and scale (1,1)
+      const currentPos = stageRef.current.position()
+      const currentScale = stageRef.current.scaleX()
+      
+      if (currentPos.x === 0 && currentPos.y === 0 && currentScale === 1) {
+        // Center the viewport on the canvas (4x larger)
+        const canvasWidth = dimensions.width * 4
+        const canvasHeight = dimensions.height * 4
+        const initialX = (canvasWidth - dimensions.width) / 2
+        const initialY = (canvasHeight - dimensions.height) / 2
+        stageRef.current.position({ x: initialX, y: initialY })
+        stageRef.current.scale({ x: 1, y: 1 })
+        setCanvasState((prev) => ({
+          ...prev,
+          panX: initialX,
+          panY: initialY,
+          zoom: 1,
+        }))
+      }
+    }
+  }, [dimensions.width, dimensions.height, loading])
+
+  // Load styles on mount
+  useEffect(() => {
+    if (!userId) return
+    
+    const loadStyles = async () => {
+      try {
+        const response = await fetch('/api/generate?action=styles', {
+          headers: {
+            'Authorization': `Bearer ${userId}`,
+          },
+        })
+        if (response.ok) {
+          const data = await response.json()
+          setStyles(data || [])
+        }
+      } catch (error) {
+        console.error('Error loading styles:', error)
+      }
+    }
+    
+    loadStyles()
+  }, [userId])
 
   const saveCanvasStateToServer = useCallback(async () => {
     if (!projectId || !userId) return

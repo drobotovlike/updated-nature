@@ -459,14 +459,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // All projects now use UUIDs - no need for auto-save logic
   // Canvas will work immediately for all projects
-  
-  // Reset auto-save ref when projectId changes to a different project
-  useEffect(() => {
-    if (autoSaveProjectIdRef.current !== projectId) {
-      autoSaveAttemptedRef.current = false
-      autoSaveProjectIdRef.current = null
-    }
-  }, [projectId])
 
   // Undo/Redo handlers - Define early to prevent scope issues
   // Undo/Redo handlers
@@ -634,7 +626,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, actualProjectId, projectId, dimensions, items, setItems, setError, setIsGenerating, stageRef])
+  }, [userId, projectId, dimensions, items, setItems, setError, setIsGenerating, stageRef])
 
   // Handle drag and drop
   const handleDrop = useCallback(async (e) => {
@@ -896,7 +888,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       console.error('Error saving history:', error)
       // Don't throw - history is non-critical
     }
-  }, [actualProjectId, projectId, historyIndex])
+  }, [projectId, historyIndex])
 
   const saveCanvasStateToServer = useCallback(async () => {
     const currentProjectId = projectId
@@ -922,7 +914,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } catch (error) {
       console.error('Error saving canvas state:', error)
     }
-  }, [actualProjectId, projectId, userId, camera, settings])
+  }, [projectId, userId, camera, settings])
 
   // Debounced save
   useEffect(() => {

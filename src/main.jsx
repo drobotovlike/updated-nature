@@ -157,7 +157,7 @@ try {
           <ClerkProvider
             publishableKey={PUBLISHABLE_KEY}
             fallbackRedirectUrl="/dashboard"
-            afterSignUpUrl="/dashboard"
+
           >
             <BrowserRouter>
               <App />

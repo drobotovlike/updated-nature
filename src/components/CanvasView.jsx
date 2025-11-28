@@ -2512,7 +2512,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }
     }
     loadProjectData()
-  }, [projectId, userId])
+  }, [projectId, userId, clerk])
 
   // Load assets for sidebar
   useEffect(() => {

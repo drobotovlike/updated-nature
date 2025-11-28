@@ -56,19 +56,19 @@ class ErrorBoundary extends React.Component {
 // Component to show when Clerk key is missing
 function MissingClerkKeyError() {
   return (
-    <div style={{ 
-      minHeight: '100vh', 
-      display: 'flex', 
-      alignItems: 'center', 
-      justifyContent: 'center', 
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
       padding: '20px',
       fontFamily: 'system-ui, -apple-system, sans-serif',
       background: '#fafafa'
     }}>
-      <div style={{ 
-        maxWidth: '600px', 
-        background: 'white', 
-        padding: '40px', 
+      <div style={{
+        maxWidth: '600px',
+        background: 'white',
+        padding: '40px',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0,0,0,0.1)'
       }}>
@@ -99,16 +99,16 @@ function MissingClerkKeyError() {
           <p style={{ fontSize: '14px', color: '#666', marginBottom: '8px' }}>
             Get your Clerk key from:
           </p>
-          <a 
-            href="https://dashboard.clerk.com/last-active?path=api-keys" 
-            target="_blank" 
+          <a
+            href="https://dashboard.clerk.com/last-active?path=api-keys"
+            target="_blank"
             rel="noopener noreferrer"
-            style={{ 
+            style={{
               display: 'inline-block',
-              padding: '10px 20px', 
-              background: '#0070f3', 
-              color: 'white', 
-              textDecoration: 'none', 
+              padding: '10px 20px',
+              background: '#0070f3',
+              color: 'white',
+              textDecoration: 'none',
               borderRadius: '6px',
               fontWeight: '500'
             }}
@@ -123,11 +123,11 @@ function MissingClerkKeyError() {
 
 try {
   const root = createRoot(document.getElementById('root'))
-  
+
   // Check if Clerk key is valid
-  const isValidKey = PUBLISHABLE_KEY && 
+  const isValidKey = PUBLISHABLE_KEY &&
     (PUBLISHABLE_KEY.startsWith('pk_test_') || PUBLISHABLE_KEY.startsWith('pk_live_'))
-  
+
   if (!isValidKey) {
     console.error('❌ VITE_CLERK_PUBLISHABLE_KEY is missing or invalid!')
     console.error('')
@@ -136,7 +136,7 @@ try {
     console.error('2. Add: VITE_CLERK_PUBLISHABLE_KEY = your_key_here')
     console.error('3. Redeploy your application')
     console.error('')
-    
+
     // Show error page without ClerkProvider (error page doesn't use Clerk hooks)
     root.render(
       <StrictMode>
@@ -154,9 +154,9 @@ try {
       <StrictMode>
         <FontPreload />
         <ErrorBoundary>
-          <ClerkProvider 
+          <ClerkProvider
             publishableKey={PUBLISHABLE_KEY}
-            afterSignInUrl="/dashboard"
+            fallbackRedirectUrl="/dashboard"
             afterSignUpUrl="/dashboard"
           >
             <BrowserRouter>

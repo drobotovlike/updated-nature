@@ -2495,8 +2495,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}
       <div
-        className={`absolute left - 0 top - 0 bottom - 0 z - 50 bg - [#FFFFFF] border - r border - [#F1EBE4] transition - all duration - macro ease - apple ${sidebarOpen ? 'w-80' : 'w-0'
-          } overflow - hidden`}
+        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${
+          sidebarOpen ? 'w-80' : 'w-0'
+        } overflow-hidden`}
       >
         {sidebarOpen && (
           <div className="h-full flex flex-col">
@@ -2779,7 +2780,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           className="absolute left-4 top-4 z-50 p-2 bg-white hover:bg-[#F1EBE4] rounded-lg border border-[#F1EBE4] shadow-oak transition-colors"
           aria-label="Show sidebar"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-text-primary">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2C2C2C]">
             <line x1="3" y1="12" x2="21" y2="12" />
             <line x1="3" y1="6" x2="21" y2="6" />
             <line x1="3" y1="18" x2="21" y2="18" />

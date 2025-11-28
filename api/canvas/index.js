@@ -24,12 +24,12 @@ async function handler(req, res, userId) {
   const { method } = req
   const { projectId, itemId, type } = req.query
 
-  // Validate projectId is a UUID if provided (localStorage projects have non-UUID IDs)
+  // Validate projectId is a UUID (all projects now use UUIDs)
   if (projectId && !isValidUUID(projectId)) {
     return res.status(400).json({ 
       error: 'Invalid project ID format',
-      message: 'Project must be saved to cloud first. LocalStorage projects cannot be used with canvas features.',
-      details: `Project ID "${projectId}" is not a valid UUID. Please save the project to cloud to get a UUID-based project ID.`
+      message: 'Project ID must be a valid UUID. Please refresh the page.',
+      details: `Project ID "${projectId}" is not a valid UUID format.`
     })
   }
 

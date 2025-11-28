@@ -1,7 +1,10 @@
 // Project Management Utility
 // Hybrid: Uses cloud storage (Supabase) with localStorage fallback
+// UUID-First Architecture: All projects use UUIDs for consistency
 
 import * as cloudManager from './cloudProjectManager'
+import { generateUUID, isValidUUID } from './uuid'
+import { syncQueue } from './syncQueue'
 
 const STORAGE_KEY = 'ature_projects'
 const SPACES_KEY = 'ature_spaces'
@@ -23,99 +26,119 @@ async function useCloud() {
   }
 }
 
-export async function saveProject(userId, projectName, workflowData, spaceId = null) {
+export async function saveProject(userId, projectName, workflowData, spaceId = null, clerkInstance = null) {
   if (!userId) {
     throw new Error('User must be authenticated to save projects')
   }
 
-  try {
-    // Try cloud first
-    if (await useCloud()) {
-      try {
-        // Prepare workflow data for cloud upload
-        const cloudWorkflow = {
-          mode: workflowData.mode || '',
-          furnitureFile: workflowData.furnitureFile instanceof File 
-            ? workflowData.furnitureFile 
-            : workflowData.furnitureFile 
-              ? { name: workflowData.furnitureFileName || '', url: workflowData.furniturePreviewUrl || '' }
-              : null,
-          roomFile: workflowData.roomFile instanceof File
-            ? workflowData.roomFile
-            : workflowData.roomFile
-              ? { name: workflowData.roomFileName || '', url: workflowData.roomPreviewUrl || '' }
-              : null,
-          model3d: workflowData.model3dUrl ? { url: workflowData.model3dUrl } : null,
-          result: workflowData.resultUrl ? {
-            url: workflowData.resultUrl,
+  // Always create with UUID first (local)
+  const localProject = saveProjectToLocalStorage(userId, projectName, workflowData, spaceId, clerkInstance)
+
+  // Try cloud sync immediately if online
+  if (navigator.onLine && clerkInstance) {
+    try {
+      if (await useCloud()) {
+        try {
+          // Prepare workflow data for cloud upload
+          const cloudWorkflow = {
+            mode: workflowData.mode || '',
+            furnitureFile: workflowData.furnitureFile instanceof File 
+              ? workflowData.furnitureFile 
+              : workflowData.furnitureFile 
+                ? { name: workflowData.furnitureFileName || '', url: workflowData.furniturePreviewUrl || '' }
+                : null,
+            roomFile: workflowData.roomFile instanceof File
+              ? workflowData.roomFile
+              : workflowData.roomFile
+                ? { name: workflowData.roomFileName || '', url: workflowData.roomPreviewUrl || '' }
+                : null,
+            model3d: workflowData.model3dUrl ? { url: workflowData.model3dUrl } : null,
+            result: workflowData.resultUrl ? {
+              url: workflowData.resultUrl,
+              description: workflowData.description || '',
+              useAIDesigner: workflowData.useAIDesigner || false,
+            } : null,
+            resultUrl: workflowData.resultUrl || null,
             description: workflowData.description || '',
             useAIDesigner: workflowData.useAIDesigner || false,
-          } : null,
-          resultUrl: workflowData.resultUrl || null,
-          description: workflowData.description || '',
-          useAIDesigner: workflowData.useAIDesigner || false,
-        }
+          }
 
-        const project = await cloudManager.saveProjectToCloud(userId, projectName, cloudWorkflow, spaceId)
-        
-        // Also save to localStorage as backup
-        saveProjectToLocalStorage(userId, project)
-        
-        return project
-      } catch (cloudError) {
-        console.warn('Cloud save failed, using localStorage:', cloudError)
-        // Fall through to localStorage
+          const cloudProject = await cloudManager.saveProjectToCloud(clerkInstance, projectName, cloudWorkflow, spaceId)
+          
+          // Update local project with cloud data
+          localProject.syncStatus = 'synced'
+          localProject.lastSyncedAt = new Date().toISOString()
+          updateProjectInLocalStorage(userId, localProject.id, {
+            syncStatus: 'synced',
+            lastSyncedAt: new Date().toISOString(),
+            ...cloudProject
+          })
+          
+          return localProject
+        } catch (cloudError) {
+          console.warn('Cloud save failed, queued for retry:', cloudError)
+          // Already queued in saveProjectToLocalStorage
+        }
       }
+    } catch (error) {
+      console.warn('Cloud check failed:', error)
     }
-  } catch (error) {
-    console.warn('Cloud check failed, using localStorage:', error)
   }
 
-  // Fallback to localStorage
-  return saveProjectToLocalStorage(userId, projectName, workflowData, spaceId)
+  return localProject
 }
 
-function saveProjectToLocalStorage(userId, projectNameOrProject, workflowData = null, spaceId = null) {
+function saveProjectToLocalStorage(userId, projectNameOrProject, workflowData = null, spaceId = null, clerkInstance = null) {
   const projects = getProjectsFromLocalStorage(userId)
   
   let project
   if (typeof projectNameOrProject === 'string') {
-    // Creating new project
-    const projectId = `project_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    // Creating new project - ALWAYS use UUID
+    const projectId = generateUUID()
     project = {
-    id: projectId,
+      id: projectId,
       name: projectNameOrProject,
-    userId,
+      userId,
       spaceId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-    workflow: {
+      syncStatus: 'local', // Track sync status
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      workflow: {
         mode: workflowData?.mode || '',
         furnitureFile: workflowData?.furnitureFile ? {
-        name: workflowData.furnitureFileName || '',
-        url: workflowData.furniturePreviewUrl || '',
-        base64: workflowData.furnitureBase64 || null,
-      } : null,
+          name: workflowData.furnitureFileName || '',
+          url: workflowData.furniturePreviewUrl || '',
+          base64: workflowData.furnitureBase64 || null,
+        } : null,
         roomFile: workflowData?.roomFile ? {
-        name: workflowData.roomFileName || '',
-        url: workflowData.roomPreviewUrl || '',
-        base64: workflowData.roomBase64 || null,
-      } : null,
+          name: workflowData.roomFileName || '',
+          url: workflowData.roomPreviewUrl || '',
+          base64: workflowData.roomBase64 || null,
+        } : null,
         model3d: workflowData?.model3dUrl ? { url: workflowData.model3dUrl } : null,
         result: workflowData?.resultUrl ? {
-        url: workflowData.resultUrl,
-        description: workflowData.description || '',
-        useAIDesigner: workflowData.useAIDesigner || false,
-      } : null,
-    },
+          url: workflowData.resultUrl,
+          description: workflowData.description || '',
+          useAIDesigner: workflowData.useAIDesigner || false,
+        } : null,
+      },
     }
   } else {
-    // Project object passed (from cloud)
+    // Project object passed (from cloud or existing)
     project = projectNameOrProject
+    // Ensure sync status is set
+    if (!project.syncStatus) {
+      project.syncStatus = isValidUUID(project.id) ? 'synced' : 'local'
+    }
   }
 
   projects.push(project)
   localStorage.setItem(STORAGE_KEY, JSON.stringify(projects))
+  
+  // Queue for background sync if online and clerkInstance available
+  if (navigator.onLine && clerkInstance && project.syncStatus === 'local') {
+    syncQueue.add(project, 'normal', clerkInstance)
+  }
   
   return project
 }
@@ -407,12 +430,13 @@ export async function createSpace(userId, spaceName) {
     console.warn('Cloud check failed, using localStorage:', error)
   }
 
-  // Fallback to localStorage
-  const spaceId = `space_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  // Fallback to localStorage - use UUID
+  const spaceId = generateUUID()
   const space = {
     id: spaceId,
     name: spaceName,
     userId,
+    syncStatus: 'local',
     createdAt: new Date().toISOString(),
   }
   createSpaceInLocalStorage(userId, space)

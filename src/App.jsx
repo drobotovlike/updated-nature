@@ -1,10 +1,12 @@
 import { useEffect, useState, Suspense, lazy } from 'react'
 import { Routes, Route, Link, useNavigate } from 'react-router-dom'
-import { useAuth, useUser } from '@clerk/clerk-react'
+import { useAuth, useUser, useClerk } from '@clerk/clerk-react'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import ScrollRoomAnimation from './components/ScrollRoomAnimation'
 import { saveProject, getProjects, addFileToProject, getSpaces } from './utils/projectManager'
+import { syncQueue } from './utils/syncQueue'
+import { migrateOldProjects } from './utils/migrateProjects'
 
 // Lazy load pages for code splitting and faster initial load
 const PricingPage = lazy(() => import('./pages/PricingPage'))
@@ -1561,6 +1563,24 @@ function SharedViewWrapper() {
 }
 
 function App() {
+  const clerk = useClerk()
+  const { isSignedIn } = useAuth()
+
+  // Initialize sync queue and run migration on app load
+  useEffect(() => {
+    if (isSignedIn && clerk) {
+      // Run migration first (pass full clerk instance)
+      migrateOldProjects(clerk)
+      
+      // Start sync queue (pass full clerk instance)
+      syncQueue.start(clerk)
+      
+      return () => {
+        // Cleanup on unmount
+        syncQueue.stop()
+      }
+    }
+  }, [isSignedIn, clerk])
   return (
     <Routes>
       <Route path="/" element={<HomePage />} />

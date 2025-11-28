@@ -26,6 +26,7 @@ import { useViewportCulling } from '../hooks/useViewportCulling'
 import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
 import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
+import { isValidUUID } from '../utils/uuid'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -339,12 +340,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 }
 
 
-// UUID validation regex
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-function isValidUUID(str) {
-  return str && UUID_REGEX.test(str)
-}
+// UUID validation is now imported from utils/uuid
 
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId, isSignedIn } = useAuth()
@@ -461,112 +457,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
-  // State to track the actual UUID projectId (may differ from prop if auto-saved)
-  const [actualProjectId, setActualProjectId] = useState(projectId)
-  
-  // Ref to track if auto-save has been attempted to prevent infinite loops
-  const autoSaveAttemptedRef = useRef(false)
-  const autoSaveProjectIdRef = useRef(null)
-
-  // Auto-save localStorage projects to cloud to get UUID
-  // CRITICAL: Only run once per projectId to prevent infinite project creation
-  useEffect(() => {
-    const autoSaveToCloud = async () => {
-      // Guard: Don't run if already attempted for this projectId
-      if (autoSaveAttemptedRef.current && autoSaveProjectIdRef.current === projectId) {
-        return
-      }
-      
-      if (!projectId || !userId || !clerk) {
-        // If already a UUID, set it immediately
-        if (projectId && isValidUUID(projectId)) {
-          setActualProjectId(projectId)
-        }
-        return
-      }
-      
-      // Mark as attempted immediately to prevent re-runs
-      autoSaveAttemptedRef.current = true
-      autoSaveProjectIdRef.current = projectId
-      
-      // Check if projectId is not a UUID (localStorage project)
-      if (!isValidUUID(projectId)) {
-        try {
-          console.log('Project is stored locally, auto-saving to cloud...', projectId)
-          setError('Saving project to cloud...')
-          
-          // Load the project from localStorage
-          const localProject = await getProject(userId, projectId)
-          
-          if (!localProject) {
-            throw new Error('Local project not found')
-          }
-
-          // Check if a cloud project with this name already exists
-          // Import getProjects from projectManager (already imported at top)
-          const existingProjects = await getProjects(userId, localProject.spaceId)
-          const existingProject = existingProjects.find(
-            p => p.name === localProject.name && isValidUUID(p.id)
-          )
-          
-          if (existingProject) {
-            // Use existing cloud project instead of creating a new one
-            console.log('Found existing cloud project:', existingProject.id)
-            setActualProjectId(existingProject.id)
-            setError('')
-            return
-          }
-
-          // Prepare workflow data for cloud save
-          const workflowData = {
-            mode: localProject.workflow?.mode || '',
-            furnitureFile: localProject.workflow?.furnitureFile || null,
-            furnitureFileName: localProject.workflow?.furnitureFile?.name,
-            furniturePreviewUrl: localProject.workflow?.furnitureFile?.url,
-            roomFile: localProject.workflow?.roomFile || null,
-            roomFileName: localProject.workflow?.roomFile?.name,
-            roomPreviewUrl: localProject.workflow?.roomFile?.url,
-            model3dUrl: localProject.workflow?.model3d?.url,
-            resultUrl: localProject.workflow?.result?.url || localProject.workflow?.resultUrl,
-            description: localProject.workflow?.result?.description || localProject.workflow?.description,
-            useAIDesigner: localProject.workflow?.result?.useAIDesigner || localProject.workflow?.useAIDesigner || false,
-          }
-
-          // Save to cloud (this will create a new UUID project)
-          const cloudProject = await saveProject(userId, localProject.name, workflowData, localProject.spaceId)
-          
-          console.log('Project auto-saved to cloud:', cloudProject.id)
-          setActualProjectId(cloudProject.id)
-          setError('')
-          
-          // Notify parent component if callback exists (use ref to avoid dependency issues)
-          if (onSave) {
-            onSave(cloudProject)
-          }
-        } catch (error) {
-          console.error('Error auto-saving project to cloud:', error)
-          // Don't block canvas from loading - allow it to work with local project
-          // User can manually save later if needed
-          setError('Project is stored locally. Some features may require saving to cloud.')
-          // Still set actualProjectId to the local projectId so canvas can load
-          setActualProjectId(projectId)
-          // Ensure loading is set to false so canvas can render
-          setLoading(false)
-          // Reset ref on error so user can retry later
-          autoSaveAttemptedRef.current = false
-        }
-      } else {
-        // Already a UUID, use it directly
-        setActualProjectId(projectId)
-        // If it's already a UUID, we can set loading to false immediately
-        // The loadCanvas effect will handle loading the data
-      }
-    }
-
-    autoSaveToCloud()
-    // CRITICAL: Removed onSave from dependencies to prevent infinite loops
-    // Only depend on projectId, userId, and clerk
-  }, [projectId, userId, clerk, setLoading])
+  // All projects now use UUIDs - no need for auto-save logic
+  // Canvas will work immediately for all projects
   
   // Reset auto-save ref when projectId changes to a different project
   useEffect(() => {
@@ -725,7 +617,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Get max z_index for new items
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
 
-      const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+      const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: x - img.width / 2,
         y_position: y - img.height / 2,
@@ -805,29 +697,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Define loadCanvas before it's used
   const loadCanvas = useCallback(async () => {
-    const currentProjectId = actualProjectId || projectId
-    
-    if (!currentProjectId || !userId) {
-      console.warn('Cannot load canvas: missing projectId or userId', { currentProjectId, userId })
+    if (!projectId || !userId) {
+      console.warn('Cannot load canvas: missing projectId or userId', { projectId, userId })
       setError('Missing project or user information. Please refresh the page.')
       setLoading(false)
       return
     }
 
-    // For non-UUID projects, load with empty state (can't fetch from API)
-    if (!isValidUUID(currentProjectId)) {
-      console.log('Project is stored locally. Canvas will work but some features may be limited.')
-      setItems([])
-      setLoading(false)
-      setError('Project is stored locally. Save to cloud to enable all features.')
-      return
-    }
+    // All projects now have UUIDs, so we can always try to load from API
+    // If project doesn't exist in cloud yet, it will work with empty state
 
     setLoading(true)
     setError('')
     try {
-      console.log('Loading canvas for project:', currentProjectId, 'user:', userId)
-      const data = await getCanvasData(userId, currentProjectId)
+      console.log('Loading canvas for project:', projectId, 'user:', userId)
+      const data = await getCanvasData(userId, projectId)
       console.log('Canvas data received:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
 
       setItems(data.items || [])
@@ -877,7 +761,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         message: error.message,
         stack: error.stack,
         name: error.name,
-        projectId,
+        projectId: projectId,
         userId,
       })
 
@@ -901,35 +785,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setLoading(false)
     }
-  }, [actualProjectId, projectId, userId, dimensions.width, dimensions.height, setItems, setError, setLoading, updateSettings, setCamera, stageRef])
+  }, [projectId, userId, dimensions.width, dimensions.height, setItems, setError, setLoading, updateSettings, setCamera, stageRef])
 
   // Load canvas data
   useEffect(() => {
-    const currentProjectId = actualProjectId || projectId
-    if (currentProjectId && userId) {
-      if (isValidUUID(currentProjectId)) {
-        // Valid UUID - load from API
-        loadCanvas()
-      } else {
-        // Non-UUID (local project) - load with empty state
-        console.log('Project is stored locally. Canvas will work but some features may be limited.')
-        setItems([])
-        setLoading(false)
-        setError('Project is stored locally. Save to cloud to enable all features.')
-      }
-    } else if (!currentProjectId && userId) {
-      // No projectId yet - wait for auto-save or set loading to false after timeout
-      const timeout = setTimeout(() => {
-        if (loading) {
-          console.warn('Canvas loading timeout - setting loading to false')
-          setLoading(false)
-          setError('Unable to load project. Please try refreshing the page.')
-        }
-      }, 5000) // 5 second timeout
-      
-      return () => clearTimeout(timeout)
+    if (projectId && userId) {
+      loadCanvas()
     }
-  }, [actualProjectId, projectId, userId, loadCanvas, loading, setItems, setLoading, setError])
+  }, [projectId, userId, loadCanvas])
 
   // Update dimensions on resize - fixed size, always full screen
   useEffect(() => {
@@ -1022,7 +885,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       // Save to IndexedDB
-      await saveHistoryToDB(actualProjectId || projectId, {
+      await saveHistoryToDB(projectId, {
         items: itemsToSave,
         timestamp: Date.now(),
       })
@@ -1036,7 +899,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [actualProjectId, projectId, historyIndex])
 
   const saveCanvasStateToServer = useCallback(async () => {
-    const currentProjectId = actualProjectId || projectId
+    const currentProjectId = projectId
     if (!currentProjectId || !userId) return
 
     try {
@@ -1046,7 +909,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const position = stage.position()
       const scale = stage.scaleX()
 
-      await saveCanvasState(userId, actualProjectId || projectId, {
+      await saveCanvasState(userId, projectId, {
         zoom_level: scale,
         pan_x: position.x,
         pan_y: position.y,
@@ -1269,7 +1132,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       // Create new blended item
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-      const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+      const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: centerX - img.width / 2,
         y_position: centerY - img.height / 2,
@@ -1733,7 +1596,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       // Create canvas item with SVG
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-      const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+      const newItem = await createCanvasItem(userId, projectId, {
         image_url: `data: image / svg + xml, ${encodeURIComponent(data.svg)} `,
         x_position: position.x,
         y_position: position.y,
@@ -1921,7 +1784,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       // Create new outpainted item
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-      const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+      const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: rect.x,
         y_position: rect.y,
@@ -2260,7 +2123,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
         const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-        const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+        const newItem = await createCanvasItem(userId, projectId, {
           image_url: imageUrl,
           x_position: centerX - 200,
           y_position: centerY - 200,
@@ -2422,7 +2285,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           const y = centerY - 200 + Math.floor(i / 2) * spacing
 
           const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-          const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+          const newItem = await createCanvasItem(userId, projectId, {
             image_url: imageUrl,
             x_position: x,
             y_position: y,
@@ -4139,7 +4002,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   try {
                     console.log('Adding asset to canvas:', { assetUrl: asset.url, projectId, userId })
                     const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-                    const newItem = await createCanvasItem(userId, actualProjectId || projectId, {
+                    const newItem = await createCanvasItem(userId, projectId, {
                       image_url: asset.url,
                       x_position: centerX - 200,
                       y_position: centerY - 200,

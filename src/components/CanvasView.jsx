@@ -2706,8 +2706,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               )}
               {activeTab === 'assets' && (
                 <AssetLibrary
-                  userId={userId}
-                  onSelect={async (asset) => {
+                  projectId={projectId}
+                  onSelectAsset={async (asset) => {
                     try {
                       // Fetch the image and create a File object
                       const response = await fetch(asset.url)

@@ -11,11 +11,27 @@ if (!supabaseUrl || !supabaseServiceKey) {
 // Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+// UUID validation regex
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+function isValidUUID(str) {
+  return str && UUID_REGEX.test(str)
+}
+
 async function handler(req, res, userId) {
   // userId is verified and safe to use
 
   const { method } = req
   const { projectId, itemId, type } = req.query
+
+  // Validate projectId is a UUID if provided (localStorage projects have non-UUID IDs)
+  if (projectId && !isValidUUID(projectId)) {
+    return res.status(400).json({ 
+      error: 'Invalid project ID format',
+      message: 'Project must be saved to cloud first. LocalStorage projects cannot be used with canvas features.',
+      details: `Project ID "${projectId}" is not a valid UUID. Please save the project to cloud to get a UUID-based project ID.`
+    })
+  }
 
   // Handle canvas state requests
   if (type === 'state') {

@@ -4007,6 +4007,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       errorMessage = 'Authentication failed. Please refresh the page and sign in again.'
                     } else if (error.message?.includes('does not exist') || error.message?.includes('42P01')) {
                       errorMessage = 'Canvas database tables not found. Please run database-canvas-migration-safe.sql in Supabase.'
+                    } else if (error.message?.includes('invalid input syntax for type uuid') || error.message?.includes('Invalid project ID format') || error.message?.includes('must be saved to cloud')) {
+                      errorMessage = 'This project is stored locally. Please save it to cloud first to use canvas features. Go to Projects and save the project.'
                     } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
                       errorMessage = 'Network error. Please check your connection and try again.'
                     } else if (error.message) {

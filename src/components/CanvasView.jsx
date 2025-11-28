@@ -591,23 +591,47 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         if (syncQueueRef.current) {
           await syncQueueRef.current.syncProject(projectId, clerk)
           
-          // Wait for sync to complete
+          // Wait for sync to complete and verify in database
           let attempts = 0
-          while (attempts < 10) {
+          const maxAttempts = 15 // 4.5 seconds total
+          let synced = false
+          
+          while (attempts < maxAttempts && !synced) {
             await new Promise(resolve => setTimeout(resolve, 300))
+            
+            // Check localStorage sync status
             const updatedProjects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
             const updatedProject = updatedProjects.find(p => p.id === projectId)
+            
             if (updatedProject && updatedProject.syncStatus === 'synced') {
-              setError('')
-              break
+              // Verify project actually exists in database by trying to fetch it
+              try {
+                const { getProject } = await import('../utils/projectManager')
+                await getProject(userId, projectId)
+                synced = true
+                setError('')
+                console.log('✅ Project verified in database')
+              } catch (verifyError) {
+                console.warn('Project sync status is synced but not in database yet, waiting...')
+              }
             }
+            
             attempts++
           }
+          
+          if (!synced) {
+            setError('Project sync is taking longer than expected. Please wait a moment and try again.')
+            return
+          }
         }
+      } else if (project && project.syncStatus === 'local' && !navigator.onLine) {
+        setError('Project needs to be synced to cloud, but you are offline. Please connect to the internet and try again.')
+        return
       }
     } catch (syncCheckError) {
-      console.warn('Error checking project sync status:', syncCheckError)
-      // Continue anyway
+      console.error('Error checking project sync status:', syncCheckError)
+      setError('Error verifying project sync. Please try again.')
+      return
     }
 
     try {

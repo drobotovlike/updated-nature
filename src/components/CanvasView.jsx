@@ -1784,7 +1784,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         is_visible: true,
       })
 
-      const newItems = [...items, newItem]
+      const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
       setItems(newItems)
       saveToHistory(items)
       setTextMode(false)
@@ -1889,7 +1889,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         newItems.push(swatchItem)
       }
 
-      const updatedItems = [...items, ...newItems]
+      const updatedItems = Array.isArray(items) ? [...items, ...newItems] : newItems
       setItems(updatedItems)
       saveToHistory(items)
       setError('')
@@ -1972,7 +1972,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         is_visible: true,
       })
 
-      const newItems = [...items, newItem]
+      const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
       setItems(newItems)
       saveToHistory(items)
       setOutpaintMode(false)
@@ -4241,7 +4241,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       is_visible: true,
                     })
                     console.log('Asset added successfully:', newItem)
-                    const newItems = [...items, newItem]
+                    const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
                     setItems(newItems)
                     saveToHistory(items) // Save state before adding asset
                     setShowAssetLibrary(false)

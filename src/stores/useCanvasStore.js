@@ -42,13 +42,13 @@ export const useCanvasStore = create(
     // ============================================
     // STATE: The "Truth"
     // ============================================
-    
+
     /**
      * All canvas items in world coordinates
      * @type {CanvasItem[]}
      */
     items: [],
-    
+
     /**
      * Camera/viewport state
      * @type {Camera}
@@ -58,25 +58,25 @@ export const useCanvasStore = create(
       y: 0,
       zoom: 1,
     },
-    
+
     /**
      * Selected item IDs (Set for O(1) lookups)
      * @type {Set<string>}
      */
     selection: new Set(),
-    
+
     /**
      * Current interaction mode
      * @type {InteractionMode}
      */
     interactionMode: 'select',
-    
+
     /**
      * Canvas dimensions (viewport size)
      * @type {{ width: number, height: number }}
      */
     dimensions: { width: 0, height: 0 },
-    
+
     /**
      * Canvas settings
      * @type {Object}
@@ -88,7 +88,7 @@ export const useCanvasStore = create(
       rulerEnabled: false,
       showMeasurements: true,
     },
-    
+
     /**
      * UI state (modals, panels, etc.)
      * @type {Object}
@@ -100,11 +100,11 @@ export const useCanvasStore = create(
       showGenerateModal: false,
       sidebarOpen: true,
     },
-    
+
     // ============================================
     // ACTIONS: Mutations
     // ============================================
-    
+
     /**
      * Set camera position and/or zoom
      * @param {Partial<Camera>} update - Partial camera update
@@ -114,7 +114,7 @@ export const useCanvasStore = create(
         camera: { ...state.camera, ...update },
       }))
     },
-    
+
     /**
      * Update camera with zoom-to-cursor logic
      * @param {Object} mousePoint - { x: number, y: number } in screen coordinates
@@ -123,12 +123,12 @@ export const useCanvasStore = create(
     zoomToCursor: (mousePoint, newZoom) => {
       const state = get()
       const { camera } = state
-      
+
       // Calculate new camera position using zoom-to-cursor math
       const zoomRatio = newZoom / camera.zoom
       const newX = mousePoint.x - (mousePoint.x - camera.x) * zoomRatio
       const newY = mousePoint.y - (mousePoint.y - camera.y) * zoomRatio
-      
+
       set({
         camera: {
           x: newX,
@@ -137,7 +137,7 @@ export const useCanvasStore = create(
         },
       })
     },
-    
+
     /**
      * Pan the camera
      * @param {number} deltaX - Change in X (screen coordinates)
@@ -152,15 +152,29 @@ export const useCanvasStore = create(
         },
       }))
     },
-    
+
     /**
      * Set all items (used for loading/undo/redo)
      * @param {CanvasItem[]} items - New items array
      */
     setItems: (items) => {
+      // DEFENSIVE: Ensure items is always an array
+      if (!items) {
+        console.warn('setItems called with null/undefined, defaulting to empty array')
+        set({ items: [] })
+        return
+      }
+
+      if (!Array.isArray(items)) {
+        console.error('setItems called with non-array value:', items)
+        console.trace('Stack trace for non-array setItems call')
+        set({ items: [] })
+        return
+      }
+
       set({ items })
     },
-    
+
     /**
      * Add a new item
      * @param {CanvasItem} item - Item to add
@@ -170,7 +184,7 @@ export const useCanvasStore = create(
         items: [...state.items, item],
       }))
     },
-    
+
     /**
      * Update an item by ID
      * @param {string} id - Item ID
@@ -183,7 +197,7 @@ export const useCanvasStore = create(
         ),
       }))
     },
-    
+
     /**
      * Delete an item by ID
      * @param {string} id - Item ID
@@ -194,7 +208,7 @@ export const useCanvasStore = create(
         selection: new Set([...state.selection].filter((selectedId) => selectedId !== id)),
       }))
     },
-    
+
     /**
      * Delete multiple items
      * @param {string[]} ids - Array of item IDs
@@ -208,7 +222,7 @@ export const useCanvasStore = create(
         }
       })
     },
-    
+
     /**
      * Set selection (single or multiple)
      * @param {string|string[]|null} ids - Item ID(s) to select, or null to clear
@@ -222,7 +236,7 @@ export const useCanvasStore = create(
         set({ selection: new Set([ids]) })
       }
     },
-    
+
     /**
      * Add to selection (multi-select)
      * @param {string} id - Item ID to add
@@ -232,7 +246,7 @@ export const useCanvasStore = create(
         selection: new Set([...state.selection, id]),
       }))
     },
-    
+
     /**
      * Remove from selection
      * @param {string} id - Item ID to remove
@@ -244,7 +258,7 @@ export const useCanvasStore = create(
         return { selection: newSelection }
       })
     },
-    
+
     /**
      * Toggle selection (add if not selected, remove if selected)
      * @param {string} id - Item ID to toggle
@@ -260,14 +274,14 @@ export const useCanvasStore = create(
         return { selection: newSelection }
       })
     },
-    
+
     /**
      * Clear selection
      */
     clearSelection: () => {
       set({ selection: new Set() })
     },
-    
+
     /**
      * Set interaction mode
      * @param {InteractionMode} mode - New interaction mode
@@ -275,7 +289,7 @@ export const useCanvasStore = create(
     setInteractionMode: (mode) => {
       set({ interactionMode: mode })
     },
-    
+
     /**
      * Set canvas dimensions
      * @param {{ width: number, height: number }} dimensions - New dimensions
@@ -283,7 +297,7 @@ export const useCanvasStore = create(
     setDimensions: (dimensions) => {
       set({ dimensions })
     },
-    
+
     /**
      * Update canvas settings
      * @param {Partial<typeof settings>} update - Partial settings update
@@ -293,7 +307,7 @@ export const useCanvasStore = create(
         settings: { ...state.settings, ...update },
       }))
     },
-    
+
     /**
      * Update UI state
      * @param {Partial<typeof ui>} update - Partial UI update
@@ -303,11 +317,11 @@ export const useCanvasStore = create(
         ui: { ...state.ui, ...update },
       }))
     },
-    
+
     // ============================================
     // SELECTORS: Computed values
     // ============================================
-    
+
     /**
      * Get selected items
      * @returns {CanvasItem[]}
@@ -317,7 +331,7 @@ export const useCanvasStore = create(
       const selectionArray = Array.from(state.selection)
       return state.items.filter((item) => selectionArray.includes(item.id))
     },
-    
+
     /**
      * Get primary selected item (first in selection)
      * @returns {CanvasItem|null}
@@ -328,7 +342,7 @@ export const useCanvasStore = create(
       const firstId = Array.from(state.selection)[0]
       return state.items.find((item) => item.id === firstId) || null
     },
-    
+
     /**
      * Check if an item is selected
      * @param {string} id - Item ID

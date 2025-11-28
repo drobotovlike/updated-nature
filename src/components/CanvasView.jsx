@@ -712,7 +712,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       // Create canvas item
       // Get max z_index for new items
-      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      // DEFENSIVE: Ensure items is an array before calling .map()
+      const safeItems = Array.isArray(items) ? items : []
+      const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
 
       const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
@@ -724,7 +726,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         is_visible: true,
       })
 
-      setItems((prev) => [...prev, newItem])
+      setItems((prev) => {
+        // DEFENSIVE: Ensure prev is an array before spreading
+        const safePrev = Array.isArray(prev) ? prev : []
+        return [...safePrev, newItem]
+      })
     } catch (error) {
       console.error('Error uploading file:', error)
 
@@ -1108,7 +1114,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleItemUpdate = useCallback(async (itemId, updates) => {
     try {
       const updatedItem = await updateCanvasItem(userId, itemId, updates)
-      setItems((prev) => prev.map((item) => (item.id === itemId ? updatedItem : item)))
+
+      // DEFENSIVE: Validate response from API
+      if (!updatedItem || typeof updatedItem !== 'object') {
+        console.error('Invalid response from updateCanvasItem:', updatedItem)
+        setError('Failed to update item: Invalid response from server')
+        return
+      }
+
+      setItems((prev) => {
+        // DEFENSIVE: Ensure prev is an array
+        const safePrev = Array.isArray(prev) ? prev : []
+        return safePrev.map((item) => (item.id === itemId ? updatedItem : item))
+      })
     } catch (error) {
       console.error('Error updating item:', error)
       setError('Failed to update item. Please try again.')
@@ -1121,7 +1139,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       saveToHistory(items)
 
       await deleteCanvasItem(userId, itemId)
-      const newItems = items.filter((item) => item.id !== itemId)
+      // DEFENSIVE: Ensure items is an array before filtering
+      const safeItems = Array.isArray(items) ? items : []
+      const newItems = safeItems.filter((item) => item.id !== itemId)
       setItems(newItems)
       if (selectedItemId === itemId) {
         setSelectedItemId(null)
@@ -1227,14 +1247,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const moveToFront = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
 
-    const maxZIndex = Math.max(...items.map(item => item.z_index || 0), 0)
+    // DEFENSIVE: items is already checked above, but being extra safe
+    const safeItems = Array.isArray(items) ? items : []
+    const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
     await handleItemUpdate(selectedItemId, { z_index: maxZIndex + 1 })
   }, [selectedItemId, items, handleItemUpdate])
 
   const moveToBack = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
 
-    const minZIndex = Math.min(...items.map(item => item.z_index || 0), 0)
+    // DEFENSIVE: items is already checked above, but being extra safe
+    const safeItems = Array.isArray(items) ? items : []
+    const minZIndex = safeItems.length > 0 ? Math.min(...safeItems.map(item => item.z_index || 0), 0) : 0
     await handleItemUpdate(selectedItemId, { z_index: minZIndex - 1 })
   }, [selectedItemId, items, handleItemUpdate])
 
@@ -1303,8 +1327,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const centerX = (sourceItem.x_position + targetItem.x_position + (sourceItem.width || 0) + (targetItem.width || 0)) / 2
       const centerY = (sourceItem.y_position + targetItem.y_position + (sourceItem.height || 0) + (targetItem.height || 0)) / 2
 
-      // Create new blended item
-      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      // Get max z_index for positioning the new blended item
+      // DEFENSIVE: Ensure items is an array
+      const safeItems = Array.isArray(items) ? items : []
+      const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
       const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: centerX - img.width / 2,
@@ -1955,8 +1981,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         img.src = imageUrl
       })
 
-      // Create new outpainted item
-      const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+      // Get max z_index for new items
+      // DEFENSIVE: Ensure items is an array
+      const safeItems = Array.isArray(items) ? items : []
+      const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
       const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: rect.x,
@@ -2295,7 +2323,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const centerX = stage && width > 0 ? (width / 2 - stage.x()) / stage.scaleX() : canvasWidth / 2
         const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
-        const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+        // DEFENSIVE: Ensure items is an array
+        const safeItems = Array.isArray(items) ? items : []
+        const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
         const newItem = await createCanvasItem(userId, projectId, {
           image_url: imageUrl,
           x_position: centerX - 200,
@@ -2457,7 +2487,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           const x = centerX - 200 + (i % 2) * spacing
           const y = centerY - 200 + Math.floor(i / 2) * spacing
 
-          const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+          // DEFENSIVE: Ensure items is an array
+          const safeItems = Array.isArray(items) ? items : []
+          const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
           const newItem = await createCanvasItem(userId, projectId, {
             image_url: imageUrl,
             x_position: x,
@@ -4228,7 +4260,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
                   try {
                     console.log('Adding asset to canvas:', { assetUrl: asset.url, projectId, userId })
-                    const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
+                    // Get max z_index
+                    // DEFENSIVE: Ensure items is an array
+                    const safeItems = Array.isArray(items) ? items : []
+                    const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
                     const newItem = await createCanvasItem(userId, projectId, {
                       image_url: asset.url,
                       x_position: centerX - 200,

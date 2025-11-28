@@ -580,6 +580,36 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return
     }
 
+    // Check if project is synced before uploading
+    try {
+      const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+      const project = projects.find(p => p.id === projectId)
+      
+      if (project && project.syncStatus === 'local' && navigator.onLine && clerk) {
+        // Project not synced yet - sync it first
+        setError('Syncing project to cloud...')
+        if (syncQueueRef.current) {
+          await syncQueueRef.current.syncProject(projectId, clerk)
+          
+          // Wait for sync to complete
+          let attempts = 0
+          while (attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+            const updatedProjects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+            const updatedProject = updatedProjects.find(p => p.id === projectId)
+            if (updatedProject && updatedProject.syncStatus === 'synced') {
+              setError('')
+              break
+            }
+            attempts++
+          }
+        }
+      }
+    } catch (syncCheckError) {
+      console.warn('Error checking project sync status:', syncCheckError)
+      // Continue anyway
+    }
+
     try {
       setIsGenerating(true)
 

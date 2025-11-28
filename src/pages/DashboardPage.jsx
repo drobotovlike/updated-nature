@@ -387,16 +387,42 @@ export default function DashboardPage() {
         useAIDesigner: false,
       }, selectedSpaceId, clerk)
       
-      // Wait a moment for cloud sync to complete if online
+      // Ensure project is synced to cloud before proceeding
       if (navigator.onLine && project.syncStatus === 'local') {
-        // Try to sync immediately
+        // Try to sync immediately and wait for completion
         try {
           const { syncQueue } = await import('../utils/syncQueue')
+          
+          // Sync the project
           await syncQueue.syncProject(project.id, clerk)
-          // Wait a bit for sync to complete
-          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // Wait and verify sync completed
+          let attempts = 0
+          const maxAttempts = 10
+          while (attempts < maxAttempts) {
+            await new Promise(resolve => setTimeout(resolve, 300))
+            
+            // Check if project is now synced
+            const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+            const updatedProject = projects.find(p => p.id === project.id)
+            
+            if (updatedProject && updatedProject.syncStatus === 'synced') {
+              console.log('✅ Project synced successfully')
+              break
+            }
+            
+            attempts++
+          }
+          
+          // If still not synced, log warning but continue
+          const finalProjects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+          const finalProject = finalProjects.find(p => p.id === project.id)
+          if (finalProject && finalProject.syncStatus !== 'synced') {
+            console.warn('Project sync may not have completed, but continuing anyway')
+          }
         } catch (syncError) {
-          console.warn('Immediate sync failed, will sync in background:', syncError)
+          console.error('Immediate sync failed:', syncError)
+          // Continue anyway - sync will retry in background
         }
       }
       

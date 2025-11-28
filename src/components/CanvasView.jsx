@@ -1055,18 +1055,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (!currentProjectId || !userId) return
 
     // Verify project exists in database before saving state
-    try {
-      const { getProject } = await import('../utils/projectManager')
-      const clerkInstance = clerk // Get clerk from closure
-      if (clerkInstance) {
-        await getProject(userId, currentProjectId, clerkInstance)
-      } else {
-        // No clerk instance - skip verification (will fail at API level if needed)
-        console.warn('No clerk instance available for project verification')
+    // Only save if project exists in database (don't save for local-only projects)
+    if (isClerkReady && clerk) {
+      try {
+        const { getProject } = await import('../utils/projectManager')
+        await getProject(userId, currentProjectId, clerk)
+        // Project exists, proceed with save
+      } catch (projectError) {
+        // Project not in database - don't try to save state
+        // This is expected for local-only projects that haven't been synced yet
+        console.log('Project not in database, skipping canvas state save (this is normal for unsynced projects)')
+        return
       }
-    } catch (projectError) {
-      // Project not in database - don't try to save state
-      console.warn('Project not in database, skipping canvas state save:', projectError.message)
+    } else {
+      // No clerk instance or not ready - skip save
+      console.log('Clerk not ready, skipping canvas state save')
       return
     }
 

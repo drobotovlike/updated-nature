@@ -2,10 +2,16 @@
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
 import { optionalAuth, verifyClerkToken } from '../_utils/auth.js'
+import { getSupabaseConfig } from '../_utils/env.js'
+import { logger } from '../_utils/logger.js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+// Get Supabase configuration
+const config = getSupabaseConfig()
+
+// Create Supabase client (may be null if not configured)
+const supabase = config.isConfigured 
+  ? createClient(config.url, config.serviceKey)
+  : null
 
 // Generate unique share token
 function generateShareToken() {
@@ -13,6 +19,15 @@ function generateShareToken() {
 }
 
 async function handler(req, res, userId) {
+  // Check if Supabase is configured
+  if (!supabase) {
+    logger.error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    return res.status(503).json({ 
+      error: 'Service unavailable',
+      message: 'Database not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel.',
+    })
+  }
+
   // userId may be null for public shared links, but verified if provided
   const { method } = req
   const { token, projectId, linkId, action } = req.query

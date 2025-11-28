@@ -1,32 +1,24 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../_utils/auth.js'
+import { getSupabaseConfig } from '../_utils/env.js'
+import { logger } from '../_utils/logger.js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
+// Get Supabase configuration
+const config = getSupabaseConfig()
 
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase environment variables')
-}
-
-// Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
-// IMPORTANT: SUPABASE_SERVICE_ROLE_KEY should be set in Vercel environment variables
-// If not set, it falls back to anon key which is subject to RLS policies
-const supabase = supabaseUrl && supabaseServiceKey ? createClient(supabaseUrl, supabaseServiceKey) : null
-
-// Log which key is being used (for debugging - remove in production)
-if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  console.log('✅ Using SUPABASE_SERVICE_ROLE_KEY (bypasses RLS)')
-} else if (process.env.SUPABASE_ANON_KEY) {
-  console.warn('⚠️ Using SUPABASE_ANON_KEY (subject to RLS) - set SUPABASE_SERVICE_ROLE_KEY in Vercel for better performance')
-} else {
-  console.error('❌ No Supabase key found!')
-}
+// Create Supabase client (may be null if not configured)
+const supabase = config.isConfigured 
+  ? createClient(config.url, config.serviceKey)
+  : null
 
 async function handler(req, res, userId) {
-  // userId is verified and safe to use
-
+  // Check if Supabase is configured
   if (!supabase) {
-    return res.status(500).json({ error: 'Database not configured' })
+    logger.error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    return res.status(503).json({ 
+      error: 'Service unavailable',
+      message: 'Database not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel.',
+    })
   }
 
   try {

@@ -65,12 +65,17 @@ export function validateEnv() {
 }
 
 /**
- * Get Supabase configuration (fails if not set)
+ * Get Supabase configuration
+ * Returns null values if not set (allows functions to return proper error responses)
  */
 export function getSupabaseConfig() {
+  const url = process.env.SUPABASE_URL
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
   return {
-    url: requireEnv('SUPABASE_URL', 'Your Supabase project URL'),
-    serviceKey: requireEnv('SUPABASE_SERVICE_ROLE_KEY', 'Service role key from Supabase'),
+    url: url || null,
+    serviceKey: serviceKey || null,
+    isConfigured: !!(url && serviceKey),
   }
 }
 

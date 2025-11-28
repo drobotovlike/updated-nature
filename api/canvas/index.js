@@ -3,11 +3,13 @@ import { requireAuth } from '../_utils/auth.js'
 import { getSupabaseConfig } from '../_utils/env.js'
 import { logger } from '../_utils/logger.js'
 
-// Get Supabase configuration (fails fast if not set)
-const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig()
+// Get Supabase configuration
+const config = getSupabaseConfig()
 
-// Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
-const supabase = createClient(supabaseUrl, supabaseServiceKey)
+// Create Supabase client (may be null if not configured)
+const supabase = config.isConfigured 
+  ? createClient(config.url, config.serviceKey)
+  : null
 
 // UUID validation regex
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -17,6 +19,15 @@ function isValidUUID(str) {
 }
 
 async function handler(req, res, userId) {
+  // Check if Supabase is configured
+  if (!supabase) {
+    logger.error('Supabase not configured - missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
+    return res.status(503).json({ 
+      error: 'Service unavailable',
+      message: 'Database not configured. Please set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY environment variables in Vercel.',
+    })
+  }
+
   // userId is verified and safe to use
 
   const { method } = req

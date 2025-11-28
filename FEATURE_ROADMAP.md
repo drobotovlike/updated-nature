@@ -7,17 +7,18 @@ Based on Visual Electric research + Interior Design workflow analysis
 ## 1. MUST-HAVE (VE Parity - Week 1)
 
 ### 1.1 Infinite Canvas ✅ (Partially Complete)
-- **Status**: Canvas is 4x larger with zoom/pan
+- **Status**: Canvas is 4x larger with zoom/pan (React Konva)
 - **Remaining**: Dark UI, Space+drag pan, 10%-400% range indicator in bottom-left
-- **Prompt**: "Wrap TLdraw canvas in a dark UI, add Cmd+scroll zoom, Space+drag pan, 10%–400% range indicator in bottom-left."
+- **Prompt**: "Wrap Konva Stage in a dark UI, add Cmd+scroll zoom, Space+drag pan, 10%–400% range indicator in bottom-left."
 
 ### 1.2 Multi-select Lasso
 - **Status**: Not Started
 - **Prompt**: "Add polygonal lasso tool; on mouse-up create selection group; show bounding box with corner nudge arrows."
 
-### 1.3 Drag-and-drop Images / Paste from Clipboard
-- **Status**: Not Started
-- **Prompt**: "Handle onDrop, onPaste; auto-upload to /api/upload; return URL and insert as TLdraw image shape."
+### 1.3 Drag-and-drop Images / Paste from Clipboard ✅
+- **Status**: Completed
+- **Implementation**: `handleDrop` and `handlePaste` in `CanvasView.jsx`
+- **Notes**: Auto-uploads to cloud storage and adds to canvas as Konva Image.
 
 ### 1.4 Merge / Blend Two Images
 - **Status**: Not Started
@@ -29,11 +30,11 @@ Based on Visual Electric research + Interior Design workflow analysis
 
 ### 1.6 Layers Panel
 - **Status**: Not Started
-- **Prompt**: "Create jotai atom `layersAtom`; sync with TLdraw page shapes; show drag-to-reorder, eyeball toggle, lock, opacity slider."
+- **Prompt**: "Create `LayersPanel` component; sync with Konva stage nodes; show drag-to-reorder, eyeball toggle, lock, opacity slider. Use Zustand for state."
 
 ### 1.7 Undo / Redo (Infinite)
 - **Status**: Not Started
-- **Prompt**: "Use TLdraw built-in history; expose Cmd-Z / Shift-Cmd-Z in UI; persist stack to IndexedDB on every change."
+- **Prompt**: "Implement custom history stack for Konva; save state snapshots on change; expose Cmd-Z / Shift-Cmd-Z."
 
 ### 1.8 Export Selections → PNG / SVG / PDF
 - **Status**: Not Started
@@ -150,6 +151,8 @@ Based on Visual Electric research + Interior Design workflow analysis
 - Alignment tools
 - Virtual rendering (viewport culling)
 - Image optimization (lazy loading)
+- Drag-and-drop images
+- Paste from clipboard
 
 ### 🚧 In Progress
 - None currently
@@ -157,9 +160,8 @@ Based on Visual Electric research + Interior Design workflow analysis
 ### 📋 Next Up (Week 1 Priority)
 1. Complete infinite canvas UI (dark theme, Space+drag pan, zoom indicator)
 2. Multi-select lasso tool
-3. Drag-and-drop / paste from clipboard
-4. Layers panel
-5. Undo/redo system
+3. Layers panel
+4. Undo/redo system
 
 ---
 

@@ -16,6 +16,9 @@ import ShareModal from './ShareModal'
 import ProjectMetadataForm from './ProjectMetadataForm'
 import VariationsView from './VariationsView'
 import VariationsComparisonView from './VariationsComparisonView'
+import { useCanvasHotkeys } from '../hooks/useCanvasHotkeys'
+import { useCanvasSelection } from '../hooks/useCanvasSelection'
+import { useCanvasHistory } from '../hooks/useCanvasHistory'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -237,19 +240,10 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
       onClick={(e) => {
-        if (e.evt.shiftKey) {
-          // Multi-select
-          onSelect(e, true)
-        } else {
-          onSelect(e, false)
-        }
+        handleSelect(e, item.id, e.evt.shiftKey)
       }}
       onTap={(e) => {
-        if (e.evt.shiftKey) {
-          onSelect(e, true)
-        } else {
-          onSelect(e, false)
-        }
+        handleSelect(e, item.id, e.evt.shiftKey)
       }}
       onContextMenu={(e) => {
         e.evt.preventDefault()
@@ -345,7 +339,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const maskLayerRef = useRef(null)
   const minimapCanvasRef = useRef(null)
   const transformerRef = useRef(null)
-  
+
   // Early return if essential props are missing
   if (!projectId || !userId || !isSignedIn) {
     return (
@@ -360,8 +354,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Canvas state
   const [items, setItems] = useState([])
-  const [selectedItemId, setSelectedItemId] = useState(null)
-  const [selectedItemIds, setSelectedItemIds] = useState(new Set()) // Multi-select
+  const { selectedItemId, selectedItemIds, setSelectedItemId, setSelectedItemIds, handleSelect, clearSelection } = useCanvasSelection()
+  const { history, historyIndex, addToHistory, undo, redo, canUndo, canRedo } = useCanvasHistory(items)
   const [clipboard, setClipboard] = useState(null) // For copy/paste
   const [canvasState, setCanvasState] = useState({
     zoom: 1,
@@ -381,7 +375,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [generatingVariations, setGeneratingVariations] = useState(false)
   const [variationCount, setVariationCount] = useState(3)
-  
+
   // Enhanced Generation State
   const [selectedModel, setSelectedModel] = useState('gemini')
   const [selectedStyle, setSelectedStyle] = useState(null)
@@ -389,21 +383,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [styles, setStyles] = useState([])
   const [showStyleLibrary, setShowStyleLibrary] = useState(false)
   const [showLayersPanel, setShowLayersPanel] = useState(false)
-  
+
   // UI State
   const [chatInput, setChatInput] = useState('')
   const [popupMenuPosition, setPopupMenuPosition] = useState({ x: 0, y: 0, visible: false, showAdjustments: false })
   const [blendMode, setBlendMode] = useState(false) // Track if we're in blend mode
   const [blendSourceId, setBlendSourceId] = useState(null) // First image to blend
   const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0, visible: false, itemId: null })
-  
+
   // Eraser/Inpaint State
   const [eraserMode, setEraserMode] = useState(false)
   const [eraserTargetId, setEraserTargetId] = useState(null)
   const [maskCanvas, setMaskCanvas] = useState(null) // Canvas for drawing mask
   const [isDrawingMask, setIsDrawingMask] = useState(false)
   const [maskPath, setMaskPath] = useState([]) // Store brush strokes
-  
+
   // Outpaint/Dimension/Text Mode State
   const [outpaintMode, setOutpaintMode] = useState(false)
   const [outpaintRect, setOutpaintRect] = useState(null)
@@ -413,31 +407,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [textMode, setTextMode] = useState(false)
   const [textPosition, setTextPosition] = useState(null)
   const [textInput, setTextInput] = useState('')
-  
+
   // Budget stickers state
   const [budgetStickers, setBudgetStickers] = useState([])
-  
+
   // Dimension lines state (for measurements)
   const [dimensionLines, setDimensionLines] = useState([])
-  
+
   // History state (for undo/redo)
-  const [history, setHistory] = useState([])
-  const [historyIndex, setHistoryIndex] = useState(-1)
-  
+  // History state (for undo/redo) managed by useCanvasHistory hook
+
   // Compare mode state
   const [compareMode, setCompareMode] = useState(false)
   const [compareItems, setCompareItems] = useState([])
   const [compareSplitPosition, setCompareSplitPosition] = useState(50) // Percentage
-  
+
   // Style transfer state
   const [showStyleTransfer, setShowStyleTransfer] = useState(false)
   const [styleTransferTargetId, setStyleTransferTargetId] = useState(null)
-  
+
   // Minimap and prompt history state
   const [showMinimap, setShowMinimap] = useState(false)
   const [showPromptHistory, setShowPromptHistory] = useState(false)
   const [promptHistory, setPromptHistory] = useState([])
-  
+
   // Project sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [activeTab, setActiveTab] = useState('overview') // 'overview', 'assets', 'creations', 'variations', 'details'
@@ -445,46 +438,41 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [sharedAssets, setSharedAssets] = useState([])
   const [loadingAssets, setLoadingAssets] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
-  
+
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  
+
   // Undo/Redo handlers - Define early to prevent scope issues
+  // Undo/Redo handlers
   const handleUndo = useCallback(() => {
-    if (historyIndex > 0) {
-      const newIndex = historyIndex - 1
-      setHistoryIndex(newIndex)
-      setItems(history[newIndex] || [])
-    }
-  }, [history, historyIndex])
+    const prevItems = undo()
+    if (prevItems) setItems(prevItems)
+  }, [undo])
 
   const handleRedo = useCallback(() => {
-    if (historyIndex < history.length - 1) {
-      const newIndex = historyIndex + 1
-      setHistoryIndex(newIndex)
-      setItems(history[newIndex] || [])
-    }
-  }, [history, historyIndex])
-  
+    const nextItems = redo()
+    if (nextItems) setItems(nextItems)
+  }, [redo])
+
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
   const selectedItem = useMemo(() => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return null
     return items.find((item) => item.id === selectedItemId) || null
   }, [selectedItemId, items])
-  
+
   const selectedItems = useMemo(() => {
     if (!items || !Array.isArray(items)) return []
     return items.filter((item) => selectedItemIds.has(item.id) || item.id === selectedItemId)
   }, [items, selectedItemIds, selectedItemId])
-  
+
   // Calculate visible items count for performance indicator
   const visibleItemsCount = useMemo(() => {
     if (!items || !Array.isArray(items) || !stageRef.current || dimensions.width === 0 || dimensions.height === 0) {
       return items?.length || 0
     }
-    
+
     const stage = stageRef.current
     const viewport = {
       left: -stage.x() / stage.scaleX(),
@@ -492,14 +480,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       top: -stage.y() / stage.scaleY(),
       bottom: (dimensions.height - stage.y()) / stage.scaleY(),
     }
-    
+
     const padding = 200
     return items.filter((item) => {
       const itemLeft = item.x_position
       const itemRight = item.x_position + (item.width || 0)
       const itemTop = item.y_position
       const itemBottom = item.y_position + (item.height || 0)
-      
+
       return !(
         itemRight < viewport.left - padding ||
         itemLeft > viewport.right + padding ||
@@ -508,19 +496,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       )
     }).length
   }, [items, dimensions.width, dimensions.height, canvasState.panX, canvasState.panY, canvasState.zoom])
-  
+
   // Show popup menu when item is selected and update position on pan/zoom
   useEffect(() => {
     if (selectedItem && stageRef.current && selectedItemId) {
       const updateMenuPosition = () => {
         const stage = stageRef.current
         if (!stage || !selectedItem) return
-        
+
         // Calculate item position in screen coordinates
         const itemX = (selectedItem.x_position || 0) * stage.scaleX() + stage.x()
         const itemY = (selectedItem.y_position || 0) * stage.scaleY() + stage.y()
         const itemWidth = (selectedItem.width || 200) * stage.scaleX()
-        
+
         // Position menu above the item, centered horizontally
         setPopupMenuPosition(prev => ({
           x: itemX + itemWidth / 2,
@@ -528,9 +516,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           visible: true,
         }))
       }
-      
+
       updateMenuPosition()
-      
+
       // Update position when canvas state changes (pan/zoom)
       const interval = setInterval(updateMenuPosition, 100)
       return () => clearInterval(interval)
@@ -569,7 +557,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Upload file to cloud
       const uploadResult = await uploadFileToCloud(file, userId)
       const imageUrl = uploadResult.url
@@ -577,7 +565,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Calculate position - use drop position or center of viewport
       const stage = stageRef.current
       let x, y
-      
+
       if (dropPosition) {
         // Convert screen coordinates to world coordinates
         x = (dropPosition.x - stage.x()) / stage.scaleX()
@@ -603,7 +591,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Create canvas item
       // Get max z_index for new items
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
-      
+
       const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: x - img.width / 2,
@@ -690,16 +678,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setLoading(false)
       return
     }
-    
+
     setLoading(true)
     setError('')
     try {
       console.log('Loading canvas for project:', projectId, 'user:', userId)
       const data = await getCanvasData(userId, projectId)
       console.log('Canvas data received:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
-      
+
       setItems(data.items || [])
-      
+
       if (data.state) {
         const restoredState = {
           zoom: data.state.zoom_level || 1,
@@ -723,10 +711,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             const maxY = currentCanvasHeight - dimensions.height
             const clampedX = Math.max(0, Math.min(maxX, restoredState.panX))
             const clampedY = Math.max(0, Math.min(maxY, restoredState.panY))
-            
+
             stageRef.current.position({ x: clampedX, y: clampedY })
             stageRef.current.scale({ x: restoredState.zoom, y: restoredState.zoom })
-            
+
             setCanvasState((prev) => ({
               ...prev,
               panX: clampedX,
@@ -745,11 +733,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         projectId,
         userId,
       })
-      
+
       // For new projects or if API fails, allow canvas to load with empty state
       console.warn('Canvas API error, loading with empty state. This is normal for new projects.')
       setItems([])
-      
+
       // Only show error if it's a critical issue
       if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
         setError('Authentication failed. Please refresh the page and sign in again.')
@@ -797,7 +785,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Only initialize if stage is at default position (0,0) and scale (1,1)
       const currentPos = stageRef.current.position()
       const currentScale = stageRef.current.scaleX()
-      
+
       if (currentPos.x === 0 && currentPos.y === 0 && currentScale === 1) {
         // Center the viewport on the canvas (4x larger)
         const canvasWidth = dimensions.width * 4
@@ -819,7 +807,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Load styles on mount
   useEffect(() => {
     if (!userId) return
-    
+
     const loadStyles = async () => {
       try {
         const response = await fetch('/api/generate?action=styles', {
@@ -835,7 +823,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         console.error('Error loading styles:', error)
       }
     }
-    
+
     loadStyles()
   }, [userId])
 
@@ -844,7 +832,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (transformerRef.current && selectedItemId && !blendMode) {
       const stage = stageRef.current
       if (!stage) return
-      
+
       // Find the shape node by ID
       const itemsLayer = stage.findOne('.items-layer') || stage.findOne('Layer')
       if (itemsLayer) {
@@ -864,23 +852,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Save history state - wrapper function for saveHistoryToDB
   const saveToHistory = useCallback(async (itemsToSave) => {
     if (!projectId || !itemsToSave) return
-    
+
     try {
       // Save to IndexedDB
       await saveHistoryToDB(projectId, {
         items: itemsToSave,
         timestamp: Date.now(),
       })
-      
+
       // Also update in-memory history for undo/redo
-      const itemsArray = Array.isArray(itemsToSave) ? itemsToSave : []
-      setHistory(prev => {
-        const newHistory = prev.slice(0, historyIndex + 1)
-        newHistory.push(itemsArray)
-        // Keep only last 50 states
-        return newHistory.slice(-50)
-      })
-      setHistoryIndex(prev => Math.min(prev + 1, 49))
+      addToHistory(itemsToSave)
     } catch (error) {
       console.error('Error saving history:', error)
       // Don't throw - history is non-critical
@@ -934,7 +915,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       // Save current state to history before delete
       saveToHistory(items)
-      
+
       await deleteCanvasItem(userId, itemId)
       const newItems = items.filter((item) => item.id !== itemId)
       setItems(newItems)
@@ -963,25 +944,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [userId])
 
-  const handleToggleVisibility = useCallback(async (itemId) => {
-    const item = items.find(i => i.id === itemId)
-    if (!item) return
-    
-    const newVisibility = item.is_visible === false ? true : false
-    await handleItemUpdate(itemId, { is_visible: newVisibility })
-  }, [items, handleItemUpdate])
 
-  const handleToggleLock = useCallback(async (itemId) => {
-    const item = items.find(i => i.id === itemId)
-    if (!item) return
-    
-    const newLockState = !item.is_locked
-    await handleItemUpdate(itemId, { is_locked: newLockState })
-  }, [items, handleItemUpdate])
-
-  const handleOpacityChange = useCallback(async (itemId, opacity) => {
-    await handleItemUpdate(itemId, { opacity })
-  }, [handleItemUpdate])
 
   // Upscale handler
   const handleUpscale = useCallback(async (itemId, scale) => {
@@ -996,7 +959,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
       setPopupMenuPosition({ x: 0, y: 0, visible: false })
-      
+
       // Call upscale API
       const response = await fetch('/api/image-editing', {
         method: 'POST',
@@ -1059,14 +1022,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const moveToFront = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
-    
+
     const maxZIndex = Math.max(...items.map(item => item.z_index || 0), 0)
     await handleItemUpdate(selectedItemId, { z_index: maxZIndex + 1 })
   }, [selectedItemId, items, handleItemUpdate])
 
   const moveToBack = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
-    
+
     const minZIndex = Math.min(...items.map(item => item.z_index || 0), 0)
     await handleItemUpdate(selectedItemId, { z_index: minZIndex - 1 })
   }, [selectedItemId, items, handleItemUpdate])
@@ -1093,7 +1056,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Call blend API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
@@ -1155,7 +1118,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       // Update items list
       setItems((prev) => prev.filter(item => item.id !== sourceId && item.id !== targetId).concat(newItem))
-      
+
       // Clear selection and blend mode
       setSelectedItemId(null)
       setBlendMode(false)
@@ -1195,7 +1158,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const itemsToCompare = selectedItemIds.size > 0
         ? items.filter(item => selectedItemIds.has(item.id))
         : [items.find(item => item.id === itemId)].filter(Boolean)
-      
+
       if (itemsToCompare.length >= 2) {
         setCompareItems(itemsToCompare.slice(0, 2))
         setCompareMode(true)
@@ -1219,7 +1182,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
       setShowStyleTransfer(false)
-      
+
       // Call style transfer API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
@@ -1276,42 +1239,100 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       console.error('Error applying style transfer:', error)
       setError('Failed to apply style transfer. Please try again.')
     } finally {
+
       setIsGenerating(false)
     }
   }, [userId, projectId, items, handleItemUpdate])
 
-  // Keyboard shortcuts handler
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      // Don't handle shortcuts when typing in inputs
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return
-      }
-      
-      // Undo: Cmd/Ctrl+Z
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && !e.shiftKey) {
-        e.preventDefault()
-        handleUndo()
-        return
-      }
-      
-      // Redo: Cmd/Ctrl+Shift+Z
-      if ((e.metaKey || e.ctrlKey) && e.key === 'z' && e.shiftKey) {
-        e.preventDefault()
-        handleRedo()
-        return
-      }
-      
-      // Style transfer: Cmd/Ctrl+T
-      if ((e.metaKey || e.ctrlKey) && e.key === 't' && !e.shiftKey && selectedItemId) {
-        e.preventDefault()
-        setStyleTransferTargetId(selectedItemId)
-        setShowStyleTransfer(true)
-      }
+  // Layers Panel Handlers
+  const handleReorderItems = useCallback(async (reorderedItems) => {
+    // Optimistic update
+    setItems(reorderedItems)
+
+    // Update all items in database
+    // In a real app, we might want to batch this or only update changed items
+    try {
+      await Promise.all(reorderedItems.map(item =>
+        updateCanvasItem(userId, item.id, { z_index: item.z_index })
+      ))
+    } catch (error) {
+      console.error('Error reordering items:', error)
+      setError('Failed to save layer order')
+      // Revert on error would go here
     }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [selectedItemId, handleUndo, handleRedo])
+  }, [userId, items])
+
+  const handleToggleVisibility = useCallback(async (itemId) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+
+    const newVisibility = item.is_visible === false ? true : false
+
+    // Optimistic update
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, is_visible: newVisibility } : i
+    ))
+
+    try {
+      await updateCanvasItem(userId, itemId, { is_visible: newVisibility })
+    } catch (error) {
+      console.error('Error toggling visibility:', error)
+    }
+  }, [userId, items])
+
+  const handleToggleLock = useCallback(async (itemId) => {
+    const item = items.find(i => i.id === itemId)
+    if (!item) return
+
+    const newLockState = !item.is_locked
+
+    // Optimistic update
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, is_locked: newLockState } : i
+    ))
+
+    try {
+      await updateCanvasItem(userId, itemId, { is_locked: newLockState })
+    } catch (error) {
+      console.error('Error toggling lock:', error)
+    }
+  }, [userId, items])
+
+  const handleOpacityChange = useCallback(async (itemId, opacity) => {
+    // Optimistic update
+    setItems(prev => prev.map(i =>
+      i.id === itemId ? { ...i, opacity } : i
+    ))
+
+    // Debounce the API call would be better here, but for now direct update
+    try {
+      await updateCanvasItem(userId, itemId, { opacity })
+    } catch (error) {
+      console.error('Error updating opacity:', error)
+    }
+  }, [userId])
+
+  // Keyboard shortcuts handler
+  useCanvasHotkeys({
+    selectedItemId,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+    onDelete: (id) => handleItemDelete(id),
+    onCopy: (id) => {
+      const item = items.find(i => i.id === id)
+      if (item) setClipboard(item)
+    },
+    onPaste: async () => {
+      if (clipboard) {
+        // Paste logic here or reuse existing handlePaste
+        // For now we rely on the native paste event listener below
+      }
+    },
+    onStyleTransfer: (id) => {
+      setStyleTransferTargetId(id)
+      setShowStyleTransfer(true)
+    }
+  })
 
   // Remove background handler
   const handleRemoveBackground = useCallback(async (itemId) => {
@@ -1325,13 +1346,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Call remove background API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${userId} `,
         },
         body: JSON.stringify({
           operation: 'remove-bg',
@@ -1349,7 +1370,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (imageUrl.startsWith('data:')) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
-        const file = new File([blob], `remove-bg-${Date.now()}.png`, { type: 'image/png' })
+        const file = new File([blob], `remove - bg - ${Date.now()}.png`, { type: 'image/png' })
         const uploadResult = await uploadFileToCloud(file, userId)
         imageUrl = uploadResult.url
       }
@@ -1395,13 +1416,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Call inpainting API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${userId} `,
         },
         body: JSON.stringify({
           operation: 'inpaint',
@@ -1422,7 +1443,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (imageUrl.startsWith('data:')) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
-        const file = new File([blob], `inpaint-${Date.now()}.png`, { type: 'image/png' })
+        const file = new File([blob], `inpaint - ${Date.now()}.png`, { type: 'image/png' })
         const uploadResult = await uploadFileToCloud(file, userId)
         imageUrl = uploadResult.url
       }
@@ -1474,12 +1495,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${userId} `,
         },
         body: JSON.stringify({
           operation: 'loop',
@@ -1498,7 +1519,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (imageUrl.startsWith('data:')) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
-        const file = new File([blob], `loop-${Date.now()}.gif`, { type: 'image/gif' })
+        const file = new File([blob], `loop - ${Date.now()}.gif`, { type: 'image/gif' })
         const uploadResult = await uploadFileToCloud(file, userId)
         imageUrl = uploadResult.url
       }
@@ -1524,12 +1545,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${userId} `,
         },
         body: JSON.stringify({
           operation: 'text2svg',
@@ -1545,12 +1566,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Create canvas item with SVG
       const maxZIndex = items.length > 0 ? Math.max(...items.map(item => item.z_index || 0), 0) : 0
       const newItem = await createCanvasItem(userId, projectId, {
-        image_url: `data:image/svg+xml,${encodeURIComponent(data.svg)}`,
+        image_url: `data: image / svg + xml, ${encodeURIComponent(data.svg)} `,
         x_position: position.x,
         y_position: position.y,
         width: 200,
         height: 100,
-        name: `Text: ${text.substring(0, 30)}`,
+        name: `Text: ${text.substring(0, 30)} `,
         metadata: {
           is_text_vector: true,
           original_text: text,
@@ -1586,7 +1607,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Load image and extract colors
       const img = new Image()
       img.crossOrigin = 'anonymous'
@@ -1614,15 +1635,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const g = pixels[i + 1]
         const b = pixels[i + 2]
         const a = pixels[i + 3]
-        
+
         if (a < 128) continue // Skip transparent pixels
 
         // Quantize colors to reduce palette size
         const qr = Math.floor(r / 32) * 32
         const qg = Math.floor(g / 32) * 32
         const qb = Math.floor(b / 32) * 32
-        const key = `${qr},${qg},${qb}`
-        
+        const key = `${qr},${qg},${qb} `
+
         colorMap.set(key, (colorMap.get(key) || 0) + 1)
       }
 
@@ -1632,7 +1653,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         .slice(0, 5)
         .map(([key]) => {
           const [r, g, b] = key.split(',').map(Number)
-          return `rgb(${r},${g},${b})`
+          return `rgb(${r}, ${g}, ${b})`
         })
 
       // Create color swatches as canvas items
@@ -1642,18 +1663,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       for (let i = 0; i < sortedColors.length; i++) {
         const color = sortedColors[i]
         const svg = `
-          <svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" fill="${color}" />
-          </svg>
-        `
+        < svg width = "100" height = "100" xmlns = "http://www.w3.org/2000/svg" >
+          <rect width="100" height="100" fill="${color}" />
+          </svg >
+    `
 
         const swatchItem = await createCanvasItem(userId, projectId, {
-          image_url: `data:image/svg+xml,${encodeURIComponent(svg)}`,
+          image_url: `data: image / svg + xml, ${encodeURIComponent(svg)} `,
           x_position: targetItem.x_position + (targetItem.width || 400) + 20,
           y_position: targetItem.y_position + i * 110,
           width: 100,
           height: 100,
-          name: `Color ${i + 1}`,
+          name: `Color ${i + 1} `,
           metadata: {
             is_color_swatch: true,
             color: color,
@@ -1682,7 +1703,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       setIsGenerating(true)
-      
+
       // Get the base image (use selected item or first item)
       const baseItem = selectedItem || items[0]
       if (!baseItem) {
@@ -1694,7 +1715,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${userId} `,
         },
         body: JSON.stringify({
           operation: 'outpaint',
@@ -1717,7 +1738,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       if (imageUrl.startsWith('data:')) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
-        const file = new File([blob], `outpaint-${Date.now()}.png`, { type: 'image/png' })
+        const file = new File([blob], `outpaint - ${Date.now()}.png`, { type: 'image/png' })
         const uploadResult = await uploadFileToCloud(file, userId)
         imageUrl = uploadResult.url
       }
@@ -1738,7 +1759,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         y_position: rect.y,
         width: img.width,
         height: img.height,
-        name: `Outpaint: ${prompt.substring(0, 30)}`,
+        name: `Outpaint: ${prompt.substring(0, 30)} `,
         metadata: {
           is_outpaint: true,
           prompt: prompt,
@@ -1792,7 +1813,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     const position = stage.position()
     const scale = stage.scaleX()
-    
+
     // Clamp pan to canvas bounds (4x larger than viewport)
     const canvasWidth = dimensions.width * 4
     const canvasHeight = dimensions.height * 4
@@ -1800,9 +1821,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, position.x))
     const clampedY = Math.max(0, Math.min(maxY, position.y))
-    
+
     stage.position({ x: clampedX, y: clampedY })
-    
+
     setCanvasState((prev) => ({
       ...prev,
       panX: clampedX,
@@ -1818,7 +1839,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     const position = stage.position()
     const scale = stage.scaleX()
-    
+
     // Clamp pan to canvas bounds during drag
     const canvasWidth = dimensions.width * 4
     const canvasHeight = dimensions.height * 4
@@ -1826,11 +1847,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, position.x))
     const clampedY = Math.max(0, Math.min(maxY, position.y))
-    
+
     if (clampedX !== position.x || clampedY !== position.y) {
       stage.position({ x: clampedX, y: clampedY })
     }
-    
+
     // Update state in real-time during drag for grid to update
     setCanvasState((prev) => ({
       ...prev,
@@ -1844,28 +1865,28 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleOutpaintMouseDown = useCallback((e) => {
     const stage = stageRef.current
     if (!stage) return
-    
+
     const pos = stage.getPointerPosition()
     if (!pos) return
-    
+
     const worldX = (pos.x - stage.x()) / stage.scaleX()
     const worldY = (pos.y - stage.y()) / stage.scaleY()
-    
+
     setOutpaintRect({ x: worldX, y: worldY, width: 0, height: 0 })
   }, [])
 
   const handleOutpaintMouseMove = useCallback((e) => {
     if (!outpaintRect) return
-    
+
     const stage = stageRef.current
     if (!stage) return
-    
+
     const pos = stage.getPointerPosition()
     if (!pos) return
-    
+
     const worldX = (pos.x - stage.x()) / stage.scaleX()
     const worldY = (pos.y - stage.y()) / stage.scaleY()
-    
+
     setOutpaintRect(prev => ({
       ...prev,
       width: worldX - prev.x,
@@ -1885,13 +1906,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleDimensionClick = useCallback((e) => {
     const stage = stageRef.current
     if (!stage) return
-    
+
     const pos = stage.getPointerPosition()
     if (!pos) return
-    
+
     const worldX = (pos.x - stage.x()) / stage.scaleX()
     const worldY = (pos.y - stage.y()) / stage.scaleY()
-    
+
     if (!dimensionStartPos) {
       setDimensionStartPos({ x: worldX, y: worldY })
       setDimensionEndPos(null)
@@ -1901,18 +1922,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const dx = worldX - dimensionStartPos.x
       const dy = worldY - dimensionStartPos.y
       const distance = Math.sqrt(dx * dx + dy * dy)
-      setError(`Distance: ${Math.round(distance)}px`)
-      
+      setError(`Distance: ${Math.round(distance)} px`)
+
       // Add dimension line to the list
       setDimensionLines(prev => [...prev, {
-        id: `dimension-${Date.now()}-${Math.random()}`,
+        id: `dimension - ${Date.now()} -${Math.random()} `,
         startX: dimensionStartPos.x,
         startY: dimensionStartPos.y,
         endX: worldX,
         endY: worldY,
         distance: Math.round(distance),
       }])
-      
+
       // Reset after a delay
       setTimeout(() => {
         setDimensionStartPos(null)
@@ -1936,7 +1957,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     // Add a budget sticker at the specified position
     // This is a placeholder - implement actual sticker creation logic
     setBudgetStickers(prev => [...prev, {
-      id: `budget-${Date.now()}`,
+      id: `budget - ${Date.now()} `,
       x: position.x,
       y: position.y,
       amount: 0,
@@ -1948,26 +1969,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const canvas = minimapCanvasRef.current
     const stage = stageRef.current
     if (!canvas || !stage) return
-    
+
     const rect = canvas.getBoundingClientRect()
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
-    
+
     // Convert minimap coordinates to canvas coordinates
     const canvasWidth = dimensions.width * 4
     const canvasHeight = dimensions.height * 4
     const minimapScaleX = canvasWidth / rect.width
     const minimapScaleY = canvasHeight / rect.height
-    
+
     const canvasX = x * minimapScaleX - dimensions.width / 2
     const canvasY = y * minimapScaleY - dimensions.height / 2
-    
+
     // Clamp to canvas bounds
     const maxX = canvasWidth - dimensions.width
     const maxY = canvasHeight - dimensions.height
     const clampedX = Math.max(0, Math.min(maxX, canvasX))
     const clampedY = Math.max(0, Math.min(maxY, canvasY))
-    
+
     stage.position({ x: clampedX, y: clampedY })
     setCanvasState(prev => ({
       ...prev,
@@ -1989,17 +2010,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     // Use device-native scroll sensitivity
     const deltaY = e.evt.deltaY
     const absDelta = Math.abs(deltaY)
-    
+
     // Calculate zoom factor based on scroll amount
     const baseZoomFactor = 1.001
     const sensitivity = Math.min(absDelta / 10, 50)
     const zoomFactor = 1 + (baseZoomFactor * sensitivity)
-    
+
     // Apply zoom in the correct direction
-    const proposedScale = deltaY > 0 
+    const proposedScale = deltaY > 0
       ? oldScale / zoomFactor  // Zoom out
       : oldScale * zoomFactor  // Zoom in
-    
+
     const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
     const mousePointTo = {
@@ -2033,7 +2054,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
-    
+
     if (!userId || !projectId) {
       setError('Missing user or project information. Please refresh the page.')
       return
@@ -2044,7 +2065,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Apply style if selected
       let finalPrompt = prompt
       if (selectedStyle) {
-        finalPrompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+        finalPrompt = `${prompt}, ${selectedStyle.prompt_suffix} `
       }
 
       // Convert reference image to base64 if it's a URL
@@ -2086,8 +2107,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         if (imageUrl.startsWith('data:')) {
           const imgResponse = await fetch(imageUrl)
           const blob = await imgResponse.blob()
-          const file = new File([blob], `canvas-${Date.now()}.png`, { type: 'image/png' })
-          
+          const file = new File([blob], `canvas - ${Date.now()}.png`, { type: 'image/png' })
+
           const uploadResult = await uploadFileToCloud(file, userId)
           imageUrl = uploadResult.url
         }
@@ -2109,9 +2130,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           y_position: centerY - 200,
           width: 400,
           height: 400,
-          name: `Generated: ${prompt.substring(0, 30)}`,
+          name: `Generated: ${prompt.substring(0, 30)} `,
           prompt: finalPrompt,
-          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''}`,
+          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''} `,
           z_index: maxZIndex + 1,
           is_visible: true,
         })
@@ -2137,11 +2158,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     setIsGenerating(true)
     try {
       const basePrompt = selectedItem.prompt || 'interior design'
-      let prompt = newPrompt || `${basePrompt}${newPrompt ? ' with modifications' : ''}`
-      
+      let prompt = newPrompt || `${basePrompt}${newPrompt ? ' with modifications' : ''} `
+
       // Apply style if selected
       if (selectedStyle) {
-        prompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+        prompt = `${prompt}, ${selectedStyle.prompt_suffix} `
       }
 
       // Use selected item as reference if no reference image set
@@ -2159,7 +2180,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           console.warn('Failed to convert reference image to base64:', e)
         }
       }
-      
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: {
@@ -2183,8 +2204,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         if (imageUrl.startsWith('data:')) {
           const imgResponse = await fetch(imageUrl)
           const blob = await imgResponse.blob()
-          const file = new File([blob], `regenerated-${Date.now()}.png`, { type: 'image/png' })
-          
+          const file = new File([blob], `regenerated - ${Date.now()}.png`, { type: 'image/png' })
+
           const uploadResult = await uploadFileToCloud(file, userId)
           imageUrl = uploadResult.url
         }
@@ -2193,7 +2214,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         await handleItemUpdate(selectedItemId, {
           image_url: imageUrl,
           prompt: prompt,
-          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''}`,
+          description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''} `,
         })
       }
     } catch (error) {
@@ -2209,7 +2230,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     setGeneratingVariations(true)
     setShowGenerateModal(false)
-    
+
     try {
       // Calculate center in world coordinates (accounting for pan/zoom)
       const stage = stageRef.current
@@ -2221,16 +2242,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const centerY = stage && height > 0 ? (height / 2 - stage.y()) / stage.scaleY() : canvasHeight / 2
 
       const newItems = []
-      
+
       // Apply style if selected
       let basePrompt = prompt
       if (selectedStyle) {
-        basePrompt = `${prompt}, ${selectedStyle.prompt_suffix}`
+        basePrompt = `${prompt}, ${selectedStyle.prompt_suffix} `
       }
 
       for (let i = 0; i < count; i++) {
         const variationPrompt = `${basePrompt} (variation ${i + 1}, different style and composition)`
-        
+
         const response = await fetch('/api/generate', {
           method: 'POST',
           headers: {
@@ -2253,8 +2274,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           if (imageUrl.startsWith('data:')) {
             const imgResponse = await fetch(imageUrl)
             const blob = await imgResponse.blob()
-            const file = new File([blob], `canvas-variation-${i + 1}-${Date.now()}.png`, { type: 'image/png' })
-            
+            const file = new File([blob], `canvas - variation - ${i + 1} -${Date.now()}.png`, { type: 'image/png' })
+
             const uploadResult = await uploadFileToCloud(file, userId)
             imageUrl = uploadResult.url
           }
@@ -2271,12 +2292,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             y_position: y,
             width: 400,
             height: 400,
-            name: `Variation ${i + 1}: ${prompt.substring(0, 30)}`,
+            name: `Variation ${i + 1}: ${prompt.substring(0, 30)} `,
             prompt: variationPrompt,
             z_index: maxZIndex + i + 1,
             is_visible: true,
           })
-          
+
           newItems.push(newItem)
         }
       }
@@ -2297,7 +2318,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleChatSubmit = async (e) => {
     e.preventDefault()
     if (!chatInput.trim() || !userId || !projectId) return
-    
+
     const prompt = chatInput.trim()
     setChatInput('')
     await generateToCanvas(prompt)
@@ -2319,12 +2340,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const right = item.x_position + (item.width || 200)
       const top = item.y_position
       const bottom = item.y_position + (item.height || 200)
-      
+
       if (acc.minLeft === null || left < acc.minLeft) acc.minLeft = left
       if (acc.maxRight === null || right > acc.maxRight) acc.maxRight = right
       if (acc.minTop === null || top < acc.minTop) acc.minTop = top
       if (acc.maxBottom === null || bottom > acc.maxBottom) acc.maxBottom = bottom
-      
+
       return acc
     }, { minLeft: null, maxRight: null, minTop: null, maxBottom: null })
 
@@ -2412,7 +2433,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const getCreations = useCallback(() => {
     if (!project?.workflow) return []
     const creations = []
-    
+
     if (project.workflow.result?.url) {
       creations.push({
         id: 'result-main',
@@ -2422,7 +2443,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         createdAt: project.updatedAt || project.createdAt,
       })
     }
-    
+
     if (project.workflow.resultUrl) {
       creations.push({
         id: 'result-url',
@@ -2432,7 +2453,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         createdAt: project.updatedAt || project.createdAt,
       })
     }
-    
+
     if (project.workflow.files && Array.isArray(project.workflow.files)) {
       project.workflow.files.forEach(file => {
         if (file.type === 'image' && file.url && file.generated) {
@@ -2446,7 +2467,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }
       })
     }
-    
+
     return creations
   }, [project])
 
@@ -2460,7 +2481,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return []
     }
   }, [getProjectAssets])
-  
+
   const creations = useMemo(() => {
     try {
       return getCreations() || []
@@ -2473,10 +2494,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}
-      <div 
-        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${
-          sidebarOpen ? 'w-80' : 'w-0'
-        } overflow-hidden`}
+      <div
+        className={`absolute left - 0 top - 0 bottom - 0 z - 50 bg - [#FFFFFF] border - r border - [#F1EBE4] transition - all duration - macro ease - apple ${sidebarOpen ? 'w-80' : 'w-0'
+          } overflow - hidden`}
       >
         {sidebarOpen && (
           <div className="h-full flex flex-col">
@@ -2488,7 +2508,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     {project?.name || 'Untitled'}
                   </h1>
                   <p className="text-xs text-[#7C7C7C] font-medium">
-                    {project?.createdAt ? `Created ${new Date(project.createdAt).toLocaleDateString()}` : 'Loading...'}
+                    {project?.createdAt ? `Created ${new Date(project.createdAt).toLocaleDateString()} ` : 'Loading...'}
                   </p>
                 </div>
                 <button
@@ -2502,7 +2522,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   </svg>
                 </button>
               </div>
-              
+
               {/* Action Buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 <button
@@ -2536,51 +2556,46 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               <div className="flex gap-1 mt-4 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('overview')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    activeTab === 'overview'
-                      ? 'bg-surface-elevated text-text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'overview'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    } `}
                 >
                   Overview
                 </button>
                 <button
                   onClick={() => setActiveTab('assets')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    activeTab === 'assets'
-                      ? 'bg-surface-elevated text-text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'assets'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    } `}
                 >
                   Asset Library ({assets.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('creations')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    activeTab === 'creations'
-                      ? 'bg-surface-elevated text-text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'creations'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    } `}
                 >
                   My Creations ({creations.length})
                 </button>
                 <button
                   onClick={() => setActiveTab('variations')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    activeTab === 'variations'
-                      ? 'bg-surface-elevated text-text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'variations'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    } `}
                 >
                   Variations
                 </button>
                 <button
                   onClick={() => setActiveTab('details')}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors whitespace-nowrap ${
-                    activeTab === 'details'
-                      ? 'bg-surface-elevated text-text-primary'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'details'
+                    ? 'bg-surface-elevated text-text-primary'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
+                    } `}
                 >
                   Details
                 </button>
@@ -2777,8 +2792,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         <div
           className="context-menu fixed z-50 bg-white rounded-lg shadow-oak border border-[#F1EBE4] py-1 min-w-[160px] linen-texture"
           style={{
-            left: `${contextMenuPosition.x}px`,
-            top: `${contextMenuPosition.y}px`,
+            left: `${contextMenuPosition.x} px`,
+            top: `${contextMenuPosition.y} px`,
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -3055,8 +3070,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         <div
           className="popup-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 py-1 min-w-[200px]"
           style={{
-            left: `${popupMenuPosition.x}px`,
-            top: `${popupMenuPosition.y}px`,
+            left: `${popupMenuPosition.x} px`,
+            top: `${popupMenuPosition.y} px`,
             transform: 'translate(-50%, -100%)',
           }}
           onClick={(e) => e.stopPropagation()}
@@ -3233,7 +3248,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       )}
 
       {/* Main Canvas Area - Adjust for sidebar */}
-      <div 
+      <div
         className="flex-1 flex flex-col w-full h-full transition-all duration-macro ease-apple"
         style={{ marginLeft: sidebarOpen ? '320px' : '0' }}
       >
@@ -3254,9 +3269,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         )}
 
         {/* Canvas Area - Full Screen */}
-        <div 
-          ref={containerRef} 
-          className="flex-1 relative w-full h-full overflow-hidden" 
+        <div
+          ref={containerRef}
+          className="flex-1 relative w-full h-full overflow-hidden"
           style={{ backgroundColor: canvasState.backgroundColor }}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -3268,7 +3283,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             const currentPanX = stage ? stage.x() : canvasState.panX
             const currentPanY = stage ? stage.y() : canvasState.panY
             const currentZoom = stage ? stage.scaleX() : canvasState.zoom
-            
+
             // Convert grid size based on unit
             let baseGridSize = canvasState.gridSize || 20
             if (canvasState.gridUnit === 'in') {
@@ -3276,33 +3291,33 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             } else if (canvasState.gridUnit === 'cm') {
               baseGridSize = baseGridSize * 37.8 // 1 cm ≈ 37.8px at 96 DPI
             }
-            
+
             // Calculate grid spacing in screen pixels (scales with zoom)
             const screenGridSize = baseGridSize * currentZoom
             const effectiveGridSize = Math.max(10, screenGridSize)
-            
+
             // Calculate grid offset based on current pan position (real-time)
             const offsetX = currentPanX % effectiveGridSize
             const offsetY = currentPanY % effectiveGridSize
             const normalizedOffsetX = offsetX < 0 ? offsetX + effectiveGridSize : offsetX
             const normalizedOffsetY = offsetY < 0 ? offsetY + effectiveGridSize : offsetY
-            
+
             return (
               <div
                 className="absolute inset-0 pointer-events-none z-0"
-                key={`grid-${currentPanX}-${currentPanY}-${currentZoom}`}
+                key={`grid - ${currentPanX} -${currentPanY} -${currentZoom} `}
                 style={{
                   backgroundImage: `
-                    linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                    linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-                  `,
-                  backgroundSize: `${effectiveGridSize}px ${effectiveGridSize}px`,
-                  backgroundPosition: `${normalizedOffsetX}px ${normalizedOffsetY}px`,
+  linear - gradient(to right, #e5e7eb 1px, transparent 1px),
+    linear - gradient(to bottom, #e5e7eb 1px, transparent 1px)
+      `,
+                  backgroundSize: `${effectiveGridSize}px ${effectiveGridSize} px`,
+                  backgroundPosition: `${normalizedOffsetX}px ${normalizedOffsetY} px`,
                 }}
               />
             )
           })()}
-          
+
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="text-center">
@@ -3314,243 +3329,239 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             const canvasWidth = dimensions.width * 4
             const canvasHeight = dimensions.height * 4
             return (
-            <Stage
-              ref={stageRef}
-              width={canvasWidth}
-              height={canvasHeight}
-              draggable={!outpaintMode && !dimensionMode && !textMode}
-              onDrag={handleStageDrag}
-              onDragEnd={handleStageDragEnd}
-              onWheel={handleWheel}
-              onMouseDown={outpaintMode ? handleOutpaintMouseDown : dimensionMode ? handleDimensionClick : undefined}
-              onMouseMove={outpaintMode ? handleOutpaintMouseMove : undefined}
-              onMouseUp={outpaintMode ? handleOutpaintMouseUp : undefined}
-              onClick={(e) => {
-                if (e.target === e.target.getStage()) {
-                  if (blendMode) {
-                    // Cancel blend mode if clicking on empty canvas
-                    setBlendMode(false)
-                    setBlendSourceId(null)
-                    setError('')
-                  }
-                  if (textMode) {
-                    const pos = stageRef.current?.getPointerPosition()
-                    if (pos) {
-                      const stage = stageRef.current
-                      const worldX = (pos.x - stage.x()) / stage.scaleX()
-                      const worldY = (pos.y - stage.y()) / stage.scaleY()
-                      setTextPosition({ x: worldX, y: worldY })
-                      setError('Enter text and press Enter to create vector text')
+              <Stage
+                ref={stageRef}
+                width={canvasWidth}
+                height={canvasHeight}
+                draggable={!outpaintMode && !dimensionMode && !textMode}
+                onDrag={handleStageDrag}
+                onDragEnd={handleStageDragEnd}
+                onWheel={handleWheel}
+                onMouseDown={outpaintMode ? handleOutpaintMouseDown : dimensionMode ? handleDimensionClick : undefined}
+                onMouseMove={outpaintMode ? handleOutpaintMouseMove : undefined}
+                onMouseUp={outpaintMode ? handleOutpaintMouseUp : undefined}
+                onClick={(e) => {
+                  if (e.target === e.target.getStage()) {
+                    if (blendMode) {
+                      // Cancel blend mode if clicking on empty canvas
+                      setBlendMode(false)
+                      setBlendSourceId(null)
+                      setError('')
+                    }
+                    if (textMode) {
+                      const pos = stageRef.current?.getPointerPosition()
+                      if (pos) {
+                        const stage = stageRef.current
+                        const worldX = (pos.x - stage.x()) / stage.scaleX()
+                        const worldY = (pos.y - stage.y()) / stage.scaleY()
+                        setTextPosition({ x: worldX, y: worldY })
+                        setError('Enter text and press Enter to create vector text')
+                      }
+                    }
+                    if (!outpaintMode && !dimensionMode && !textMode) {
+                      setSelectedItemId(null)
+                      setPopupMenuPosition({ x: 0, y: 0, visible: false })
                     }
                   }
-                  if (!outpaintMode && !dimensionMode && !textMode) {
-                    setSelectedItemId(null)
-                    setPopupMenuPosition({ x: 0, y: 0, visible: false })
-                  }
-                }
-              }}
-              style={{ position: 'relative', zIndex: 1 }}
-            >
+                }}
+                style={{ position: 'relative', zIndex: 1 }}
+              >
 
-              {/* Canvas Items Layer - Virtual Rendering */}
-              <Layer name="items-layer">
-                {(() => {
-                  // Virtual rendering: only render items visible in viewport
-                  // Account for pan and zoom
-                  const stage = stageRef.current
-                  if (!stage || !items || !Array.isArray(items)) return items || []
+                {/* Canvas Items Layer - Virtual Rendering */}
+                <Layer name="items-layer">
+                  {(() => {
+                    // Virtual rendering: only render items visible in viewport
+                    // Account for pan and zoom
+                    const stage = stageRef.current
+                    if (!stage || !items || !Array.isArray(items)) return items || []
 
-                  const viewport = {
-                    left: -stage.x() / stage.scaleX(),
-                    right: (dimensions.width - stage.x()) / stage.scaleX(),
-                    top: -stage.y() / stage.scaleY(),
-                    bottom: (dimensions.height - stage.y()) / stage.scaleY(),
-                  }
+                    const viewport = {
+                      left: -stage.x() / stage.scaleX(),
+                      right: (dimensions.width - stage.x()) / stage.scaleX(),
+                      top: -stage.y() / stage.scaleY(),
+                      bottom: (dimensions.height - stage.y()) / stage.scaleY(),
+                    }
 
-                  // Add padding for items partially visible
-                  const padding = 200
-                  const visibleItems = items.filter((item) => {
-                    const itemLeft = item.x_position
-                    const itemRight = item.x_position + (item.width || 0)
-                    const itemTop = item.y_position
-                    const itemBottom = item.y_position + (item.height || 0)
+                    // Add padding for items partially visible
+                    const padding = 200
 
-                    return !(
-                      itemRight < viewport.left - padding ||
-                      itemLeft > viewport.right + padding ||
-                      itemBottom < viewport.top - padding ||
-                      itemTop > viewport.bottom + padding
-                    )
-                  })
+                    // Sort items by z_index (ascending) for correct stacking context
+                    // Lower z_index = drawn first = behind
+                    const sortedItems = [...items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
 
-                  return visibleItems.map((item) => (
-                    <CanvasItem
-                      key={item.id}
-                      item={item}
-                      isSelected={item.id === selectedItemId}
-                      isMultiSelected={selectedItemIds.has(item.id)}
-                      onSelect={(e, isMulti) => {
-                        if (blendMode && blendSourceId && !isMulti) {
-                          // In blend mode, clicking an item triggers blend
-                          if (item.id !== blendSourceId) {
-                            handleBlend(blendSourceId, item.id)
-                          } else {
-                            setError('Cannot blend an image with itself. Click on a different image.')
-                            setBlendMode(false)
-                            setBlendSourceId(null)
-                          }
-                          return
-                        }
-                        
-                        if (isMulti) {
-                          setSelectedItemIds(prev => {
-                            const newSet = new Set(prev)
-                            if (newSet.has(item.id)) {
-                              newSet.delete(item.id)
+                    const visibleItems = sortedItems.filter((item) => {
+                      const itemLeft = item.x_position
+                      const itemRight = item.x_position + (item.width || 0)
+                      const itemTop = item.y_position
+                      const itemBottom = item.y_position + (item.height || 0)
+
+                      return !(
+                        itemRight < viewport.left - padding ||
+                        itemLeft > viewport.right + padding ||
+                        itemBottom < viewport.top - padding ||
+                        itemTop > viewport.bottom + padding
+                      )
+                    })
+
+                    return visibleItems.map((item) => (
+                      <CanvasItem
+                        key={item.id}
+                        item={item}
+                        isSelected={item.id === selectedItemId}
+                        isMultiSelected={selectedItemIds.has(item.id)}
+                        onSelect={(e, isMulti) => {
+                          if (blendMode && blendSourceId && !isMulti) {
+                            // In blend mode, clicking an item triggers blend
+                            if (item.id !== blendSourceId) {
+                              handleBlend(blendSourceId, item.id)
                             } else {
-                              newSet.add(item.id)
+                              setError('Cannot blend an image with itself. Click on a different image.')
+                              setBlendMode(false)
+                              setBlendSourceId(null)
                             }
-                            return newSet
-                          })
-                        } else {
-                          setSelectedItemId(item.id)
-                          setSelectedItemIds(new Set())
-                        }
-                      }}
-                      onUpdate={handleItemUpdate}
-                      onDelete={handleItemDelete}
-                      onContextMenu={(e, itemId) => {
-                        e.evt.preventDefault()
-                        const stage = stageRef.current
-                        if (!stage) return
-                        const pointer = stage.getPointerPosition()
-                        if (pointer) {
-                          setContextMenuPosition({
-                            x: pointer.x,
-                            y: pointer.y,
-                            visible: true,
-                            itemId: itemId,
-                          })
-                        }
-                      }}
-                      showMeasurements={canvasState.showMeasurements}
-                      zoom={canvasState.zoom}
-                      blendMode={blendMode}
-                    />
-                  ))
-                })()}
-              </Layer>
+                            return
+                          }
 
-              {/* Transformer Layer - Resize handles for selected items */}
-              {selectedItemId && !blendMode && (
-                <Layer>
-                  <Transformer
-                    ref={transformerRef}
-                    boundBoxFunc={(oldBox, newBox) => {
-                      // Limit minimum size
-                      if (Math.abs(newBox.width) < 50 || Math.abs(newBox.height) < 50) {
-                        return oldBox
-                      }
-                      return newBox
-                    }}
-                    borderEnabled={true}
-                    anchorFill="#D97757"
-                    anchorStroke="#FFFFFF"
-                    anchorStrokeWidth={2}
-                    anchorSize={10}
-                    borderStroke="#D97757"
-                    borderStrokeWidth={2}
-                    borderDash={[5, 5]}
-                    rotateEnabled={true}
-                    enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
-                    onTransformEnd={(e) => {
-                      const node = e.target
-                      const selectedItem = items.find(item => item.id === selectedItemId)
-                      if (selectedItem && node) {
-                        const scaleX = node.scaleX()
-                        const scaleY = node.scaleY()
-                        node.scaleX(1)
-                        node.scaleY(1)
-                        handleItemUpdate(selectedItemId, {
-                          x_position: node.x(),
-                          y_position: node.y(),
-                          width: Math.max(50, (selectedItem.width || 200) * scaleX),
-                          height: Math.max(50, (selectedItem.height || 200) * scaleY),
-                          rotation: node.rotation(),
-                        })
-                      }
-                    }}
-                  />
+                          if (isMulti) {
+                            handleSelect(e, item.id, true)
+                          } else {
+                            handleSelect(e, item.id, false)
+                          }
+                        }}
+                        onUpdate={handleItemUpdate}
+                        onDelete={handleItemDelete}
+                        onContextMenu={(e, itemId) => {
+                          e.evt.preventDefault()
+                          const stage = stageRef.current
+                          if (!stage) return
+                          const pointer = stage.getPointerPosition()
+                          if (pointer) {
+                            setContextMenuPosition({
+                              x: pointer.x,
+                              y: pointer.y,
+                              visible: true,
+                              itemId: itemId,
+                            })
+                          }
+                        }}
+                        showMeasurements={canvasState.showMeasurements}
+                        zoom={canvasState.zoom}
+                        blendMode={blendMode}
+                      />
+                    ))
+                  })()}
                 </Layer>
-              )}
 
-              {/* Mask Drawing Layer - Only visible in eraser mode */}
-              {eraserMode && eraserTargetId && (
-                <Layer ref={maskLayerRef} name="mask-layer" listening={false} />
-              )}
+                {/* Transformer Layer - Resize handles for selected items */}
+                {selectedItemId && !blendMode && (
+                  <Layer>
+                    <Transformer
+                      ref={transformerRef}
+                      boundBoxFunc={(oldBox, newBox) => {
+                        // Limit minimum size
+                        if (Math.abs(newBox.width) < 50 || Math.abs(newBox.height) < 50) {
+                          return oldBox
+                        }
+                        return newBox
+                      }}
+                      borderEnabled={true}
+                      anchorFill="#D97757"
+                      anchorStroke="#FFFFFF"
+                      anchorStrokeWidth={2}
+                      anchorSize={10}
+                      borderStroke="#D97757"
+                      borderStrokeWidth={2}
+                      borderDash={[5, 5]}
+                      rotateEnabled={true}
+                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
+                      onTransformEnd={(e) => {
+                        const node = e.target
+                        const selectedItem = items.find(item => item.id === selectedItemId)
+                        if (selectedItem && node) {
+                          const scaleX = node.scaleX()
+                          const scaleY = node.scaleY()
+                          node.scaleX(1)
+                          node.scaleY(1)
+                          handleItemUpdate(selectedItemId, {
+                            x_position: node.x(),
+                            y_position: node.y(),
+                            width: Math.max(50, (selectedItem.width || 200) * scaleX),
+                            height: Math.max(50, (selectedItem.height || 200) * scaleY),
+                            rotation: node.rotation(),
+                          })
+                        }
+                      }}
+                    />
+                  </Layer>
+                )}
 
-              {/* Dimension Lines Layer */}
-              {dimensionMode && (
-                <Layer>
-                  {dimensionStartPos && (
+                {/* Mask Drawing Layer - Only visible in eraser mode */}
+                {eraserMode && eraserTargetId && (
+                  <Layer ref={maskLayerRef} name="mask-layer" listening={false} />
+                )}
+
+                {/* Dimension Lines Layer */}
+                {dimensionMode && (
+                  <Layer>
+                    {dimensionStartPos && (
+                      <Circle
+                        x={dimensionStartPos.x}
+                        y={dimensionStartPos.y}
+                        radius={5}
+                        fill="#D97757"
+                        stroke="#fff"
+                        strokeWidth={2}
+                      />
+                    )}
+                    {dimensionLines.map((line) => {
+                      const dx = line.endX - line.startX
+                      const dy = line.endY - line.startY
+                      const length = Math.sqrt(dx * dx + dy * dy)
+                      const angle = Math.atan2(dy, dx) * (180 / Math.PI)
+
+                      return (
+                        <Group key={line.id} x={line.startX} y={line.startY} rotation={angle}>
+                          <Line
+                            points={[0, 0, length, 0]}
+                            stroke="#D97757"
+                            strokeWidth={2}
+                            lineCap="round"
+                          />
+                          <Text
+                            x={length / 2}
+                            y={-20}
+                            text={`${line.distance} px`}
+                            fontSize={12}
+                            fill="#2C2C2C"
+                            fontStyle="bold"
+                            align="center"
+                            offsetX={String(line.distance).length * 3}
+                          />
+                          {/* Arrow heads */}
+                          <Line points={[0, 0, 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                          <Line points={[0, 0, 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                          <Line points={[length, 0, length - 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                          <Line points={[length, 0, length - 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
+                        </Group>
+                      )
+                    })}
+                  </Layer>
+                )}
+
+                {/* Text Position Indicator */}
+                {textMode && textPosition && (
+                  <Layer>
                     <Circle
-                      x={dimensionStartPos.x}
-                      y={dimensionStartPos.y}
+                      x={textPosition.x}
+                      y={textPosition.y}
                       radius={5}
                       fill="#D97757"
                       stroke="#fff"
                       strokeWidth={2}
                     />
-                  )}
-                  {dimensionLines.map((line) => {
-                    const dx = line.endX - line.startX
-                    const dy = line.endY - line.startY
-                    const length = Math.sqrt(dx * dx + dy * dy)
-                    const angle = Math.atan2(dy, dx) * (180 / Math.PI)
-
-                    return (
-                      <Group key={line.id} x={line.startX} y={line.startY} rotation={angle}>
-                        <Line
-                          points={[0, 0, length, 0]}
-                          stroke="#D97757"
-                          strokeWidth={2}
-                          lineCap="round"
-                        />
-                        <Text
-                          x={length / 2}
-                          y={-20}
-                          text={`${line.distance}px`}
-                          fontSize={12}
-                          fill="#2C2C2C"
-                          fontStyle="bold"
-                          align="center"
-                          offsetX={String(line.distance).length * 3}
-                        />
-                        {/* Arrow heads */}
-                        <Line points={[0, 0, 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
-                        <Line points={[0, 0, 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
-                        <Line points={[length, 0, length - 10, -5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
-                        <Line points={[length, 0, length - 10, 5]} stroke="#D97757" strokeWidth={2} lineCap="round" />
-                      </Group>
-                    )
-                  })}
-                </Layer>
-              )}
-
-              {/* Text Position Indicator */}
-              {textMode && textPosition && (
-                <Layer>
-                  <Circle
-                    x={textPosition.x}
-                    y={textPosition.y}
-                    radius={5}
-                    fill="#D97757"
-                    stroke="#fff"
-                    strokeWidth={2}
-                  />
-                </Layer>
-              )}
-            </Stage>
+                  </Layer>
+                )}
+              </Stage>
             )
           })()}
         </div>
@@ -3576,9 +3587,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <div className="flex items-center gap-1 bg-[#F1EBE4] rounded-full p-1">
               <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
-                className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
-                }`}
+                className={`p - 1.5 rounded - full transition - colors ${canvasState.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
+                  } `}
                 title="Toggle grid overlay - Show/hide alignment grid on canvas"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3590,9 +3600,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </button>
               <button
                 onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
-                className={`p-1.5 rounded-full transition-colors ${
-                  canvasState.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
-                }`}
+                className={`p - 1.5 rounded - full transition - colors ${canvasState.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
+                  } `}
                 title="Toggle ruler - Show/hide measurement ruler on canvas edges"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3637,9 +3646,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 setDimensionMode(true)
                 setError('Dimension mode: Click two points to measure distance. Press M to start.')
               }}
-              className={`p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors ${
-                dimensionMode ? 'bg-[#F1EBE4]' : ''
-              }`}
+              className={`p - 2 rounded - full hover: bg - [#F1EBE4] text - [#7C7C7C] hover: text - [#2C2C2C] transition - colors ${dimensionMode ? 'bg-[#F1EBE4]' : ''
+                } `}
               title="Dimension tool - Measure distances between two points on the canvas (Keyboard: M)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3656,9 +3664,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 setTextMode(true)
                 setError('Text mode: Click on canvas to place text, then type and press Enter')
               }}
-              className={`p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors ${
-                textMode ? 'bg-[#F1EBE4]' : ''
-              }`}
+              className={`p - 2 rounded - full hover: bg - [#F1EBE4] text - [#7C7C7C] hover: text - [#2C2C2C] transition - colors ${textMode ? 'bg-[#F1EBE4]' : ''
+                } `}
               title="Text tool - Add text labels to your canvas (Keyboard: T)"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -3723,9 +3730,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   input.click()
                 }
               }}
-              className={`p-2 hover:bg-[#F1EBE4] rounded-full transition-colors ${
-                referenceImage ? 'bg-[#F1EBE4]' : ''
-              }`}
+              className={`p - 2 hover: bg - [#F1EBE4] rounded - full transition - colors ${referenceImage ? 'bg-[#F1EBE4]' : ''
+                } `}
               title="Add reference image - Use an image as a style reference for AI generation"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
@@ -3734,7 +3740,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
               </svg>
             </button>
-            
+
             <button
               onClick={() => setShowAssetLibrary(true)}
               className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
@@ -3745,7 +3751,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <path d="M9 9h6v6H9z" />
               </svg>
             </button>
-            
+
             {items.length > 0 && (
               <>
                 <button
@@ -3783,11 +3789,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm font-medium"
               title="AI model selection - Choose which AI model to use for image generation"
             >
-                <option value="gemini">Gemini 2.5 Flash</option>
-                <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
-                <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
-                <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
-              </select>
+              <option value="gemini">Gemini 2.5 Flash</option>
+              <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
+              <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
+              <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
+            </select>
 
             <select
               value={selectedStyle?.id || ''}
@@ -3798,23 +3804,23 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[120px] font-medium"
               title="Style selection - Apply a design style to your generated images"
             >
-                <option value="">No Style</option>
-                {styles.map((style) => (
-                  <option key={style.id} value={style.id}>
-                    {style.name} {style.is_public ? '(Public)' : ''}
-                  </option>
-                ))}
-              </select>
+              <option value="">No Style</option>
+              {styles.map((style) => (
+                <option key={style.id} value={style.id}>
+                  {style.name} {style.is_public ? '(Public)' : ''}
+                </option>
+              ))}
+            </select>
 
             <button
               onClick={() => setShowStyleLibrary(true)}
               className="p-1.5 hover:bg-[#F1EBE4] rounded-lg transition-colors bg-white border border-[#F1EBE4] shadow-sm"
               title="Style library - Browse and manage design styles for AI generation"
             >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-              </button>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
+                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+              </svg>
+            </button>
 
             {/* Divider */}
             <div className="w-px h-6 bg-[#F1EBE4]" />
@@ -3836,14 +3842,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             {/* Chat Input */}
             <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="What would you like to create?"
+              <input
+                type="text"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                placeholder="What would you like to create?"
                 className="px-4 py-1.5 bg-white border border-[#F1EBE4] rounded-full text-sm text-[#2C2C2C] placeholder:text-[#A8A8A8] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[200px] font-medium"
-                />
-                <div className="flex items-center gap-1">
+              />
+              <div className="flex items-center gap-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -3868,42 +3874,41 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       input.click()
                     }
                   }}
-                  className={`p-1.5 hover:bg-[#F1EBE4] rounded-full transition-colors ${
-                    referenceImage ? 'bg-[#F1EBE4]' : ''
-                  }`}
+                  className={`p - 1.5 hover: bg - [#F1EBE4] rounded - full transition - colors ${referenceImage ? 'bg-[#F1EBE4]' : ''
+                    } `}
                   title="Add reference image - Use an image as a style reference for AI generation"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <circle cx="9" cy="9" r="2" />
-                      <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                    </svg>
-                  </button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <circle cx="9" cy="9" r="2" />
+                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                  </svg>
+                </button>
                 <button
                   type="button"
                   onClick={() => setShowAssetLibrary(true)}
                   className="p-1.5 hover:bg-[#F1EBE4] rounded-full transition-colors"
                   title="Add asset - Browse and add furniture, decor, and design assets to your canvas"
                 >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                      <rect x="3" y="3" width="18" height="18" rx="2" />
-                      <path d="M9 9h6v6H9z" />
-                    </svg>
-                  </button>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 9h6v6H9z" />
+                  </svg>
+                </button>
                 <button
                   type="submit"
-                    disabled={!chatInput.trim() || isGenerating || generatingVariations}
-                    className="clay-button p-2 text-white rounded-full hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                    title="Generate image - Create a new image based on your prompt using the selected AI model and style"
-                  >
-                    {isGenerating || generatingVariations ? (
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <polygon points="5 3 19 12 5 21 5 3" />
-                      </svg>
-                    )}
-                  </button>
+                  disabled={!chatInput.trim() || isGenerating || generatingVariations}
+                  className="clay-button p-2 text-white rounded-full hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+                  title="Generate image - Create a new image based on your prompt using the selected AI model and style"
+                >
+                  {isGenerating || generatingVariations ? (
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polygon points="5 3 19 12 5 21 5 3" />
+                    </svg>
+                  )}
+                </button>
               </div>
             </form>
           </div>
@@ -3935,11 +3940,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       setSelectedStyle(style)
                       setShowStyleLibrary(false)
                     }}
-                    className={`p-4 rounded-lg border-2 transition-all text-left ${
-                      selectedStyle?.id === style.id
-                        ? 'border-stone-900 bg-stone-50'
-                        : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
-                    }`}
+                    className={`p - 4 rounded - lg border - 2 transition - all text - left ${selectedStyle?.id === style.id
+                      ? 'border-stone-900 bg-stone-50'
+                      : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+                      } `}
                   >
                     {style.preview_image_url ? (
                       <img src={style.preview_image_url} alt={style.name} className="w-full h-24 object-cover rounded mb-2" />
@@ -4030,7 +4034,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                     } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
                       errorMessage = 'Network error. Please check your connection and try again.'
                     } else if (error.message) {
-                      errorMessage = `Failed to add asset: ${error.message}`
+                      errorMessage = `Failed to add asset: ${error.message} `
                     }
                     setError(errorMessage)
                   }
@@ -4056,16 +4060,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       {/* Layers Panel */}
       <LayersPanel
+        isOpen={showLayersPanel}
+        onClose={() => setShowLayersPanel(false)}
         items={items}
         selectedItemId={selectedItemId}
-        onSelectItem={(itemId) => setSelectedItemId(itemId)}
-        onReorderItems={handleReorderLayers}
+        onSelectItem={(id) => handleSelect(null, id, false)}
+        onReorderItems={handleReorderItems}
         onToggleVisibility={handleToggleVisibility}
         onToggleLock={handleToggleLock}
         onOpacityChange={handleOpacityChange}
         onDeleteItem={handleItemDelete}
-        isOpen={showLayersPanel}
-        onClose={() => setShowLayersPanel(false)}
       />
 
       {/* Mini-map */}

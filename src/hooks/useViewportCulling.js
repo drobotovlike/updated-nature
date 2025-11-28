@@ -25,6 +25,8 @@ export function useViewportCulling(stageRef, padding = 200) {
     const stage = stageRef.current
     const viewport = getWorldViewport(stage, dimensions)
 
+    if (!Array.isArray(items)) return []
+
     return items.filter((item) => {
       const bounds = {
         x: item.x_position || 0,

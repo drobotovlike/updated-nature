@@ -28,7 +28,7 @@ export function useSmartSnapping(draggingItem, camera) {
     let snapOffsetY = 0
 
     // Get all items except the one being dragged
-    const otherItems = items.filter((item) => item.id !== draggingId)
+    const otherItems = Array.isArray(items) ? items.filter((item) => item.id !== draggingId) : []
 
     // Convert threshold to world space
     const worldThreshold = SNAP_THRESHOLD / camera.zoom

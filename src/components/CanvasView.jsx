@@ -2561,7 +2561,29 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     async function loadProjectData() {
       if (projectId && userId) {
         try {
-          const projectData = await getProject(userId, projectId, clerk)
+          let projectData = await getProject(userId, projectId, clerk)
+
+           // CRITICAL FIX: Ensure project exists in cloud before proceeding
+           // If we got data from localStorage but it's not in cloud, we must sync it
+           if (isClerkReady && clerk) {
+             try {
+               const { getProjectFromCloud } = await import('../utils/cloudProjectManager')
+               try {
+                 await getProjectFromCloud(clerk, projectId)
+               } catch (cloudError) {
+                 if (cloudError.message?.includes('404') || cloudError.message?.includes('not found')) {
+                   console.log('Project found locally but missing in cloud. Syncing now...', projectId)
+                   const { saveProject } = await import('../utils/projectManager')
+                   await saveProject(userId, projectData.name, projectData.workflow, projectData.spaceId, clerk)
+                   // Re-fetch to ensure we have the cloud version
+                   projectData = await getProject(userId, projectId, clerk)
+                 }
+               }
+             } catch (syncCheckError) {
+               console.warn('Failed to check/sync cloud status:', syncCheckError)
+             }
+           }
+
           setProject(projectData)
         } catch (error) {
           console.error('Error loading project:', error)

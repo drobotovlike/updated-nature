@@ -11,6 +11,7 @@ export default function DashboardPage() {
   const { user, isLoaded: userLoaded } = useUser()
   const { userId, isSignedIn } = useAuth()
   const { signOut } = useClerk()
+  const clerk = useClerk()
   const navigate = useNavigate()
   
   // View state: 'projects' | 'workspace' | 'account' | 'my-projects'
@@ -375,7 +376,7 @@ export default function DashboardPage() {
     }
     
     try {
-      // Create a new project with empty workflow
+      // Create a new project with empty workflow - pass clerk instance to ensure immediate cloud sync
       const project = await saveProject(userId, newProjectName.trim(), {
         mode: '',
         furnitureFile: null,
@@ -384,7 +385,20 @@ export default function DashboardPage() {
         resultUrl: null,
         description: '',
         useAIDesigner: false,
-      }, selectedSpaceId)
+      }, selectedSpaceId, clerk)
+      
+      // Wait a moment for cloud sync to complete if online
+      if (navigator.onLine && project.syncStatus === 'local') {
+        // Try to sync immediately
+        try {
+          const { syncQueue } = await import('../utils/syncQueue')
+          await syncQueue.syncProject(project.id, clerk)
+          // Wait a bit for sync to complete
+          await new Promise(resolve => setTimeout(resolve, 500))
+        } catch (syncError) {
+          console.warn('Immediate sync failed, will sync in background:', syncError)
+        }
+      }
       
       // Set as selected project and switch to project view
       // IMPORTANT: Set ALL state synchronously to avoid race conditions

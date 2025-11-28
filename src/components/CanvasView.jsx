@@ -828,11 +828,34 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return
     }
 
-    // All projects now have UUIDs, so we can always try to load from API
-    // If project doesn't exist in cloud yet, it will work with empty state
-
     setLoading(true)
     setError('')
+    
+    // First, check if project exists in database, if not, try to sync it
+    if (isClerkReady && clerk) {
+      try {
+        const { getProject } = await import('../utils/projectManager')
+        await getProject(userId, projectId, clerk)
+        console.log('✅ Project exists in database')
+      } catch (projectError) {
+        // Project doesn't exist - try to sync it
+        console.warn('Project not in database, attempting to sync...', projectError.message)
+        const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+        const localProject = projects.find(p => p.id === projectId)
+        
+        if (localProject && syncQueueRef.current) {
+          try {
+            console.log('Syncing project to cloud...')
+            await syncQueueRef.current.syncProject(projectId, clerk)
+            // Wait a bit for sync to complete
+            await new Promise(resolve => setTimeout(resolve, 1000))
+          } catch (syncError) {
+            console.warn('Project sync failed, continuing with local project:', syncError)
+          }
+        }
+      }
+    }
+
     try {
       console.log('Loading canvas for project:', projectId, 'user:', userId)
       const data = await getCanvasData(userId, projectId)
@@ -890,7 +913,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
 
       // For new projects or if API fails, allow canvas to load with empty state
-      console.warn('Canvas API error, loading with empty state. This is normal for new projects.')
+      // Check if it's a 404 (project not found) - this is expected for new projects
+      if (error.message?.includes('404') || error.message?.includes('not found') || error.message?.includes('Project not found')) {
+        console.log('Project not found in database (this is normal for new projects), loading with empty state')
+      } else {
+        console.warn('Canvas API error, loading with empty state:', error.message)
+      }
       setItems([])
 
       // Only show error if it's a critical issue
@@ -916,7 +944,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     if (projectId && userId) {
       loadCanvas()
     }
-  }, [projectId, userId, loadCanvas])
+  }, [projectId, userId, loadCanvas, isClerkReady, clerk])
 
   // Update dimensions on resize - fixed size, always full screen
   useEffect(() => {

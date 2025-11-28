@@ -28,14 +28,14 @@ class SyncQueue {
 
     const queue = this.getQueue()
     const existing = queue.find(item => item.projectId === project.id)
-    
+
     if (existing) {
       // Update existing entry
       existing.project = project
       existing.priority = priority
       existing.retries = 0
       existing.timestamp = Date.now()
-      existing.clerkInstance = clerkInstance
+      // Do NOT store clerkInstance in localStorage as it has cyclic structures
     } else {
       // Add new entry
       queue.push({
@@ -44,13 +44,13 @@ class SyncQueue {
         priority,
         retries: 0,
         timestamp: Date.now(),
-        status: 'pending',
-        clerkInstance
+        status: 'pending'
+        // Do NOT store clerkInstance in localStorage as it has cyclic structures
       })
     }
-    
+
     this.saveQueue(queue)
-    
+
     // Trigger sync if online
     if (navigator.onLine && !this.isSyncing && clerkInstance) {
       this.sync(clerkInstance)
@@ -91,10 +91,10 @@ class SyncQueue {
       console.warn('No clerk instance provided, skipping sync')
       return
     }
-    
+
     this.isSyncing = true
     const queue = this.getQueue()
-    
+
     if (queue.length === 0) {
       this.isSyncing = false
       return
@@ -111,7 +111,7 @@ class SyncQueue {
 
     for (const item of queue) {
       if (item.status === 'completed') continue
-      
+
       if (item.retries >= MAX_RETRIES) {
         item.status = 'failed'
         this.updateProjectSyncStatus(item.projectId, 'error', 'Max retries exceeded')
@@ -121,10 +121,10 @@ class SyncQueue {
       try {
         // Import here to avoid circular dependencies
         const { saveProjectToCloud } = await import('./cloudProjectManager')
-        
+
         // Update project sync status
         this.updateProjectSyncStatus(item.projectId, 'syncing')
-        
+
         // Prepare workflow data for cloud
         const workflowData = {
           mode: item.project.workflow?.mode || '',
@@ -139,7 +139,7 @@ class SyncQueue {
           description: item.project.workflow?.result?.description || item.project.workflow?.description,
           useAIDesigner: item.project.workflow?.result?.useAIDesigner || item.project.workflow?.useAIDesigner || false,
         }
-        
+
         // Sync to cloud - pass the project ID to ensure same UUID is used
         const cloudProject = await saveProjectToCloud(
           clerkInstance,
@@ -148,7 +148,7 @@ class SyncQueue {
           item.project.spaceId,
           item.project.id // Pass the local UUID
         )
-        
+
         // Update project with cloud data
         const updatedProject = {
           ...item.project,
@@ -156,14 +156,14 @@ class SyncQueue {
           syncStatus: 'synced',
           lastSyncedAt: new Date().toISOString()
         }
-        
+
         // Update in localStorage
         this.updateProjectInLocalStorage(updatedProject)
         this.updateProjectSyncStatus(item.projectId, 'synced')
-        
+
         // Remove from queue
         item.status = 'completed'
-        
+
       } catch (error) {
         console.error('Sync error for project:', item.projectId, error)
         item.retries++
@@ -176,7 +176,7 @@ class SyncQueue {
     // Remove completed items
     const remaining = queue.filter(item => item.status !== 'completed')
     this.saveQueue(remaining)
-    
+
     this.isSyncing = false
 
     // Schedule next sync if there are pending items

@@ -27,7 +27,7 @@ async function apiRequest(endpoint, options = {}, clerkInstance) {
     // Check if response is JSON before trying to parse
     const contentType = response.headers.get('content-type')
     let errorMessage = `API error: ${response.status} ${response.statusText}`
-    
+
     if (contentType && contentType.includes('application/json')) {
       try {
         const error = await response.json()
@@ -44,7 +44,7 @@ async function apiRequest(endpoint, options = {}, clerkInstance) {
         console.error('Failed to read error response:', textError)
       }
     }
-    
+
     throw new Error(errorMessage)
   }
 
@@ -80,7 +80,7 @@ async function spacesApiRequest(endpoint, options = {}, clerkInstance) {
     // Check if response is JSON before trying to parse
     const contentType = response.headers.get('content-type')
     let errorMessage = `API error: ${response.status} ${response.statusText}`
-    
+
     if (contentType && contentType.includes('application/json')) {
       try {
         const error = await response.json()
@@ -97,7 +97,7 @@ async function spacesApiRequest(endpoint, options = {}, clerkInstance) {
         console.error('Failed to read error response:', textError)
       }
     }
-    
+
     throw new Error(errorMessage)
   }
 
@@ -162,11 +162,11 @@ export async function uploadFileToCloud(file, clerkInstance) {
     }
 
     const result = await response.json()
-    
+
     if (!result.url) {
       throw new Error('Upload succeeded but no URL was returned from server')
     }
-    
+
     return result
   } catch (error) {
     console.error('Error uploading file:', error)
@@ -179,7 +179,7 @@ export async function uploadFileToCloud(file, clerkInstance) {
 }
 
 // Save project to cloud
-export async function saveProjectToCloud(clerkInstance, projectName, workflowData, spaceId = null) {
+export async function saveProjectToCloud(clerkInstance, projectName, workflowData, spaceId = null, projectId = null) {
   if (!clerkInstance) {
     throw new Error('User must be authenticated to save projects')
   }

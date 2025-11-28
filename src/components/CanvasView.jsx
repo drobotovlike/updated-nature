@@ -3995,6 +3995,32 @@ export default function CanvasView({ projectId, onBack, onSave }) {
               </svg>
             </button>
 
+            {/* File Upload Button */}
+            <button
+              onClick={() => {
+                // Create hidden file input
+                const input = document.createElement('input')
+                input.type = 'file'
+                input.accept = 'image/*'
+                input.multiple = true // Allow multiple file selection
+                input.onchange = async (e) => {
+                  const files = Array.from(e.target.files || [])
+                  for (const file of files) {
+                    await handleFileUpload(file, null) // null = center position
+                  }
+                }
+                input.click()
+              }}
+              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
+              title="Upload images - Click to select image files from your computer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="17 8 12 3 7 8" />
+                <line x1="12" y1="3" x2="12" y2="15" />
+              </svg>
+            </button>
+
             <button
               onClick={() => setShowAssetLibrary(true)}
               className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"

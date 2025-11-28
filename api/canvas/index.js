@@ -1,12 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../utils/auth.js'
+import { getSupabaseConfig } from '../utils/env.js'
+import { logger } from '../utils/logger.js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
-
-if (!supabaseUrl || !supabaseServiceKey) {
-  console.error('Missing Supabase environment variables')
-}
+// Get Supabase configuration (fails fast if not set)
+const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig()
 
 // Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
 const supabase = createClient(supabaseUrl, supabaseServiceKey)

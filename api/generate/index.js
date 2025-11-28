@@ -262,29 +262,45 @@ async function generateWithGemini({ prompt, reference_image, reference_strength,
 async function generateWithGPT({ prompt, reference_image, reference_strength, aspect_ratio, quality, seed }) {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
-    throw new Error('OPENAI_API_KEY is not set. GPT Image model requires OpenAI API key.')
+    throw new Error('OPENAI_API_KEY is not set. See AI_INTEGRATION_GUIDE.md for setup instructions.')
   }
 
-  // TODO: Implement OpenAI DALL-E 3 integration
-  // For now, return error
-  throw new Error('GPT Image model not yet implemented. Please use Gemini or Flux.')
+  // IMPLEMENTATION NEEDED: OpenAI DALL-E 3 integration
+  // See AI_INTEGRATION_GUIDE.md for implementation steps
+  // Required: npm install openai
+  throw new Error(
+    'DALL-E 3 model not yet implemented. ' +
+    'See AI_INTEGRATION_GUIDE.md for implementation steps. ' +
+    'Please use Gemini for now.'
+  )
 }
 
 // Flux handler (placeholder - requires Stability AI API key)
 async function generateWithFlux({ prompt, reference_image, reference_strength, aspect_ratio, quality, seed }) {
   const apiKey = process.env.STABILITY_API_KEY
   if (!apiKey) {
-    throw new Error('STABILITY_API_KEY is not set. Flux model requires Stability AI API key.')
+    throw new Error('STABILITY_API_KEY is not set. See AI_INTEGRATION_GUIDE.md for setup instructions.')
   }
 
-  // TODO: Implement Stability AI Flux integration
-  // For now, return error
-  throw new Error('Flux model not yet implemented. Please use Gemini.')
+  // IMPLEMENTATION NEEDED: Stability AI Flux integration
+  // See AI_INTEGRATION_GUIDE.md for implementation steps
+  // API endpoint: https://api.stability.ai/v2beta/stable-image/generate/ultra
+  throw new Error(
+    'Flux Ultra model not yet implemented. ' +
+    'See AI_INTEGRATION_GUIDE.md for implementation steps. ' +
+    'Please use Gemini for now.'
+  )
 }
 
 // Imagen handler (placeholder - requires Google Cloud API key)
 async function generateWithImagen({ prompt, reference_image, reference_strength, aspect_ratio, quality, seed }) {
-  // TODO: Implement Google Imagen 4 integration
-  throw new Error('Imagen model not yet implemented. Please use Gemini.')
+  // IMPLEMENTATION NEEDED: Google Imagen 4 integration
+  // See AI_INTEGRATION_GUIDE.md for implementation steps
+  // Requires Google Cloud project with Imagen API enabled
+  throw new Error(
+    'Imagen 4 model not yet implemented. ' +
+    'See AI_INTEGRATION_GUIDE.md for implementation steps. ' +
+    'Please use Gemini for now.'
+  )
 }
 

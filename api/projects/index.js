@@ -1,15 +1,19 @@
 // Cloud Storage API for Projects using Supabase
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../utils/auth.js'
+import { getSupabaseConfig } from '../utils/env.js'
+import { logger } from '../utils/logger.js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmdnFrbXB5a25mZXpweHNjbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzk5NjksImV4cCI6MjA3OTYxNTk2OX0._0c2EwgFodZOdBRj2ejlZBhdclMt_OOlAG0XprNNsFg'
+// Get Supabase configuration (fails fast if not set)
+const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig()
 
 // Create Supabase client with service role key for server-side operations
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
 async function handler(req, res, userId) {
   // userId is verified and safe to use
+  const startTime = Date.now()
+  logger.debug('Projects API request', { method: req.method, userId, query: req.query })
 
   try {
     const { method } = req
@@ -370,11 +374,24 @@ async function handler(req, res, userId) {
         return res.status(405).json({ error: `Method ${method} not allowed` })
     }
   } catch (error) {
-    console.error('API Error:', error)
+    logger.error('Projects API error', { 
+      method: req.method,
+      userId,
+      error: error.message,
+      code: error.code,
+      stack: error.stack
+    })
     return res.status(500).json({ 
       error: 'Internal server error', 
       details: error.message,
       code: error.code 
+    })
+  } finally {
+    const duration = Date.now() - startTime
+    logger.debug('Projects API response', { 
+      method: req.method,
+      status: res.statusCode,
+      duration: `${duration}ms`
     })
   }
 }

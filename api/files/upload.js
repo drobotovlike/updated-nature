@@ -1,9 +1,11 @@
 // File Upload API using Supabase Storage
 import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../utils/auth.js'
+import { getSupabaseConfig } from '../utils/env.js'
+import { logger } from '../utils/logger.js'
 
-const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmdnFrbXB5a25mZXpweHNjbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzk5NjksImV4cCI6MjA3OTYxNTk2OX0._0c2EwgFodZOdBRj2ejlZBhdclMt_OOlAG0XprNNsFg'
+// Get Supabase configuration (fails fast if not set)
+const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig()
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
@@ -40,7 +42,7 @@ async function handler(req, res, userId) {
       })
 
     if (uploadError) {
-      console.error('Upload error:', uploadError)
+      logger.error('File upload error', { error: uploadError.message, userId })
       // If bucket doesn't exist, return error with instructions
       if (uploadError.message.includes('Bucket not found')) {
         return res.status(500).json({ 
@@ -72,7 +74,7 @@ async function handler(req, res, userId) {
       uploadedAt: new Date().toISOString(),
     })
   } catch (error) {
-    console.error('Upload Error:', error)
+    logger.error('Upload API error', { error: error.message, userId })
     return res.status(500).json({ 
       error: 'Failed to upload file', 
       details: error.message 

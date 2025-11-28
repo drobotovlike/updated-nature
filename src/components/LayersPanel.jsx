@@ -21,9 +21,8 @@ const LayerItemContent = forwardRef(({ item, isSelected, isHovered, setIsHovered
     <div
       ref={ref}
       style={style}
-      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-        isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-stone-50'
-      } ${item.is_locked ? 'opacity-60' : ''}`}
+      className={`flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border border-blue-200' : 'hover:bg-stone-50'
+        } ${item.is_locked ? 'opacity-60' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
       onClick={() => onSelect(item.id)}
@@ -212,7 +211,8 @@ export default function LayersPanel({ items, selectedItemId, onSelectItem, onReo
   )
 
   // Sort items by z_index (highest first, so top layer is first in list)
-  const sortedItems = [...items].sort((a, b) => (b.z_index || 0) - (a.z_index || 0))
+  // Sort items by z_index (descending) so highest z_index appears at top of list
+  const sortedItems = Array.isArray(items) ? [...items].sort((a, b) => (b.z_index || 0) - (a.z_index || 0)) : []
 
   const handleDragEnd = (event) => {
     const { active, over } = event
@@ -222,7 +222,7 @@ export default function LayersPanel({ items, selectedItemId, onSelectItem, onReo
       const newIndex = sortedItems.findIndex(item => item.id === over.id)
 
       const newOrder = arrayMove(sortedItems, oldIndex, newIndex)
-      
+
       // Update z_index values (reverse order: first item gets highest z_index)
       const updatedItems = newOrder.map((item, index) => ({
         ...item,

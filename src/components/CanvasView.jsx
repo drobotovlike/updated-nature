@@ -1001,6 +1001,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const currentProjectId = projectId
     if (!currentProjectId || !userId) return
 
+    // Verify project exists in database before saving state
+    try {
+      const { getProject } = await import('../utils/projectManager')
+      await getProject(userId, currentProjectId)
+    } catch (projectError) {
+      // Project not in database - don't try to save state
+      console.warn('Project not in database, skipping canvas state save:', projectError.message)
+      return
+    }
+
     try {
       const stage = stageRef.current
       if (!stage) return
@@ -1020,6 +1030,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
     } catch (error) {
       console.error('Error saving canvas state:', error)
+      // Don't show error to user - canvas state save is non-critical
     }
   }, [projectId, userId, camera, settings])
 

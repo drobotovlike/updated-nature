@@ -42,6 +42,20 @@ async function handler(req, res, userId) {
     try {
       switch (method) {
         case 'GET':
+          // Verify project exists before fetching state
+          const { data: projectCheck, error: projectCheckError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', projectId)
+            .eq('user_id', userId)
+            .single()
+
+          if (projectCheckError || !projectCheck) {
+            console.error('Project not found when fetching canvas state:', { projectId, userId, error: projectCheckError })
+            // Return null instead of error - canvas can work without state
+            return res.status(200).json(null)
+          }
+
           const { data: state, error: getError } = await supabase
             .from('canvas_states')
             .select('*')
@@ -50,13 +64,34 @@ async function handler(req, res, userId) {
             .single()
 
           if (getError && getError.code !== 'PGRST116') {
-            throw getError
+            // If it's not a "not found" error, log it but don't fail
+            if (getError.code !== '42P01') {
+              console.error('Error fetching canvas state:', getError)
+            }
+            return res.status(200).json(null)
           }
 
           return res.status(200).json(state || null)
 
         case 'POST':
         case 'PUT':
+          // First, verify the project exists in the database
+          const { data: project, error: projectError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', projectId)
+            .eq('user_id', userId)
+            .single()
+
+          if (projectError || !project) {
+            console.error('Project not found when saving canvas state:', { projectId, userId, error: projectError })
+            return res.status(404).json({ 
+              error: 'Project not found',
+              message: 'The project does not exist in the database. Please save the project to cloud first.',
+              details: `Project ID "${projectId}" was not found. The project may need to be synced to the cloud.`
+            })
+          }
+
           const {
             zoom_level,
             pan_x,
@@ -100,7 +135,18 @@ async function handler(req, res, userId) {
               .select()
               .single()
 
-            if (updateError) throw updateError
+            if (updateError) {
+              console.error('Error updating canvas state:', updateError)
+              // Check for foreign key constraint violation
+              if (updateError.code === '23503' || updateError.message?.includes('foreign key constraint')) {
+                return res.status(400).json({
+                  error: 'Project not found',
+                  message: 'The project does not exist in the database. Please save the project to cloud first.',
+                  details: `Foreign key constraint violation: Project ID "${projectId}" does not exist in the projects table.`
+                })
+              }
+              throw updateError
+            }
             result = updatedState
           } else {
             const { data: newState, error: insertError } = await supabase
@@ -109,7 +155,18 @@ async function handler(req, res, userId) {
               .select()
               .single()
 
-            if (insertError) throw insertError
+            if (insertError) {
+              console.error('Error inserting canvas state:', insertError)
+              // Check for foreign key constraint violation
+              if (insertError.code === '23503' || insertError.message?.includes('foreign key constraint')) {
+                return res.status(400).json({
+                  error: 'Project not found',
+                  message: 'The project does not exist in the database. Please save the project to cloud first.',
+                  details: `Foreign key constraint violation: Project ID "${projectId}" does not exist in the projects table.`
+                })
+              }
+              throw insertError
+            }
             result = newState
           }
 

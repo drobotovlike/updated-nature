@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { requireAuth } from '../utils/auth.js'
 
 // Model configurations
 const MODELS = {
@@ -24,24 +25,12 @@ const MODELS = {
   },
 }
 
-export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  const userId = req.headers.authorization?.replace('Bearer ', '')
+async function handler(req, res, userId) {
+  // userId is verified and safe to use
   const { action } = req.query
 
   // Handle styles management
   if (action === 'styles') {
-    if (!userId) {
-      return res.status(401).json({ error: 'Unauthorized' })
-    }
 
     const { createClient } = await import('@supabase/supabase-js')
     const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
@@ -209,6 +198,9 @@ export default async function handler(req, res) {
     })
   }
 }
+
+// Export with authentication middleware
+export default requireAuth(handler)
 
 // Gemini handler (existing implementation)
 async function generateWithGemini({ prompt, reference_image, reference_strength, aspect_ratio, quality, seed }) {

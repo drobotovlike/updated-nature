@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
@@ -10,15 +11,8 @@ if (!supabaseUrl || !supabaseServiceKey) {
 // Use service role key to bypass RLS (security is handled at API level with Clerk user_id validation)
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-export default async function handler(req, res) {
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  const userId = req.headers.authorization?.replace('Bearer ', '')
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
+async function handler(req, res, userId) {
+  // userId is verified and safe to use
 
   const { method } = req
   const { projectId, itemId, type } = req.query
@@ -372,3 +366,5 @@ export default async function handler(req, res) {
   }
 }
 
+// Export with authentication middleware
+export default requireAuth(handler)

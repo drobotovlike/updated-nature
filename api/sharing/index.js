@@ -1,6 +1,7 @@
 // Client Sharing & Collaboration API
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
+import { optionalAuth, verifyClerkToken } from '../utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
@@ -11,15 +12,8 @@ function generateShareToken() {
   return crypto.randomBytes(32).toString('hex')
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
+async function handler(req, res, userId) {
+  // userId may be null for public shared links, but verified if provided
   const { method } = req
   const { token, projectId, linkId, action } = req.query
 
@@ -73,11 +67,7 @@ export default async function handler(req, res) {
             return res.status(403).json({ error: 'Comments not allowed on this link' })
           }
 
-          const authHeader = req.headers.authorization
-          let userId = null
-          if (authHeader && authHeader.startsWith('Bearer ')) {
-            userId = authHeader.replace('Bearer ', '')
-          }
+          // userId is already verified from optionalAuth middleware (may be null for anonymous comments)
 
           const { data: newComment, error: insertError } = await supabase
             .from('comments')
@@ -184,7 +174,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
-  const userId = authHeader.replace('Bearer ', '')
+  // userId is already verified from optionalAuth middleware
 
   try {
     switch (method) {
@@ -298,4 +288,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error', details: error.message })
   }
 }
+
+// Export with optional authentication (public links don't require auth, but creation/management does)
+export default optionalAuth(handler)
 

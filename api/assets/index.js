@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY
@@ -21,26 +22,8 @@ if (process.env.SUPABASE_SERVICE_ROLE_KEY) {
   console.error('❌ No Supabase key found!')
 }
 
-export default async function handler(req, res) {
-  // Set CORS headers
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  // Get user ID from Authorization header (Clerk user ID)
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized - Missing or invalid authorization header' })
-  }
-
-  const userId = authHeader.replace('Bearer ', '')
-  if (!userId || userId === 'undefined') {
-    return res.status(401).json({ error: 'Unauthorized - Invalid user ID' })
-  }
+async function handler(req, res, userId) {
+  // userId is verified and safe to use
 
   if (!supabase) {
     return res.status(500).json({ error: 'Database not configured' })
@@ -291,3 +274,5 @@ export default async function handler(req, res) {
   }
 }
 
+// Export with authentication middleware
+export default requireAuth(handler)

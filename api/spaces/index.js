@@ -1,26 +1,14 @@
 // Spaces API using Supabase
 import { createClient } from '@supabase/supabase-js'
+import { requireAuth } from '../utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlmdnFrbXB5a25mZXpweHNjbmVmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQwMzk5NjksImV4cCI6MjA3OTYxNTk2OX0._0c2EwgFodZOdBRj2ejlZBhdclMt_OOlAG0XprNNsFg'
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*')
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
-
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' })
-  }
-
-  const userId = authHeader.replace('Bearer ', '')
+async function handler(req, res, userId) {
+  // userId is verified and safe to use
 
   try {
     const { method } = req
@@ -110,4 +98,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Internal server error', details: error.message })
   }
 }
+
+// Export with authentication middleware
+export default requireAuth(handler)
 

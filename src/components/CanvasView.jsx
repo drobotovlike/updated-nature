@@ -654,8 +654,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
-      // Upload file to cloud
-      const uploadResult = await uploadFileToCloud(file, userId)
+      // Upload file to cloud - requires clerk instance for authentication
+      if (!clerk) {
+        setError('Authentication required. Please refresh the page and sign in again.')
+        return
+      }
+      const uploadResult = await uploadFileToCloud(file, clerk)
       const imageUrl = uploadResult.url
 
       // Calculate position - use drop position or center of viewport
@@ -733,7 +737,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, dimensions, items, setItems, setError, setIsGenerating, stageRef])
+  }, [userId, projectId, dimensions, items, setItems, setError, setIsGenerating, stageRef, clerk])
 
   // Handle drag and drop
   const handleDrop = useCallback(async (e) => {
@@ -1132,7 +1136,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `upscale-${scale}x-${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1165,7 +1169,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate])
+  }, [userId, projectId, items, handleItemUpdate, clerk])
 
   const moveToFront = useCallback(async () => {
     if (!selectedItemId || !items || !Array.isArray(items) || items.length === 0) return
@@ -1230,7 +1234,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `blend-${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1277,7 +1281,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items])
+  }, [userId, projectId, items, clerk])
 
   // Handle context menu actions
   const handleContextMenuAction = useCallback((action, itemId) => {
@@ -1355,7 +1359,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `style-transfer-${styleName}-${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1389,7 +1393,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate])
+  }, [userId, projectId, items, handleItemUpdate, clerk])
 
   // Layers Panel Handlers
   const handleReorderItems = useCallback(async (reorderedItems) => {
@@ -1518,7 +1522,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `remove - bg - ${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1549,7 +1553,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate])
+  }, [userId, projectId, items, handleItemUpdate, clerk])
 
   // Handle inpainting with mask
   const handleInpaint = useCallback(async (itemId, maskDataUrl) => {
@@ -1591,7 +1595,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `inpaint - ${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1628,7 +1632,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate])
+  }, [userId, projectId, items, handleItemUpdate, clerk])
 
   // Create loop handler
   const handleCreateLoop = useCallback(async (itemId) => {
@@ -1667,7 +1671,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `loop - ${Date.now()}.gif`, { type: 'image/gif' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -1684,7 +1688,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate])
+  }, [userId, projectId, items, handleItemUpdate, clerk])
 
   // Text-to-vector handler
   const handleTextToVector = useCallback(async (text, position) => {
@@ -1740,7 +1744,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, saveToHistory])
+  }, [userId, projectId, items, saveToHistory, clerk])
 
   // Extract palette handler
   const handleExtractPalette = useCallback(async (itemId) => {
@@ -1842,7 +1846,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, saveToHistory])
+  }, [userId, projectId, items, saveToHistory, clerk])
 
   // Outpaint handler
   const handleOutpaintGenerate = useCallback(async (rect, prompt) => {
@@ -1886,7 +1890,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
         const file = new File([blob], `outpaint - ${Date.now()}.png`, { type: 'image/png' })
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
 
@@ -2224,7 +2228,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           const blob = await imgResponse.blob()
           const file = new File([blob], `canvas - ${Date.now()}.png`, { type: 'image/png' })
 
-          const uploadResult = await uploadFileToCloud(file, userId)
+          const uploadResult = await uploadFileToCloud(file, clerk)
           imageUrl = uploadResult.url
         }
 
@@ -2321,7 +2325,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           const blob = await imgResponse.blob()
           const file = new File([blob], `regenerated - ${Date.now()}.png`, { type: 'image/png' })
 
-          const uploadResult = await uploadFileToCloud(file, userId)
+          const uploadResult = await uploadFileToCloud(file, clerk)
           imageUrl = uploadResult.url
         }
 
@@ -2391,7 +2395,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             const blob = await imgResponse.blob()
             const file = new File([blob], `canvas - variation - ${i + 1} -${Date.now()}.png`, { type: 'image/png' })
 
-            const uploadResult = await uploadFileToCloud(file, userId)
+            const uploadResult = await uploadFileToCloud(file, clerk)
             imageUrl = uploadResult.url
           }
 

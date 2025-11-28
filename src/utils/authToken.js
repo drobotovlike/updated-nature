@@ -16,6 +16,13 @@ export async function getAuthToken(clerkInstance) {
     return null
   }
 
+  // Check if getToken method exists
+  if (typeof clerkInstance.getToken !== 'function') {
+    console.error('Clerk instance does not have getToken method. Clerk may not be fully initialized.')
+    console.error('Clerk instance type:', typeof clerkInstance, 'Keys:', Object.keys(clerkInstance || {}))
+    return null
+  }
+
   try {
     const token = await clerkInstance.getToken()
     return token

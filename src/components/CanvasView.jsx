@@ -248,10 +248,10 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
       onClick={(e) => {
-        onSelect(e, item.id, e.evt.shiftKey)
+        onSelect(e, e.evt.shiftKey)
       }}
       onTap={(e) => {
-        onSelect(e, item.id, e.evt.shiftKey)
+        onSelect(e, e.evt.shiftKey)
       }}
       onContextMenu={(e) => {
         e.evt.preventDefault()

@@ -580,39 +580,53 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return
     }
 
-    // Check if project is synced before uploading
+    // CRITICAL: Verify project exists in database before uploading
     try {
-      const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
-      const project = projects.find(p => p.id === projectId)
-      
-      if (project && project.syncStatus === 'local' && navigator.onLine && clerk) {
-        // Project not synced yet - sync it first
-        setError('Syncing project to cloud...')
-        if (syncQueueRef.current) {
+      // First, try to verify project exists in database
+      const { getProject } = await import('../utils/projectManager')
+      try {
+        const dbProject = await getProject(userId, projectId)
+        console.log('✅ Project verified in database:', projectId)
+      } catch (dbError) {
+        console.warn('Project not in database, attempting sync...', dbError.message)
+        
+        // Project doesn't exist in database - sync it
+        const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+        const project = projects.find(p => p.id === projectId)
+        
+        if (!project) {
+          setError('Project not found. Please refresh the page.')
+          return
+        }
+        
+        if (navigator.onLine && clerk && syncQueueRef.current) {
+          setError('Syncing project to cloud...')
+          
+          // Sync the project
           await syncQueueRef.current.syncProject(projectId, clerk)
           
           // Wait for sync to complete and verify in database
           let attempts = 0
-          const maxAttempts = 15 // 4.5 seconds total
+          const maxAttempts = 20 // 6 seconds total
           let synced = false
           
           while (attempts < maxAttempts && !synced) {
             await new Promise(resolve => setTimeout(resolve, 300))
             
-            // Check localStorage sync status
-            const updatedProjects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
-            const updatedProject = updatedProjects.find(p => p.id === projectId)
-            
-            if (updatedProject && updatedProject.syncStatus === 'synced') {
-              // Verify project actually exists in database by trying to fetch it
-              try {
-                const { getProject } = await import('../utils/projectManager')
-                await getProject(userId, projectId)
+            // Try to fetch project from database
+            try {
+              const { getProject: getProjectCheck } = await import('../utils/projectManager')
+              const verifiedProject = await getProjectCheck(userId, projectId)
+              if (verifiedProject && verifiedProject.id === projectId) {
                 synced = true
                 setError('')
-                console.log('✅ Project verified in database')
-              } catch (verifyError) {
-                console.warn('Project sync status is synced but not in database yet, waiting...')
+                console.log('✅ Project synced and verified in database')
+                break
+              }
+            } catch (verifyError) {
+              // Project still not in database, keep waiting
+              if (attempts === maxAttempts - 1) {
+                console.error('Project sync timeout - project still not in database')
               }
             }
             
@@ -620,17 +634,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           }
           
           if (!synced) {
-            setError('Project sync is taking longer than expected. Please wait a moment and try again.')
+            setError('Project sync is taking longer than expected. Please wait a moment and try again, or refresh the page.')
             return
           }
+        } else if (!navigator.onLine) {
+          setError('Project needs to be synced to cloud, but you are offline. Please connect to the internet and try again.')
+          return
+        } else {
+          setError('Unable to sync project. Please refresh the page and try again.')
+          return
         }
-      } else if (project && project.syncStatus === 'local' && !navigator.onLine) {
-        setError('Project needs to be synced to cloud, but you are offline. Please connect to the internet and try again.')
-        return
       }
     } catch (syncCheckError) {
       console.error('Error checking project sync status:', syncCheckError)
-      setError('Error verifying project sync. Please try again.')
+      setError('Error verifying project. Please refresh the page and try again.')
       return
     }
 

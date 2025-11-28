@@ -3674,7 +3674,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       borderStrokeWidth={2}
                       borderDash={[5, 5]}
                       rotateEnabled={true}
-                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'left-center', 'right-center']}
+                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'middle-left', 'middle-right']}
                       onTransformEnd={(e) => {
                         const node = e.target
                         const selectedItem = items.find(item => item.id === selectedItemId)

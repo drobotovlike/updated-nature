@@ -18,6 +18,8 @@ export function useViewportCulling(stageRef, padding = 200) {
   const dimensions = useCanvasStore((state) => state.dimensions)
 
   const visibleItems = useMemo(() => {
+    if (!Array.isArray(items)) return []
+
     if (!stageRef.current || !dimensions.width || !dimensions.height) {
       return items
     }

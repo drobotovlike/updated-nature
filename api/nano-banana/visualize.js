@@ -1,18 +1,19 @@
 import { GoogleGenAI } from "@google/genai";
+import { requireAuth } from '../utils/auth.js'
 
-export default async function handler(req, res) {
+async function handler(req, res, userId) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end()
-  }
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization')
 
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
+
+  // userId is now verified and safe to use
+  // Log for audit purposes (optional)
+  console.log(`[Visualize] Request from authenticated user: ${userId}`)
 
   try {
     const { furnitureBase64, roomBase64, description, useAIDesigner } = req.body
@@ -183,4 +184,7 @@ export default async function handler(req, res) {
     })
   }
 }
+
+// Export with authentication middleware
+export default requireAuth(handler)
 

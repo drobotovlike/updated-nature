@@ -8,7 +8,7 @@ import ExportModal from './ExportModal'
 import CanvasExportModal from './CanvasExportModal'
 import LayersPanel from './LayersPanel'
 import { getCanvasData, createCanvasItem, updateCanvasItem, deleteCanvasItem, saveCanvasState } from '../utils/canvasManager'
-import { getProject, saveProject, getAssets, addAssetToLibrary } from '../utils/projectManager'
+import { getProject, saveProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
 import Folder from './Folder'
@@ -463,11 +463,31 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // State to track the actual UUID projectId (may differ from prop if auto-saved)
   const [actualProjectId, setActualProjectId] = useState(projectId)
+  
+  // Ref to track if auto-save has been attempted to prevent infinite loops
+  const autoSaveAttemptedRef = useRef(false)
+  const autoSaveProjectIdRef = useRef(null)
 
   // Auto-save localStorage projects to cloud to get UUID
+  // CRITICAL: Only run once per projectId to prevent infinite project creation
   useEffect(() => {
     const autoSaveToCloud = async () => {
-      if (!projectId || !userId || !clerk) return
+      // Guard: Don't run if already attempted for this projectId
+      if (autoSaveAttemptedRef.current && autoSaveProjectIdRef.current === projectId) {
+        return
+      }
+      
+      if (!projectId || !userId || !clerk) {
+        // If already a UUID, set it immediately
+        if (projectId && isValidUUID(projectId)) {
+          setActualProjectId(projectId)
+        }
+        return
+      }
+      
+      // Mark as attempted immediately to prevent re-runs
+      autoSaveAttemptedRef.current = true
+      autoSaveProjectIdRef.current = projectId
       
       // Check if projectId is not a UUID (localStorage project)
       if (!isValidUUID(projectId)) {
@@ -480,6 +500,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           
           if (!localProject) {
             throw new Error('Local project not found')
+          }
+
+          // Check if a cloud project with this name already exists
+          // Import getProjects from projectManager (already imported at top)
+          const existingProjects = await getProjects(userId, localProject.spaceId)
+          const existingProject = existingProjects.find(
+            p => p.name === localProject.name && isValidUUID(p.id)
+          )
+          
+          if (existingProject) {
+            // Use existing cloud project instead of creating a new one
+            console.log('Found existing cloud project:', existingProject.id)
+            setActualProjectId(existingProject.id)
+            setError('')
+            return
           }
 
           // Prepare workflow data for cloud save
@@ -504,13 +539,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           setActualProjectId(cloudProject.id)
           setError('')
           
-          // Notify parent component if callback exists
+          // Notify parent component if callback exists (use ref to avoid dependency issues)
           if (onSave) {
             onSave(cloudProject)
           }
         } catch (error) {
           console.error('Error auto-saving project to cloud:', error)
-          setError('Failed to save project to cloud. Canvas features may not work properly.')
+          // Don't block canvas from loading - allow it to work with local project
+          // User can manually save later if needed
+          setError('Project is stored locally. Some features may require saving to cloud.')
+          // Still set actualProjectId to the local projectId so canvas can load
+          setActualProjectId(projectId)
+          // Reset ref on error so user can retry later
+          autoSaveAttemptedRef.current = false
         }
       } else {
         // Already a UUID, use it directly
@@ -519,7 +560,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
 
     autoSaveToCloud()
-  }, [projectId, userId, clerk, onSave])
+    // CRITICAL: Removed onSave from dependencies to prevent infinite loops
+    // Only depend on projectId, userId, and clerk
+  }, [projectId, userId, clerk])
+  
+  // Reset auto-save ref when projectId changes to a different project
+  useEffect(() => {
+    if (autoSaveProjectIdRef.current !== projectId) {
+      autoSaveAttemptedRef.current = false
+      autoSaveProjectIdRef.current = null
+    }
+  }, [projectId])
 
   // Undo/Redo handlers - Define early to prevent scope issues
   // Undo/Redo handlers
@@ -759,9 +810,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return
     }
 
-    // Don't load if projectId is not a UUID yet (waiting for auto-save)
+    // For non-UUID projects, load with empty state (can't fetch from API)
     if (!isValidUUID(currentProjectId)) {
-      console.log('Waiting for project to be saved to cloud...')
+      console.log('Project is stored locally. Canvas will work but some features may be limited.')
+      setItems([])
+      setLoading(false)
+      setError('Project is stored locally. Save to cloud to enable all features.')
       return
     }
 

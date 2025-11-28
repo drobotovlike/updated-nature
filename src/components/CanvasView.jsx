@@ -526,12 +526,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleUndo = useCallback(() => {
     const prevItems = undo()
     if (prevItems) setItems(prevItems)
-  }, [undo])
+  }, [undo, setItems])
 
   const handleRedo = useCallback(() => {
     const nextItems = redo()
     if (nextItems) setItems(nextItems)
-  }, [redo])
+  }, [redo, setItems])
 
   // Calculate selectedItem - memoized to prevent unnecessary recalculations
   // Use useMemo to ensure it's always either null or an object, never undefined
@@ -687,7 +687,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, actualProjectId, projectId, dimensions])
+  }, [userId, actualProjectId, projectId, dimensions, items, setItems, setError, setIsGenerating, stageRef])
 
   // Handle drag and drop
   const handleDrop = useCallback(async (e) => {
@@ -843,7 +843,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } finally {
       setLoading(false)
     }
-  }, [actualProjectId, projectId, userId, dimensions.width, dimensions.height])
+  }, [actualProjectId, projectId, userId, dimensions.width, dimensions.height, setItems, setError, setLoading, updateSettings, setCamera, stageRef])
 
   // Load canvas data
   useEffect(() => {

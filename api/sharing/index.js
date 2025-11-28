@@ -169,12 +169,9 @@ async function handler(req, res, userId) {
   }
 
   // For other operations, require authentication
-  const authHeader = req.headers.authorization
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' })
+  if (!userId) {
+    return res.status(401).json({ error: 'Unauthorized - Authentication required for this operation' })
   }
-
-  // userId is already verified from optionalAuth middleware
 
   try {
     switch (method) {

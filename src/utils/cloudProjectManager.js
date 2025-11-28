@@ -1,14 +1,20 @@
 // Cloud-based Project Management Utility
 // Syncs projects across devices using Supabase
+import { getAuthToken } from './authToken.js'
 
 const API_BASE = '/api/projects'
 const SPACES_API = '/api/spaces'
 const FILES_API = '/api/files/upload'
 
-async function apiRequest(endpoint, options = {}, userId) {
+async function apiRequest(endpoint, options = {}, clerkInstance) {
+  const token = await getAuthToken(clerkInstance)
+  if (!token) {
+    throw new Error('Authentication failed. Please refresh the page and sign in again.')
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${userId}`, // Using Clerk user ID as token
+    'Authorization': `Bearer ${token}`,
     ...options.headers,
   }
 
@@ -53,10 +59,15 @@ async function apiRequest(endpoint, options = {}, userId) {
   }
 }
 
-async function spacesApiRequest(endpoint, options = {}, userId) {
+async function spacesApiRequest(endpoint, options = {}, clerkInstance) {
+  const token = await getAuthToken(clerkInstance)
+  if (!token) {
+    throw new Error('Authentication failed. Please refresh the page and sign in again.')
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${userId}`,
+    'Authorization': `Bearer ${token}`,
     ...options.headers,
   }
 
@@ -102,8 +113,13 @@ async function spacesApiRequest(endpoint, options = {}, userId) {
 }
 
 // Upload file to cloud storage
-export async function uploadFileToCloud(file, userId) {
+export async function uploadFileToCloud(file, clerkInstance) {
   try {
+    const token = await getAuthToken(clerkInstance)
+    if (!token) {
+      throw new Error('Authentication failed. Please refresh the page and sign in again.')
+    }
+
     // Convert file to base64
     const base64 = await new Promise((resolve, reject) => {
       const reader = new FileReader()
@@ -121,7 +137,7 @@ export async function uploadFileToCloud(file, userId) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userId}`,
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         fileBase64: base64,
@@ -163,8 +179,8 @@ export async function uploadFileToCloud(file, userId) {
 }
 
 // Save project to cloud
-export async function saveProjectToCloud(userId, projectName, workflowData, spaceId = null) {
-  if (!userId) {
+export async function saveProjectToCloud(clerkInstance, projectName, workflowData, spaceId = null) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated to save projects')
   }
 
@@ -173,7 +189,7 @@ export async function saveProjectToCloud(userId, projectName, workflowData, spac
 
     // Upload room file if it's a File object
     if (workflowData.roomFile && workflowData.roomFile instanceof File) {
-      const uploadResult = await uploadFileToCloud(workflowData.roomFile, userId)
+      const uploadResult = await uploadFileToCloud(workflowData.roomFile, clerkInstance)
       uploadedWorkflow.roomFile = {
         name: workflowData.roomFile.name,
         url: uploadResult.url,
@@ -182,7 +198,7 @@ export async function saveProjectToCloud(userId, projectName, workflowData, spac
 
     // Upload furniture file if it's a File object
     if (workflowData.furnitureFile && workflowData.furnitureFile instanceof File) {
-      const uploadResult = await uploadFileToCloud(workflowData.furnitureFile, userId)
+      const uploadResult = await uploadFileToCloud(workflowData.furnitureFile, clerkInstance)
       uploadedWorkflow.furnitureFile = {
         name: workflowData.furnitureFile.name,
         url: uploadResult.url,
@@ -195,7 +211,7 @@ export async function saveProjectToCloud(userId, projectName, workflowData, spac
       const response = await fetch(workflowData.resultUrl)
       const blob = await response.blob()
       const file = new File([blob], `result-${Date.now()}.png`, { type: 'image/png' })
-      const uploadResult = await uploadFileToCloud(file, userId)
+      const uploadResult = await uploadFileToCloud(file, clerkInstance)
       uploadedWorkflow.resultUrl = uploadResult.url
     }
 
@@ -209,7 +225,7 @@ export async function saveProjectToCloud(userId, projectName, workflowData, spac
           spaceId,
         }),
       },
-      userId
+      clerkInstance
     )
 
     return project
@@ -220,14 +236,14 @@ export async function saveProjectToCloud(userId, projectName, workflowData, spac
 }
 
 // Get projects from cloud
-export async function getProjectsFromCloud(userId, spaceId = null) {
-  if (!userId) {
+export async function getProjectsFromCloud(clerkInstance, spaceId = null) {
+  if (!clerkInstance) {
     return []
   }
 
   try {
     const endpoint = spaceId ? `?spaceId=${spaceId}` : ''
-    const data = await apiRequest(endpoint, { method: 'GET' }, userId)
+    const data = await apiRequest(endpoint, { method: 'GET' }, clerkInstance)
     // Handle both { projects: [...] } and direct array responses
     if (Array.isArray(data)) {
       return data
@@ -244,13 +260,13 @@ export async function getProjectsFromCloud(userId, spaceId = null) {
 }
 
 // Get single project from cloud
-export async function getProjectFromCloud(userId, projectId) {
-  if (!userId) {
+export async function getProjectFromCloud(clerkInstance, projectId) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated')
   }
 
   try {
-    const project = await apiRequest(`?projectId=${projectId}`, { method: 'GET' }, userId)
+    const project = await apiRequest(`?projectId=${projectId}`, { method: 'GET' }, clerkInstance)
     return project
   } catch (error) {
     console.error('Error fetching project from cloud:', error)
@@ -259,8 +275,8 @@ export async function getProjectFromCloud(userId, projectId) {
 }
 
 // Update project in cloud
-export async function updateProjectInCloud(userId, projectId, updates) {
-  if (!userId) {
+export async function updateProjectInCloud(clerkInstance, projectId, updates) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated')
   }
 
@@ -271,7 +287,7 @@ export async function updateProjectInCloud(userId, projectId, updates) {
         method: 'PUT',
         body: JSON.stringify(updates),
       },
-      userId
+      clerkInstance
     )
     return project
   } catch (error) {
@@ -281,13 +297,13 @@ export async function updateProjectInCloud(userId, projectId, updates) {
 }
 
 // Delete project from cloud
-export async function deleteProjectFromCloud(userId, projectId) {
-  if (!userId) {
+export async function deleteProjectFromCloud(clerkInstance, projectId) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated')
   }
 
   try {
-    await apiRequest(`?projectId=${projectId}`, { method: 'DELETE' }, userId)
+    await apiRequest(`?projectId=${projectId}`, { method: 'DELETE' }, clerkInstance)
     return true
   } catch (error) {
     console.error('Error deleting project from cloud:', error)
@@ -296,13 +312,13 @@ export async function deleteProjectFromCloud(userId, projectId) {
 }
 
 // Spaces management
-export async function getSpacesFromCloud(userId) {
-  if (!userId) {
+export async function getSpacesFromCloud(clerkInstance) {
+  if (!clerkInstance) {
     return []
   }
 
   try {
-    const data = await spacesApiRequest('', { method: 'GET' }, userId)
+    const data = await spacesApiRequest('', { method: 'GET' }, clerkInstance)
     return data.spaces || []
   } catch (error) {
     console.error('Error fetching spaces from cloud:', error)
@@ -310,8 +326,8 @@ export async function getSpacesFromCloud(userId) {
   }
 }
 
-export async function createSpaceInCloud(userId, spaceName) {
-  if (!userId) {
+export async function createSpaceInCloud(clerkInstance, spaceName) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated')
   }
 
@@ -322,7 +338,7 @@ export async function createSpaceInCloud(userId, spaceName) {
         method: 'POST',
         body: JSON.stringify({ name: spaceName }),
       },
-      userId
+      clerkInstance
     )
     return space
   } catch (error) {
@@ -331,13 +347,13 @@ export async function createSpaceInCloud(userId, spaceName) {
   }
 }
 
-export async function deleteSpaceFromCloud(userId, spaceId) {
-  if (!userId) {
+export async function deleteSpaceFromCloud(clerkInstance, spaceId) {
+  if (!clerkInstance) {
     throw new Error('User must be authenticated')
   }
 
   try {
-    await spacesApiRequest(`?spaceId=${spaceId}`, { method: 'DELETE' }, userId)
+    await spacesApiRequest(`?spaceId=${spaceId}`, { method: 'DELETE' }, clerkInstance)
     return true
   } catch (error) {
     console.error('Error deleting space from cloud:', error)

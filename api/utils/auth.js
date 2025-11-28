@@ -24,9 +24,13 @@
 /**
  * Verifies Clerk session token and extracts user ID
  * 
- * SECURITY NOTE: This is a basic implementation. For production, you should:
+ * BACKWARD COMPATIBILITY: Accepts both session tokens (JWT) and user IDs
+ * This allows gradual migration from user ID to session tokens.
+ * 
+ * SECURITY NOTE: For production, you should:
  * 1. Install @clerk/backend: npm install @clerk/backend
  * 2. Use clerkClient.verifyToken() for proper JWT verification
+ * 3. Remove backward compatibility (user ID fallback)
  * 
  * @param {string} authHeader - Authorization header value
  * @returns {Promise<{userId: string} | null>}
@@ -43,51 +47,50 @@ async function verifyClerkToken(authHeader) {
   }
 
   try {
-    // Basic validation: Check if token looks like a Clerk token
-    // Clerk tokens are JWTs that start with specific patterns
-    if (token.length < 50) {
-      console.warn('Token too short to be valid')
-      return null
-    }
+    // Check if token is a JWT (has 3 parts separated by dots)
+    const parts = token.split('.')
+    const isJWT = parts.length === 3
 
-    // For now, we'll do a basic check and trust the token structure
-    // TODO: Implement proper JWT verification with Clerk's public key
-    // This requires installing @clerk/backend:
-    //   import { clerkClient } from '@clerk/backend'
-    //   const clerk = clerkClient(process.env.CLERK_SECRET_KEY)
-    //   const session = await clerk.verifyToken(token)
-    
-    // TEMPORARY: Extract user ID from token payload (basic JWT decode)
-    // WARNING: This doesn't verify the signature, only decodes the payload
-    // This is better than nothing but NOT secure - implement proper verification ASAP
-    try {
-      const parts = token.split('.')
-      if (parts.length !== 3) {
-        return null // Invalid JWT format
+    if (isJWT) {
+      // It's a JWT token - try to decode it
+      try {
+        const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
+        
+        // Check if token is expired
+        if (payload.exp && payload.exp < Date.now() / 1000) {
+          console.warn('Token expired')
+          return null
+        }
+        
+        // Extract user ID from Clerk token payload
+        const userId = payload.sub || payload.user_id || payload.userId
+        
+        if (!userId) {
+          return null
+        }
+        
+        return { userId }
+      } catch (decodeError) {
+        console.error('JWT decode failed:', decodeError.message)
+        return null
       }
+    } else {
+      // BACKWARD COMPATIBILITY: If it's not a JWT, treat it as a user ID
+      // This allows existing code to continue working while we migrate to session tokens
+      // TODO: Remove this fallback once all frontend code uses session tokens
+      console.warn('⚠️ Using user ID as token (backward compatibility mode). Please migrate to session tokens.')
       
-      const payload = JSON.parse(Buffer.from(parts[1], 'base64').toString())
-      
-      // Check if token is expired
-      if (payload.exp && payload.exp < Date.now() / 1000) {
-        console.warn('Token expired')
+      // Basic validation: user IDs should be reasonable length
+      if (token.length < 10 || token.length > 200) {
         return null
       }
       
-      // Extract user ID from Clerk token payload
-      const userId = payload.sub || payload.user_id || payload.userId
-      
-      if (!userId) {
-        return null
-      }
-      
-      return { userId }
-    } catch (decodeError) {
-      console.error('Token decode failed:', decodeError.message)
-      return null
+      // For backward compatibility, accept user ID directly
+      // In production, you should reject this and require proper session tokens
+      return { userId: token }
     }
   } catch (error) {
-    console.error('Clerk token verification failed:', error.message)
+    console.error('Token verification failed:', error.message)
     return null
   }
 }

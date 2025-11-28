@@ -3599,7 +3599,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 <Layer name="items-layer">
                   {(() => {
                     // Use viewport-culled items from hook
-                    const itemsToRender = visibleItemsFromHook.length > 0 ? visibleItemsFromHook : items
+                    // Ensure both values are arrays to prevent spread syntax errors
+                    const visibleItems = Array.isArray(visibleItemsFromHook) ? visibleItemsFromHook : []
+                    const fallbackItems = Array.isArray(items) ? items : []
+                    const itemsToRender = visibleItems.length > 0 ? visibleItems : fallbackItems
+
                     // Sort items by z_index (ascending) for correct stacking context
                     // Lower z_index = drawn first = behind
                     const sortedItems = [...itemsToRender].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))

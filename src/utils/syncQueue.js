@@ -140,12 +140,13 @@ class SyncQueue {
           useAIDesigner: item.project.workflow?.result?.useAIDesigner || item.project.workflow?.useAIDesigner || false,
         }
         
-        // Sync to cloud
+        // Sync to cloud - pass the project ID to ensure same UUID is used
         const cloudProject = await saveProjectToCloud(
           clerkInstance,
           item.project.name,
           workflowData,
-          item.project.spaceId
+          item.project.spaceId,
+          item.project.id // Pass the local UUID
         )
         
         // Update project with cloud data

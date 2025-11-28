@@ -223,6 +223,7 @@ export async function saveProjectToCloud(clerkInstance, projectName, workflowDat
           name: projectName,
           workflow: uploadedWorkflow,
           spaceId,
+          id: projectId, // Pass the local UUID so cloud uses the same ID
         }),
       },
       clerkInstance

@@ -63,18 +63,23 @@ export async function saveProject(userId, projectName, workflowData, spaceId = n
             useAIDesigner: workflowData.useAIDesigner || false,
           }
 
-          const cloudProject = await cloudManager.saveProjectToCloud(clerkInstance, projectName, cloudWorkflow, spaceId)
+          // Pass the local project ID to ensure cloud uses the same UUID
+          const cloudProject = await cloudManager.saveProjectToCloud(clerkInstance, projectName, cloudWorkflow, spaceId, localProject.id)
           
-          // Update local project with cloud data
+          // Update local project with cloud data (but keep the same ID)
           localProject.syncStatus = 'synced'
           localProject.lastSyncedAt = new Date().toISOString()
-          updateProjectInLocalStorage(userId, localProject.id, {
+          // Merge cloud data but preserve local ID
+          const updatedProject = {
+            ...localProject,
+            ...cloudProject,
+            id: localProject.id, // Ensure we keep the local UUID
             syncStatus: 'synced',
             lastSyncedAt: new Date().toISOString(),
-            ...cloudProject
-          })
+          }
+          updateProjectInLocalStorage(userId, localProject.id, updatedProject)
           
-          return localProject
+          return updatedProject
         } catch (cloudError) {
           console.warn('Cloud save failed, queued for retry:', cloudError)
           // Already queued in saveProjectToLocalStorage

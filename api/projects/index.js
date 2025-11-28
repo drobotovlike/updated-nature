@@ -249,24 +249,47 @@ async function handler(req, res, userId) {
 
       case 'POST':
         // Create new project
-        const { name, workflow, spaceId: newSpaceId } = req.body
+        const { name, workflow, spaceId: newSpaceId, id: providedId } = req.body
 
         if (!name || !name.trim()) {
           return res.status(400).json({ error: 'Project name is required' })
         }
 
+        // Build insert data - include ID if provided (from client-side UUID generation)
+        const insertData = {
+          user_id: userId,
+          name: name.trim(),
+          space_id: newSpaceId || null,
+          workflow: workflow || {},
+        }
+
+        // If a UUID is provided, use it (ensures local and cloud IDs match)
+        if (providedId && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(providedId)) {
+          insertData.id = providedId
+        }
+
         const { data: newProject, error: insertError } = await supabase
           .from('projects')
-          .insert({
-            user_id: userId,
-            name: name.trim(),
-            space_id: newSpaceId || null,
-            workflow: workflow || {},
-          })
+          .insert(insertData)
           .select()
           .single()
 
-        if (insertError) throw insertError
+        if (insertError) {
+          // If ID conflict (project already exists), try to get existing project
+          if (insertError.code === '23505' && providedId) {
+            const { data: existingProject, error: getError } = await supabase
+              .from('projects')
+              .select('*')
+              .eq('id', providedId)
+              .eq('user_id', userId)
+              .single()
+            
+            if (!getError && existingProject) {
+              return res.status(200).json(existingProject)
+            }
+          }
+          throw insertError
+        }
 
         return res.status(201).json(newProject)
 

@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react'
-import { useUser, useAuth } from '@clerk/clerk-react'
+import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
 import { getProjects, deleteProject } from '../utils/projectManager'
 
 export default function AccountView() {
   const [activeTab, setActiveTab] = useState('profile')
   const { user, isLoaded } = useUser()
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [savedProjects, setSavedProjects] = useState([])
   
   // Profile editing state

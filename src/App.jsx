@@ -631,7 +631,7 @@ function StudioPage() {
   useEffect(() => {
     async function loadProjects() {
       if (userId) {
-        const projects = await getProjects(userId)
+        const projects = await getProjects(userId, null, clerk)
         setSavedProjects(projects)
       }
     }

@@ -583,23 +583,25 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     // CRITICAL: Verify project exists in database before uploading
     try {
       // First, try to verify project exists in database
-      const { getProject } = await import('../utils/projectManager')
-      try {
-        const dbProject = await getProject(userId, projectId, clerk)
-        console.log('✅ Project verified in database:', projectId)
-      } catch (dbError) {
-        console.warn('Project not in database, attempting sync...', dbError.message)
-        
-        // Project doesn't exist in database - sync it
-        const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
-        const project = projects.find(p => p.id === projectId)
-        
-        if (!project) {
-          setError('Project not found. Please refresh the page.')
-          return
-        }
-        
-        if (navigator.onLine && clerk && syncQueueRef.current) {
+      // Only verify if clerk is available and ready
+      if (clerk && typeof clerk.getToken === 'function') {
+        const { getProject } = await import('../utils/projectManager')
+        try {
+          const dbProject = await getProject(userId, projectId, clerk)
+          console.log('✅ Project verified in database:', projectId)
+        } catch (dbError) {
+          console.warn('Project not in database, attempting sync...', dbError.message)
+          
+          // Project doesn't exist in database - sync it
+          const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+          const project = projects.find(p => p.id === projectId)
+          
+          if (!project) {
+            setError('Project not found. Please refresh the page.')
+            return
+          }
+          
+          if (navigator.onLine && clerk && typeof clerk.getToken === 'function' && syncQueueRef.current) {
           setError('Syncing project to cloud...')
           
           // Sync the project
@@ -644,6 +646,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           setError('Unable to sync project. Please refresh the page and try again.')
           return
         }
+        }
+      } else {
+        // Clerk not ready - skip verification and try to proceed (will fail at upload if needed)
+        console.warn('Clerk not ready, skipping project verification')
       }
     } catch (syncCheckError) {
       console.error('Error checking project sync status:', syncCheckError)
@@ -659,6 +665,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         setError('Authentication required. Please refresh the page and sign in again.')
         return
       }
+      
+      // Verify clerk has getToken method before proceeding
+      if (typeof clerk.getToken !== 'function') {
+        console.error('Clerk instance is not ready:', { 
+          clerkType: typeof clerk, 
+          hasGetToken: typeof clerk.getToken,
+          clerkKeys: Object.keys(clerk || {})
+        })
+        setError('Authentication is not ready. Please wait a moment and try again.')
+        return
+      }
+      
       const uploadResult = await uploadFileToCloud(file, clerk)
       const imageUrl = uploadResult.url
 

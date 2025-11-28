@@ -42,18 +42,18 @@ async function verifyClerkToken(authHeader) {
 
 **High Priority:**
 - ✅ `api/nano-banana/visualize.js` - SECURED
-- ⚠️ `api/generate/index.js` - Has optional auth, should require it
-- ⚠️ `api/projects/index.js` - Needs proper token verification
-- ⚠️ `api/spaces/index.js` - Needs proper token verification
-- ⚠️ `api/files/upload.js` - Needs proper token verification
-- ⚠️ `api/canvas/index.js` - Needs proper token verification
-- ⚠️ `api/assets/index.js` - Needs proper token verification
+- ✅ `api/generate/index.js` - SECURED
+- ✅ `api/projects/index.js` - SECURED
+- ✅ `api/spaces/index.js` - SECURED
+- ✅ `api/files/upload.js` - SECURED
+- ✅ `api/canvas/index.js` - SECURED
+- ✅ `api/assets/index.js` - SECURED
 
 **Medium Priority:**
-- `api/image-processing/index.js`
-- `api/image-editing/index.js`
-- `api/sharing/index.js`
-- `api/export/index.js`
+- ✅ `api/image-processing/index.js` - SECURED
+- ✅ `api/image-editing/index.js` - SECURED
+- ✅ `api/sharing/index.js` - SECURED (uses optionalAuth for public links)
+- ✅ `api/export/index.js` - SECURED
 
 ### 4. How to Secure Remaining Endpoints
 

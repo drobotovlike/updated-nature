@@ -19,6 +19,13 @@ import VariationsComparisonView from './VariationsComparisonView'
 import { useCanvasHotkeys } from '../hooks/useCanvasHotkeys'
 import { useCanvasSelection } from '../hooks/useCanvasSelection'
 import { useCanvasHistory } from '../hooks/useCanvasHistory'
+// New imports for the Visual Electric Canvas Engine
+import { useCanvasStore } from '../stores/useCanvasStore'
+import { toWorld, getWorldPointerPosition } from '../utils/coordinateSystem'
+import { useViewportCulling } from '../hooks/useViewportCulling'
+import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
+import { useSmartSnapping } from '../hooks/useSmartSnapping'
+import { InfiniteGrid } from './InfiniteGrid'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -352,22 +359,25 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     )
   }
 
-  // Canvas state
-  const [items, setItems] = useState([])
-  const { selectedItemId, selectedItemIds, setSelectedItemId, setSelectedItemIds, handleSelect, clearSelection } = useCanvasSelection()
+  // Canvas state - Using Zustand store for core canvas state
+  const items = useCanvasStore((state) => state.items)
+  const setItems = useCanvasStore((state) => state.setItems)
+  const camera = useCanvasStore((state) => state.camera)
+  const setCamera = useCanvasStore((state) => state.setCamera)
+  const dimensions = useCanvasStore((state) => state.dimensions)
+  const setDimensions = useCanvasStore((state) => state.setDimensions)
+  const settings = useCanvasStore((state) => state.settings)
+  const updateSettings = useCanvasStore((state) => state.updateSettings)
+  const selection = useCanvasStore((state) => state.selection)
+  const setSelection = useCanvasStore((state) => state.setSelection)
+  const clearSelection = useCanvasStore((state) => state.clearSelection)
+  
+  // Legacy selection hooks (keeping for compatibility during migration)
+  const { selectedItemId, selectedItemIds, setSelectedItemId, setSelectedItemIds, handleSelect } = useCanvasSelection()
   const { history, historyIndex, addToHistory, undo, redo, canUndo, canRedo } = useCanvasHistory(items)
   const [clipboard, setClipboard] = useState(null) // For copy/paste
-  const [canvasState, setCanvasState] = useState({
-    zoom: 1,
-    panX: 0,
-    panY: 0,
-    rulerEnabled: false,
-    showMeasurements: true,
-    backgroundColor: '#F6F2EE',
-    gridEnabled: true,
-    gridSize: 20,
-  })
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 })
+  
+  // Dimensions are managed in the store, but we need to sync them from containerRef
   const [isGenerating, setIsGenerating] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
   const [generatePrompt, setGeneratePrompt] = useState('')
@@ -495,7 +505,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         itemTop > viewport.bottom + padding
       )
     }).length
-  }, [items, dimensions.width, dimensions.height, canvasState.panX, canvasState.panY, canvasState.zoom])
+  }, [items, dimensions.width, dimensions.height, camera.x, camera.y, camera.zoom])
 
   // Show popup menu when item is selected and update position on pan/zoom
   useEffect(() => {
@@ -525,7 +535,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } else {
       setPopupMenuPosition({ x: 0, y: 0, visible: false })
     }
-  }, [selectedItemId, canvasState.panX, canvasState.panY, canvasState.zoom, selectedItem])
+  }, [selectedItemId, camera.x, camera.y, camera.zoom, selectedItem])
 
   // Close popup menu when clicking outside
   useEffect(() => {
@@ -689,17 +699,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setItems(data.items || [])
 
       if (data.state) {
-        const restoredState = {
-          zoom: data.state.zoom_level || 1,
-          panX: data.state.pan_x || 0,
-          panY: data.state.pan_y || 0,
+        // Restore camera state
+        const restoredZoom = data.state.zoom_level || 1
+        const restoredPanX = data.state.pan_x || 0
+        const restoredPanY = data.state.pan_y || 0
+        
+        // Restore settings
+        updateSettings({
           rulerEnabled: data.state.ruler_enabled || false,
           showMeasurements: data.state.show_measurements !== false,
           backgroundColor: data.state.background_color || '#fafaf9',
           gridEnabled: data.state.grid_enabled !== false,
           gridSize: data.state.grid_size || 20,
-        }
-        setCanvasState(restoredState)
+        })
 
         // Restore stage position and zoom
         setTimeout(() => {
@@ -709,17 +721,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             const currentCanvasHeight = dimensions.height * 4
             const maxX = currentCanvasWidth - dimensions.width
             const maxY = currentCanvasHeight - dimensions.height
-            const clampedX = Math.max(0, Math.min(maxX, restoredState.panX))
-            const clampedY = Math.max(0, Math.min(maxY, restoredState.panY))
+            const clampedX = Math.max(0, Math.min(maxX, restoredPanX))
+            const clampedY = Math.max(0, Math.min(maxY, restoredPanY))
 
             stageRef.current.position({ x: clampedX, y: clampedY })
-            stageRef.current.scale({ x: restoredState.zoom, y: restoredState.zoom })
+            stageRef.current.scale({ x: restoredZoom, y: restoredZoom })
 
-            setCanvasState((prev) => ({
-              ...prev,
-              panX: clampedX,
-              panY: clampedY,
-            }))
+            // Update store
+            setCamera({
+              x: clampedX,
+              y: clampedY,
+              zoom: restoredZoom,
+            })
           }
         }, 100)
       }
@@ -794,12 +807,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const initialY = (canvasHeight - dimensions.height) / 2
         stageRef.current.position({ x: initialX, y: initialY })
         stageRef.current.scale({ x: 1, y: 1 })
-        setCanvasState((prev) => ({
-          ...prev,
-          panX: initialX,
-          panY: initialY,
+        setCamera({
+          x: initialX,
+          y: initialY,
           zoom: 1,
-        }))
+        })
       }
     }
   }, [dimensions.width, dimensions.height, loading])
@@ -882,11 +894,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         zoom_level: scale,
         pan_x: position.x,
         pan_y: position.y,
-        ruler_enabled: canvasState.rulerEnabled,
-        show_measurements: canvasState.showMeasurements,
-        background_color: canvasState.backgroundColor,
-        grid_enabled: canvasState.gridEnabled,
-        grid_size: canvasState.gridSize,
+        ruler_enabled: settings.rulerEnabled,
+        show_measurements: settings.showMeasurements,
+        background_color: settings.backgroundColor,
+        grid_enabled: settings.gridEnabled,
+        grid_size: settings.gridSize,
       })
     } catch (error) {
       console.error('Error saving canvas state:', error)
@@ -1824,12 +1836,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     stage.position({ x: clampedX, y: clampedY })
 
-    setCanvasState((prev) => ({
-      ...prev,
-      panX: clampedX,
-      panY: clampedY,
+    setCamera({
+      x: clampedX,
+      y: clampedY,
       zoom: scale,
-    }))
+    })
     saveCanvasStateToServer()
   }, [dimensions.width, dimensions.height, saveCanvasStateToServer])
 
@@ -1853,12 +1864,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
 
     // Update state in real-time during drag for grid to update
-    setCanvasState((prev) => ({
-      ...prev,
-      panX: clampedX,
-      panY: clampedY,
+    setCamera({
+      x: clampedX,
+      y: clampedY,
       zoom: scale,
-    }))
+    })
   }, [dimensions.width, dimensions.height])
 
   // Outpaint mode handlers
@@ -1990,67 +2000,37 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     const clampedY = Math.max(0, Math.min(maxY, canvasY))
 
     stage.position({ x: clampedX, y: clampedY })
-    setCanvasState(prev => ({
-      ...prev,
-      panX: clampedX,
-      panY: clampedY,
-    }))
+    setCamera({
+      x: clampedX,
+      y: clampedY,
+      zoom: camera.zoom,
+    })
   }, [dimensions.width, dimensions.height])
 
-  const handleWheel = useCallback((e) => {
-    e.evt.preventDefault()
-
-    const stage = stageRef.current
-    if (!stage || dimensions.width === 0 || dimensions.height === 0) return
-
-    const oldScale = stage.scaleX()
-    const pointer = stage.getPointerPosition()
-    if (!pointer) return
-
-    // Use device-native scroll sensitivity
-    const deltaY = e.evt.deltaY
-    const absDelta = Math.abs(deltaY)
-
-    // Calculate zoom factor based on scroll amount
-    const baseZoomFactor = 1.001
-    const sensitivity = Math.min(absDelta / 10, 50)
-    const zoomFactor = 1 + (baseZoomFactor * sensitivity)
-
-    // Apply zoom in the correct direction
-    const proposedScale = deltaY > 0
-      ? oldScale / zoomFactor  // Zoom out
-      : oldScale * zoomFactor  // Zoom in
-
-    const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
-
-    const mousePointTo = {
-      x: (pointer.x - stage.x()) / oldScale,
-      y: (pointer.y - stage.y()) / oldScale,
+  // Use the new canvas interactions hook for zoom-to-cursor and panning
+  const {
+    handleWheel,
+    handleStageMouseDown: handleInteractionsMouseDown,
+    handleStageMouseMove: handleInteractionsMouseMove,
+    handleStageMouseUp: handleInteractionsMouseUp,
+    handleKeyDown: handleInteractionsKeyDown,
+    handleKeyUp: handleInteractionsKeyUp,
+    isSelecting,
+    selectionBox,
+  } = useCanvasInteractions(stageRef, dimensions)
+  
+  // Use viewport culling for performance
+  const visibleItemsFromHook = useViewportCulling(stageRef, 200)
+  
+  // Add keyboard event listeners for spacebar panning
+  useEffect(() => {
+    document.addEventListener('keydown', handleInteractionsKeyDown)
+    document.addEventListener('keyup', handleInteractionsKeyUp)
+    return () => {
+      document.removeEventListener('keydown', handleInteractionsKeyDown)
+      document.removeEventListener('keyup', handleInteractionsKeyUp)
     }
-
-    const newPos = {
-      x: pointer.x - mousePointTo.x * clampedScale,
-      y: pointer.y - mousePointTo.y * clampedScale,
-    }
-
-    // Clamp pan to canvas bounds
-    const canvasWidth = dimensions.width * 4
-    const canvasHeight = dimensions.height * 4
-    const maxX = canvasWidth - dimensions.width
-    const maxY = canvasHeight - dimensions.height
-    const clampedX = Math.max(0, Math.min(maxX, newPos.x))
-    const clampedY = Math.max(0, Math.min(maxY, newPos.y))
-
-    stage.scale({ x: clampedScale, y: clampedScale })
-    stage.position({ x: clampedX, y: clampedY })
-
-    setCanvasState((prev) => ({
-      ...prev,
-      zoom: clampedScale,
-      panX: clampedX,
-      panY: clampedY,
-    }))
-  }, [dimensions.width, dimensions.height])
+  }, [handleInteractionsKeyDown, handleInteractionsKeyUp])
 
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
@@ -2492,7 +2472,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [getCreations])
 
   return (
-    <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: canvasState.backgroundColor }}>
+    <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}
       <div
         className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${
@@ -3059,7 +3039,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 maskLayerRef.current.draw()
               }
             }}
-            zoom={canvasState.zoom}
+            zoom={camera.zoom}
             brushSize={eraserBrushSize}
             setBrushSize={setEraserBrushSize}
           />
@@ -3273,21 +3253,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         <div
           ref={containerRef}
           className="flex-1 relative w-full h-full overflow-hidden"
-          style={{ backgroundColor: canvasState.backgroundColor }}
+          style={{ backgroundColor: settings.backgroundColor }}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
           {/* Grid Background - CSS-based, fixed to viewport, behind Stage */}
-          {canvasState.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
+          {settings.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
             // Get current stage position in real-time for smooth grid updates
             const stage = stageRef.current
-            const currentPanX = stage ? stage.x() : canvasState.panX
-            const currentPanY = stage ? stage.y() : canvasState.panY
-            const currentZoom = stage ? stage.scaleX() : canvasState.zoom
+            const currentPanX = stage ? stage.x() : camera.x
+            const currentPanY = stage ? stage.y() : camera.y
+            const currentZoom = stage ? stage.scaleX() : camera.zoom
 
             // Convert grid size based on unit
-            let baseGridSize = canvasState.gridSize || 20
-            if (canvasState.gridUnit === 'in') {
+            let baseGridSize = settings.gridSize || 20
+            if (settings.gridUnit === 'in') {
               baseGridSize = baseGridSize * 96 // 1 inch = 96px at 96 DPI
             } else if (canvasState.gridUnit === 'cm') {
               baseGridSize = baseGridSize * 37.8 // 1 cm ≈ 37.8px at 96 DPI
@@ -3368,43 +3348,21 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 style={{ position: 'relative', zIndex: 1 }}
               >
 
-                {/* Canvas Items Layer - Virtual Rendering */}
+                {/* Infinite Grid Background */}
+                <Layer name="grid-layer">
+                  <InfiniteGrid />
+                </Layer>
+
+                {/* Canvas Items Layer - Virtual Rendering using hook */}
                 <Layer name="items-layer">
                   {(() => {
-                    // Virtual rendering: only render items visible in viewport
-                    // Account for pan and zoom
-                    const stage = stageRef.current
-                    if (!stage || !items || !Array.isArray(items)) return items || []
-
-                    const viewport = {
-                      left: -stage.x() / stage.scaleX(),
-                      right: (dimensions.width - stage.x()) / stage.scaleX(),
-                      top: -stage.y() / stage.scaleY(),
-                      bottom: (dimensions.height - stage.y()) / stage.scaleY(),
-                    }
-
-                    // Add padding for items partially visible
-                    const padding = 200
-
+                    // Use viewport-culled items from hook
+                    const itemsToRender = visibleItemsFromHook.length > 0 ? visibleItemsFromHook : items
                     // Sort items by z_index (ascending) for correct stacking context
                     // Lower z_index = drawn first = behind
-                    const sortedItems = [...items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+                    const sortedItems = [...itemsToRender].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
 
-                    const visibleItems = sortedItems.filter((item) => {
-                      const itemLeft = item.x_position
-                      const itemRight = item.x_position + (item.width || 0)
-                      const itemTop = item.y_position
-                      const itemBottom = item.y_position + (item.height || 0)
-
-                      return !(
-                        itemRight < viewport.left - padding ||
-                        itemLeft > viewport.right + padding ||
-                        itemBottom < viewport.top - padding ||
-                        itemTop > viewport.bottom + padding
-                      )
-                    })
-
-                    return visibleItems.map((item) => (
+                    return sortedItems.map((item) => (
                       <CanvasItem
                         key={item.id}
                         item={item}
@@ -3446,7 +3404,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           }
                         }}
                         showMeasurements={canvasState.showMeasurements}
-                        zoom={canvasState.zoom}
+                        zoom={camera.zoom}
                         blendMode={blendMode}
                       />
                     ))
@@ -3492,6 +3450,23 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           })
                         }
                       }}
+                    />
+                  </Layer>
+                )}
+
+                {/* Rubber Band Selection Box */}
+                {isSelecting && selectionBox && (
+                  <Layer name="selection-box-layer">
+                    <Rect
+                      x={selectionBox.x * camera.zoom + camera.x}
+                      y={selectionBox.y * camera.zoom + camera.y}
+                      width={selectionBox.width * camera.zoom}
+                      height={selectionBox.height * camera.zoom}
+                      stroke="#3b82f6"
+                      strokeWidth={2 / camera.zoom}
+                      fill="rgba(59, 130, 246, 0.1)"
+                      dash={[5, 5]}
+                      listening={false}
                     />
                   </Layer>
                 )}
@@ -3587,8 +3562,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             {/* Canvas Controls */}
             <div className="flex items-center gap-1 bg-[#F1EBE4] rounded-full p-1">
               <button
-                onClick={() => setCanvasState((prev) => ({ ...prev, gridEnabled: !prev.gridEnabled }))}
-                className={`p - 1.5 rounded - full transition - colors ${canvasState.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
+                onClick={() => updateSettings({ gridEnabled: !settings.gridEnabled })}
+                className={`p - 1.5 rounded - full transition - colors ${settings.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
                   } `}
                 title="Toggle grid overlay - Show/hide alignment grid on canvas"
               >
@@ -3600,8 +3575,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </svg>
               </button>
               <button
-                onClick={() => setCanvasState((prev) => ({ ...prev, rulerEnabled: !prev.rulerEnabled }))}
-                className={`p - 1.5 rounded - full transition - colors ${canvasState.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
+                onClick={() => updateSettings({ rulerEnabled: !settings.rulerEnabled })}
+                className={`p - 1.5 rounded - full transition - colors ${settings.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
                   } `}
                 title="Toggle ruler - Show/hide measurement ruler on canvas edges"
               >

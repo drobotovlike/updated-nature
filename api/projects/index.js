@@ -1,8 +1,8 @@
 // Cloud Storage API for Projects using Supabase
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth } from '../../lib/server-utils/auth.js'
-import { getSupabaseConfig } from '../../lib/server-utils/env.js'
-import { logger } from '../../lib/server-utils/logger.js'
+import { requireAuth } from '../_utils/auth.js'
+import { getSupabaseConfig } from '../_utils/env.js'
+import { logger } from '../_utils/logger.js'
 
 // Get Supabase configuration (fails fast if not set)
 const { url: supabaseUrl, serviceKey: supabaseServiceKey } = getSupabaseConfig()

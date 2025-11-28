@@ -1,7 +1,7 @@
 // Client Sharing & Collaboration API
 import { createClient } from '@supabase/supabase-js'
 import crypto from 'crypto'
-import { optionalAuth, verifyClerkToken } from '../../lib/server-utils/auth.js'
+import { optionalAuth, verifyClerkToken } from '../_utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY

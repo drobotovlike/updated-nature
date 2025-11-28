@@ -1,4 +1,4 @@
-import { requireAuth } from '../../lib/server-utils/auth.js'
+import { requireAuth } from '../_utils/auth.js'
 
 async function handler(req, res, userId) {
   // userId is verified and safe to use

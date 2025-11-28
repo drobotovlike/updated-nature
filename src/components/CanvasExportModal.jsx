@@ -2,7 +2,7 @@ import { useState } from 'react'
 import html2canvas from 'html2canvas'
 import { PDFDocument, rgb } from 'pdf-lib'
 
-export default function CanvasExportModal({ items, selectedItemIds, stageRef, dimensions, canvasState, onClose }) {
+export default function CanvasExportModal({ items, selectedItemIds, stageRef, dimensions, camera, settings, onClose }) {
   const [exportFormat, setExportFormat] = useState('png')
   const [exporting, setExporting] = useState(false)
   const [includeMetadata, setIncludeMetadata] = useState(true)
@@ -80,12 +80,12 @@ export default function CanvasExportModal({ items, selectedItemIds, stageRef, di
       const ctx = exportCanvas.getContext('2d')
 
       // Draw background
-      ctx.fillStyle = canvasState.backgroundColor || '#fafaf9'
+      ctx.fillStyle = settings?.backgroundColor || '#fafaf9'
       ctx.fillRect(0, 0, bbox.width, bbox.height)
 
       // Draw grid if enabled
-      if (canvasState.gridEnabled) {
-        const gridSize = canvasState.gridSize || 20
+      if (settings?.gridEnabled) {
+        const gridSize = settings?.gridSize || 20
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.1)'
         ctx.lineWidth = 1
         for (let x = 0; x <= bbox.width; x += gridSize) {
@@ -246,11 +246,11 @@ export default function CanvasExportModal({ items, selectedItemIds, stageRef, di
       let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${bbox.width}" height="${bbox.height}" viewBox="0 0 ${bbox.width} ${bbox.height}">`
       
       // Background
-      svg += `<rect width="${bbox.width}" height="${bbox.height}" fill="${canvasState.backgroundColor || '#fafaf9'}" />`
+      svg += `<rect width="${bbox.width}" height="${bbox.height}" fill="${settings?.backgroundColor || '#fafaf9'}" />`
       
       // Grid if enabled
-      if (canvasState.gridEnabled) {
-        const gridSize = canvasState.gridSize || 20
+      if (settings?.gridEnabled) {
+        const gridSize = settings?.gridSize || 20
         for (let x = 0; x <= bbox.width; x += gridSize) {
           svg += `<line x1="${x}" y1="0" x2="${x}" y2="${bbox.height}" stroke="rgba(0,0,0,0.1)" stroke-width="1" />`
         }

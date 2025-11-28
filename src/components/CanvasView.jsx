@@ -903,7 +903,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } catch (error) {
       console.error('Error saving canvas state:', error)
     }
-  }, [projectId, userId, canvasState])
+  }, [projectId, userId, camera, settings])
 
   // Debounced save
   useEffect(() => {
@@ -911,7 +911,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       saveCanvasStateToServer()
     }, 1000)
     return () => clearTimeout(timer)
-  }, [canvasState, saveCanvasStateToServer])
+  }, [camera, settings, saveCanvasStateToServer])
 
   const handleItemUpdate = useCallback(async (itemId, updates) => {
     try {
@@ -3269,7 +3269,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             let baseGridSize = settings.gridSize || 20
             if (settings.gridUnit === 'in') {
               baseGridSize = baseGridSize * 96 // 1 inch = 96px at 96 DPI
-            } else if (canvasState.gridUnit === 'cm') {
+            } else if (settings.gridUnit === 'cm') {
               baseGridSize = baseGridSize * 37.8 // 1 cm ≈ 37.8px at 96 DPI
             }
 
@@ -3403,7 +3403,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                             })
                           }
                         }}
-                        showMeasurements={canvasState.showMeasurements}
+                        showMeasurements={settings.showMeasurements}
                         zoom={camera.zoom}
                         blendMode={blendMode}
                       />
@@ -3803,7 +3803,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
             {/* Zoom Display */}
             <div className="px-3 py-1 text-xs text-[#7C7C7C] font-medium whitespace-nowrap" title="Current zoom level - Use mouse wheel to zoom in/out">
-              {Math.round(canvasState.zoom * 100)}%
+              {Math.round(camera.zoom * 100)}%
             </div>
 
             {/* Performance Indicator (dev mode) */}
@@ -4029,7 +4029,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           selectedItemIds={selectedItemIds}
           stageRef={stageRef}
           dimensions={dimensions}
-          canvasState={canvasState}
+          camera={camera}
+          settings={settings}
           onClose={() => setShowExportModal(false)}
         />
       )}

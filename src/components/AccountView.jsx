@@ -70,7 +70,7 @@ export default function AccountView() {
     if (window.confirm('Are you sure you want to delete this project?')) {
       try {
         await deleteProject(userId, projectId)
-        const projects = await getProjects(userId)
+        const projects = await getProjects(userId, null, clerk)
         setSavedProjects(projects)
       } catch (error) {
         console.error('Error deleting project:', error)

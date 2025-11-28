@@ -461,6 +461,66 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
+  // State to track the actual UUID projectId (may differ from prop if auto-saved)
+  const [actualProjectId, setActualProjectId] = useState(projectId)
+
+  // Auto-save localStorage projects to cloud to get UUID
+  useEffect(() => {
+    const autoSaveToCloud = async () => {
+      if (!projectId || !userId || !clerk) return
+      
+      // Check if projectId is not a UUID (localStorage project)
+      if (!isValidUUID(projectId)) {
+        try {
+          console.log('Project is stored locally, auto-saving to cloud...', projectId)
+          setError('Saving project to cloud...')
+          
+          // Load the project from localStorage
+          const localProject = await getProject(userId, projectId)
+          
+          if (!localProject) {
+            throw new Error('Local project not found')
+          }
+
+          // Prepare workflow data for cloud save
+          const workflowData = {
+            mode: localProject.workflow?.mode || '',
+            furnitureFile: localProject.workflow?.furnitureFile || null,
+            furnitureFileName: localProject.workflow?.furnitureFile?.name,
+            furniturePreviewUrl: localProject.workflow?.furnitureFile?.url,
+            roomFile: localProject.workflow?.roomFile || null,
+            roomFileName: localProject.workflow?.roomFile?.name,
+            roomPreviewUrl: localProject.workflow?.roomFile?.url,
+            model3dUrl: localProject.workflow?.model3d?.url,
+            resultUrl: localProject.workflow?.result?.url || localProject.workflow?.resultUrl,
+            description: localProject.workflow?.result?.description || localProject.workflow?.description,
+            useAIDesigner: localProject.workflow?.result?.useAIDesigner || localProject.workflow?.useAIDesigner || false,
+          }
+
+          // Save to cloud (this will create a new UUID project)
+          const cloudProject = await saveProject(userId, localProject.name, workflowData, localProject.spaceId)
+          
+          console.log('Project auto-saved to cloud:', cloudProject.id)
+          setActualProjectId(cloudProject.id)
+          setError('')
+          
+          // Notify parent component if callback exists
+          if (onSave) {
+            onSave(cloudProject)
+          }
+        } catch (error) {
+          console.error('Error auto-saving project to cloud:', error)
+          setError('Failed to save project to cloud. Canvas features may not work properly.')
+        }
+      } else {
+        // Already a UUID, use it directly
+        setActualProjectId(projectId)
+      }
+    }
+
+    autoSaveToCloud()
+  }, [projectId, userId, clerk, onSave])
+
   // Undo/Redo handlers - Define early to prevent scope issues
   // Undo/Redo handlers
   const handleUndo = useCallback(() => {
@@ -687,66 +747,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     document.addEventListener('paste', handlePaste)
     return () => document.removeEventListener('paste', handlePaste)
   }, [handleFileUpload])
-
-  // State to track the actual UUID projectId (may differ from prop if auto-saved)
-  const [actualProjectId, setActualProjectId] = useState(projectId)
-
-  // Auto-save localStorage projects to cloud to get UUID
-  useEffect(() => {
-    const autoSaveToCloud = async () => {
-      if (!projectId || !userId || !clerk) return
-      
-      // Check if projectId is not a UUID (localStorage project)
-      if (!isValidUUID(projectId)) {
-        try {
-          console.log('Project is stored locally, auto-saving to cloud...', projectId)
-          setError('Saving project to cloud...')
-          
-          // Load the project from localStorage
-          const localProject = await getProject(userId, projectId)
-          
-          if (!localProject) {
-            throw new Error('Local project not found')
-          }
-
-          // Prepare workflow data for cloud save
-          const workflowData = {
-            mode: localProject.workflow?.mode || '',
-            furnitureFile: localProject.workflow?.furnitureFile || null,
-            furnitureFileName: localProject.workflow?.furnitureFile?.name,
-            furniturePreviewUrl: localProject.workflow?.furnitureFile?.url,
-            roomFile: localProject.workflow?.roomFile || null,
-            roomFileName: localProject.workflow?.roomFile?.name,
-            roomPreviewUrl: localProject.workflow?.roomFile?.url,
-            model3dUrl: localProject.workflow?.model3d?.url,
-            resultUrl: localProject.workflow?.result?.url || localProject.workflow?.resultUrl,
-            description: localProject.workflow?.result?.description || localProject.workflow?.description,
-            useAIDesigner: localProject.workflow?.result?.useAIDesigner || localProject.workflow?.useAIDesigner || false,
-          }
-
-          // Save to cloud (this will create a new UUID project)
-          const cloudProject = await saveProject(userId, localProject.name, workflowData, localProject.spaceId)
-          
-          console.log('Project auto-saved to cloud:', cloudProject.id)
-          setActualProjectId(cloudProject.id)
-          setError('')
-          
-          // Notify parent component if callback exists
-          if (onSave) {
-            onSave(cloudProject)
-          }
-        } catch (error) {
-          console.error('Error auto-saving project to cloud:', error)
-          setError('Failed to save project to cloud. Canvas features may not work properly.')
-        }
-      } else {
-        // Already a UUID, use it directly
-        setActualProjectId(projectId)
-      }
-    }
-
-    autoSaveToCloud()
-  }, [projectId, userId, clerk, onSave])
 
   // Define loadCanvas before it's used
   const loadCanvas = useCallback(async () => {

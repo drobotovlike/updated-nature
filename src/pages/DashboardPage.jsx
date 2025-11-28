@@ -396,29 +396,39 @@ export default function DashboardPage() {
           // Sync the project
           await syncQueue.syncProject(project.id, clerk)
           
-          // Wait and verify sync completed
+          // Wait and verify sync completed - also verify in database
           let attempts = 0
-          const maxAttempts = 10
-          while (attempts < maxAttempts) {
-            await new Promise(resolve => setTimeout(resolve, 300))
+          const maxAttempts = 15
+          let synced = false
+          
+          while (attempts < maxAttempts && !synced) {
+            await new Promise(resolve => setTimeout(resolve, 400))
             
-            // Check if project is now synced
+            // Check if project is now synced in localStorage
             const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
             const updatedProject = projects.find(p => p.id === project.id)
             
             if (updatedProject && updatedProject.syncStatus === 'synced') {
-              console.log('✅ Project synced successfully')
-              break
+              // Verify project actually exists in database
+              try {
+                const { getProject } = await import('../utils/projectManager')
+                const dbProject = await getProject(userId, project.id)
+                if (dbProject && dbProject.id === project.id) {
+                  console.log('✅ Project synced and verified in database:', project.id)
+                  synced = true
+                  break
+                }
+              } catch (verifyError) {
+                console.log('Project not yet in database, waiting...', verifyError.message)
+              }
             }
             
             attempts++
           }
           
-          // If still not synced, log warning but continue
-          const finalProjects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
-          const finalProject = finalProjects.find(p => p.id === project.id)
-          if (finalProject && finalProject.syncStatus !== 'synced') {
-            console.warn('Project sync may not have completed, but continuing anyway')
+          if (!synced) {
+            console.warn('⚠️ Project sync verification timeout. Project may not be in database yet.')
+            // Don't block - let user proceed, but they may see errors
           }
         } catch (syncError) {
           console.error('Immediate sync failed:', syncError)

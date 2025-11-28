@@ -64,7 +64,14 @@ export async function saveProject(userId, projectName, workflowData, spaceId = n
           }
 
           // Pass the local project ID to ensure cloud uses the same UUID
+          console.log('Syncing project to cloud with ID:', localProject.id)
           const cloudProject = await cloudManager.saveProjectToCloud(clerkInstance, projectName, cloudWorkflow, spaceId, localProject.id)
+          
+          console.log('Cloud project returned:', { id: cloudProject.id, localId: localProject.id, match: cloudProject.id === localProject.id })
+          
+          // IMPORTANT: Use the local ID, not the cloud ID (in case database generated a different one)
+          // The local ID is what we'll use for all operations
+          const finalProjectId = localProject.id
           
           // Update local project with cloud data (but keep the same ID)
           localProject.syncStatus = 'synced'
@@ -73,11 +80,18 @@ export async function saveProject(userId, projectName, workflowData, spaceId = n
           const updatedProject = {
             ...localProject,
             ...cloudProject,
-            id: localProject.id, // Ensure we keep the local UUID
+            id: finalProjectId, // CRITICAL: Always use the local UUID
             syncStatus: 'synced',
             lastSyncedAt: new Date().toISOString(),
           }
-          updateProjectInLocalStorage(userId, localProject.id, updatedProject)
+          
+          // If cloud returned a different ID, log a warning but use local ID
+          if (cloudProject.id && cloudProject.id !== finalProjectId) {
+            console.warn('⚠️ ID mismatch detected! Local:', finalProjectId, 'Cloud:', cloudProject.id)
+            console.warn('Using local ID for consistency. Project may need to be re-synced.')
+          }
+          
+          updateProjectInLocalStorage(userId, finalProjectId, updatedProject)
           
           return updatedProject
         } catch (cloudError) {

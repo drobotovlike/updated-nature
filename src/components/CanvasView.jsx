@@ -585,7 +585,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // First, try to verify project exists in database
       const { getProject } = await import('../utils/projectManager')
       try {
-        const dbProject = await getProject(userId, projectId)
+        const dbProject = await getProject(userId, projectId, clerk)
         console.log('✅ Project verified in database:', projectId)
       } catch (dbError) {
         console.warn('Project not in database, attempting sync...', dbError.message)
@@ -616,7 +616,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             // Try to fetch project from database
             try {
               const { getProject: getProjectCheck } = await import('../utils/projectManager')
-              const verifiedProject = await getProjectCheck(userId, projectId)
+              const verifiedProject = await getProjectCheck(userId, projectId, clerk)
               if (verifiedProject && verifiedProject.id === projectId) {
                 synced = true
                 setError('')
@@ -1004,7 +1004,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     // Verify project exists in database before saving state
     try {
       const { getProject } = await import('../utils/projectManager')
-      await getProject(userId, currentProjectId)
+      const clerkInstance = clerk // Get clerk from closure
+      if (clerkInstance) {
+        await getProject(userId, currentProjectId, clerkInstance)
+      } else {
+        // No clerk instance - skip verification (will fail at API level if needed)
+        console.warn('No clerk instance available for project verification')
+      }
     } catch (projectError) {
       // Project not in database - don't try to save state
       console.warn('Project not in database, skipping canvas state save:', projectError.message)
@@ -2498,7 +2504,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     async function loadProjectData() {
       if (projectId && userId) {
         try {
-          const projectData = await getProject(userId, projectId)
+          const projectData = await getProject(userId, projectId, clerk)
           setProject(projectData)
         } catch (error) {
           console.error('Error loading project:', error)

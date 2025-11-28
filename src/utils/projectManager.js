@@ -224,12 +224,12 @@ export async function getProjects(userId, spaceId = null) {
   return getProjectsFromLocalStorage(userId, spaceId)
 }
 
-export async function getProject(userId, projectId) {
+export async function getProject(userId, projectId, clerkInstance = null) {
   try {
-    // Try cloud first
-    if (await useCloud()) {
+    // Try cloud first (only if we have clerk instance)
+    if (await useCloud() && clerkInstance) {
       try {
-        const project = await cloudManager.getProjectFromCloud(userId, projectId)
+        const project = await cloudManager.getProjectFromCloud(clerkInstance, projectId)
         // Also cache in localStorage
         const projects = getProjectsFromLocalStorage(userId)
         const index = projects.findIndex(p => p.id === projectId)

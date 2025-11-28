@@ -13,12 +13,12 @@ export default function DashboardPage() {
   const { signOut } = useClerk()
   const clerk = useClerk()
   const navigate = useNavigate()
-  
+
   // View state: 'projects' | 'workspace' | 'account' | 'my-projects'
   const [currentView, setCurrentView] = useState('projects')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [editingCreation, setEditingCreation] = useState(null)
-  
+
   const [savedProjects, setSavedProjects] = useState([]) // All projects
   const [recentProjects, setRecentProjects] = useState([]) // Last 4 projects for home page
   const [sidebarProjects, setSidebarProjects] = useState([]) // Last 10 projects for sidebar
@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const [showCreateSpaceModal, setShowCreateSpaceModal] = useState(false)
   const [newSpaceName, setNewSpaceName] = useState('')
   const [showTrash, setShowTrash] = useState(false)
-  
+
   // New project creation state
   const [showCreateProjectModal, setShowCreateProjectModal] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
@@ -56,7 +56,7 @@ export default function DashboardPage() {
       setSidebarProjects([])
       return
     }
-    
+
     setSavedProjects(allProjects)
     // Sort by updated_at (most recent first)
     const sortedProjects = [...allProjects].sort((a, b) => {
@@ -91,11 +91,11 @@ export default function DashboardPage() {
   // Load thumbnails for projects
   useEffect(() => {
     if (!userId || !isSignedIn) return
-    
+
     const loadThumbnails = async () => {
       const thumbnails = {}
       const allProjects = [...new Set([...recentProjects, ...savedProjects].map(p => p.id))]
-      
+
       for (const projectId of allProjects) {
         if (!canvasThumbnails[projectId]) {
           const thumbnail = await getCanvasThumbnail(projectId)
@@ -104,12 +104,12 @@ export default function DashboardPage() {
           }
         }
       }
-      
+
       if (Object.keys(thumbnails).length > 0) {
         setCanvasThumbnails(prev => ({ ...prev, ...thumbnails }))
       }
     }
-    
+
     if (recentProjects.length > 0 || savedProjects.length > 0) {
       loadThumbnails()
     }
@@ -118,33 +118,33 @@ export default function DashboardPage() {
   // Load spaces and projects on mount
   useEffect(() => {
     if (!userId || !isSignedIn) return
-    
+
     // Ensure updateProjectLists is available before using it
     if (typeof updateProjectLists !== 'function') {
       console.warn('updateProjectLists not available yet')
       return
     }
-    
+
     async function loadData() {
       try {
-      // Clean up trash on every load - each item is checked individually
-      // Items are deleted only when their own 1-week period has passed
-      cleanupTrash(userId)
-      
-      const userSpaces = await getSpaces(userId)
-      const trashed = getTrashedSpaces(userId)
-      const trashedProjs = getTrashedProjects(userId)
+        // Clean up trash on every load - each item is checked individually
+        // Items are deleted only when their own 1-week period has passed
+        cleanupTrash(userId)
+
+        const userSpaces = await getSpaces(userId, clerk)
+        const trashed = getTrashedSpaces(userId)
+        const trashedProjs = getTrashedProjects(userId)
         setSpaces(userSpaces || [])
         setTrashedSpaces(trashed || [])
         setTrashedProjects(trashedProjs || [])
-      
-      // Load all projects for sidebar menu (regardless of space)
-      const allProjects = await getProjects(userId, null, clerk)
+
+        // Load all projects for sidebar menu (regardless of space)
+        const allProjects = await getProjects(userId, null, clerk)
         if (updateProjectLists && typeof updateProjectLists === 'function') {
           updateProjectLists(allProjects || [])
         }
-      
-      // Auto-select first space if none selected and spaces exist
+
+        // Auto-select first space if none selected and spaces exist
         // Use functional update to avoid dependency on selectedSpaceId
         setSelectedSpaceId(prev => {
           if (!prev && userSpaces && userSpaces.length > 0) {
@@ -160,12 +160,12 @@ export default function DashboardPage() {
     // Remove selectedSpaceId from dependencies to prevent infinite loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, isSignedIn, updateProjectLists])
-  
+
   // Auto-cleanup trash every 5 minutes to check individual items
   // Each item is deleted independently when its own 1-week period expires
   useEffect(() => {
     if (!userId || !isSignedIn) return
-    
+
     const interval = setInterval(() => {
       cleanupTrash(userId)
       const trashed = getTrashedSpaces(userId)
@@ -173,7 +173,7 @@ export default function DashboardPage() {
       setTrashedSpaces(trashed)
       setTrashedProjects(trashedProjs)
     }, 5 * 60 * 1000) // Every 5 minutes to catch items as soon as they expire
-    
+
     return () => clearInterval(interval)
   }, [userId, isSignedIn])
 
@@ -191,10 +191,10 @@ export default function DashboardPage() {
       alert('Please enter a space name')
       return
     }
-    
+
     try {
       const newSpace = await createSpace(userId, newSpaceName.trim())
-      const updatedSpaces = await getSpaces(userId)
+      const updatedSpaces = await getSpaces(userId, clerk)
       setSpaces(updatedSpaces)
       setNewSpaceName('')
       setShowCreateSpaceModal(false)
@@ -215,10 +215,10 @@ export default function DashboardPage() {
     if (!window.confirm(`Are you sure you want to delete "${spaceName}"? It will be moved to trash and can be restored within 1 week.`)) {
       return
     }
-    
+
     try {
       await deleteSpace(userId, spaceId)
-      const updatedSpaces = await getSpaces(userId)
+      const updatedSpaces = await getSpaces(userId, clerk)
       const trashed = getTrashedSpaces(userId)
       const trashedProjs = getTrashedProjects(userId)
       setSpaces(updatedSpaces)
@@ -247,7 +247,7 @@ export default function DashboardPage() {
   const handleRestoreSpace = async (spaceId) => {
     try {
       restoreSpace(userId, spaceId)
-      const userSpaces = await getSpaces(userId)
+      const userSpaces = await getSpaces(userId, clerk)
       const trashed = getTrashedSpaces(userId)
       setSpaces(userSpaces)
       setTrashedSpaces(trashed)
@@ -263,7 +263,7 @@ export default function DashboardPage() {
     if (!window.confirm(`Are you sure you want to permanently delete "${spaceName}"? This action cannot be undone.`)) {
       return
     }
-    
+
     try {
       permanentlyDeleteSpace(userId, spaceId)
       const trashed = getTrashedSpaces(userId)
@@ -295,7 +295,7 @@ export default function DashboardPage() {
     if (!window.confirm(`Are you sure you want to permanently delete "${projectName}"? This action cannot be undone.`)) {
       return
     }
-    
+
     try {
       permanentlyDeleteProject(userId, projectId)
       const trashedProjs = getTrashedProjects(userId)
@@ -310,11 +310,11 @@ export default function DashboardPage() {
     if (!window.confirm('Are you sure you want to delete ALL projects? This action cannot be undone. Spaces will be preserved.')) {
       return
     }
-    
+
     if (!window.confirm('This will permanently delete all your projects. Are you absolutely sure?')) {
       return
     }
-    
+
     try {
       await deleteAllProjects(userId)
       // Refresh all project lists
@@ -322,7 +322,7 @@ export default function DashboardPage() {
         updateProjectLists([])
       }
       // Refresh spaces to update project counts
-      const userSpaces = await getSpaces(userId)
+      const userSpaces = await getSpaces(userId, clerk)
       setSpaces(userSpaces)
       // Refresh trash
       const trashedProjs = getTrashedProjects(userId)
@@ -339,15 +339,15 @@ export default function DashboardPage() {
     if (totalItems === 0) {
       return
     }
-    
+
     if (!window.confirm(`Are you sure you want to permanently delete all ${totalItems} item${totalItems !== 1 ? 's' : ''} in trash? This action cannot be undone.`)) {
       return
     }
-    
+
     if (!window.confirm('This will permanently delete all trashed spaces and projects. Are you absolutely sure?')) {
       return
     }
-    
+
     try {
       const result = emptyTrash(userId)
       // Refresh trash state
@@ -356,7 +356,7 @@ export default function DashboardPage() {
       setTrashedSpaces(trashed)
       setTrashedProjects(trashedProjs)
       // Refresh spaces to update project counts
-      getSpaces(userId).then(userSpaces => setSpaces(userSpaces))
+      getSpaces(userId, clerk).then(userSpaces => setSpaces(userSpaces))
       alert(`Successfully deleted ${result.deletedSpaces} space${result.deletedSpaces !== 1 ? 's' : ''} and ${result.deletedProjects} project${result.deletedProjects !== 1 ? 's' : ''} from trash.`)
     } catch (error) {
       console.error('Error emptying trash:', error)
@@ -369,12 +369,12 @@ export default function DashboardPage() {
       alert('Please sign in to create projects')
       return
     }
-    
+
     if (!newProjectName.trim()) {
       alert('Please enter a project name')
       return
     }
-    
+
     try {
       // Create a new project with empty workflow - pass clerk instance to ensure immediate cloud sync
       const project = await saveProject(userId, newProjectName.trim(), {
@@ -386,28 +386,28 @@ export default function DashboardPage() {
         description: '',
         useAIDesigner: false,
       }, selectedSpaceId, clerk)
-      
+
       // Ensure project is synced to cloud before proceeding
       if (navigator.onLine && project.syncStatus === 'local') {
         // Try to sync immediately and wait for completion
         try {
           const { syncQueue } = await import('../utils/syncQueue')
-          
+
           // Sync the project
           await syncQueue.syncProject(project.id, clerk)
-          
+
           // Wait and verify sync completed - also verify in database
           let attempts = 0
           const maxAttempts = 15
           let synced = false
-          
+
           while (attempts < maxAttempts && !synced) {
             await new Promise(resolve => setTimeout(resolve, 400))
-            
+
             // Check if project is now synced in localStorage
             const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
             const updatedProject = projects.find(p => p.id === project.id)
-            
+
             if (updatedProject && updatedProject.syncStatus === 'synced') {
               // Verify project actually exists in database
               try {
@@ -422,10 +422,10 @@ export default function DashboardPage() {
                 console.log('Project not yet in database, waiting...', verifyError.message)
               }
             }
-            
+
             attempts++
           }
-          
+
           if (!synced) {
             console.warn('⚠️ Project sync verification timeout. Project may not be in database yet.')
             // Don't block - let user proceed, but they may see errors
@@ -435,7 +435,7 @@ export default function DashboardPage() {
           // Continue anyway - sync will retry in background
         }
       }
-      
+
       // Set as selected project and switch to project view
       // IMPORTANT: Set ALL state synchronously to avoid race conditions
       setShowCreateProjectModal(false)
@@ -443,17 +443,17 @@ export default function DashboardPage() {
       setEditingCreation(null) // Clear any editing state
       setCurrentView('workspace') // Set view FIRST - go directly to canvas
       setSelectedProjectId(project.id) // Then set project ID
-      
+
       console.log('✅ Project created, view set to workspace for project:', project.id)
-      
+
       // Refresh all projects (for sidebar) and update recent projects
       const allProjects = await getProjects(userId, null, clerk)
       if (updateProjectLists && typeof updateProjectLists === 'function') {
         updateProjectLists(allProjects || [])
       }
-      
+
       // Refresh spaces to update project counts in sidebar
-      const userSpaces = await getSpaces(userId)
+      const userSpaces = await getSpaces(userId, clerk)
       setSpaces(userSpaces)
     } catch (error) {
       console.error('Error creating project:', error)
@@ -465,123 +465,120 @@ export default function DashboardPage() {
     <div className="bg-background-base h-screen flex overflow-hidden text-text-primary antialiased">
       {/* Sidebar - Hidden when in workspace/canvas view */}
       {currentView !== 'workspace' && (
-      <aside className="w-72 flex flex-col bg-surface-base border-r border-border h-screen flex-shrink-0">
-        {/* Logo */}
-        <div className="px-6 py-6 flex items-center gap-3">
-          <Link to="/" className="text-xl font-semibold tracking-tight text-text-primary">
-            ature studio.
-          </Link>
-        </div>
+        <aside className="w-72 flex flex-col bg-surface-base border-r border-border h-screen flex-shrink-0">
+          {/* Logo */}
+          <div className="px-6 py-6 flex items-center gap-3">
+            <Link to="/" className="text-xl font-semibold tracking-tight text-text-primary">
+              ature studio.
+            </Link>
+          </div>
 
-        {/* Main Nav */}
-        <nav className="flex-1 overflow-y-auto px-3 space-y-1">
-          <button
-            onClick={async () => {
-              setCurrentView('projects')
-              setSelectedProjectId(null)
-              setEditingCreation(null)
-              setSelectedSpaceId(null) // Show all projects on home
-              // Refresh recent projects when going to home
-              if (userId) {
-                const allProjects = await getProjects(userId, null, clerk)
+          {/* Main Nav */}
+          <nav className="flex-1 overflow-y-auto px-3 space-y-1">
+            <button
+              onClick={async () => {
+                setCurrentView('projects')
+                setSelectedProjectId(null)
+                setEditingCreation(null)
+                setSelectedSpaceId(null) // Show all projects on home
+                // Refresh recent projects when going to home
+                if (userId) {
+                  const allProjects = await getProjects(userId, null, clerk)
+                  if (updateProjectLists && typeof updateProjectLists === 'function') {
+                    updateProjectLists(allProjects || [])
+                  }
+                }
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${currentView === 'projects' && selectedProjectId === null && selectedSpaceId === null
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
+                }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                <polyline points="9 22 9 12 15 12 15 22" />
+              </svg>
+              <span className="text-sm font-medium">Home</span>
+            </button>
+            <button
+              onClick={async () => {
+                // Navigate to My Projects page when "My Projects" is clicked
+                setSelectedProjectId(null) // Clear project selection
+                setEditingCreation(null)
+                setSelectedSpaceId(null) // Clear space selection
+                setCurrentView('my-projects')
+                const allProjects = await getProjects(userId, null, clerk) // null = all projects
                 if (updateProjectLists && typeof updateProjectLists === 'function') {
                   updateProjectLists(allProjects || [])
                 }
-              }
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${
-              currentView === 'projects' && selectedProjectId === null && selectedSpaceId === null
-                ? 'bg-surface-elevated text-text-primary'
-                : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-              <polyline points="9 22 9 12 15 12 15 22" />
-            </svg>
-            <span className="text-sm font-medium">Home</span>
-          </button>
-          <button
-            onClick={async () => {
-              // Navigate to My Projects page when "My Projects" is clicked
-              setSelectedProjectId(null) // Clear project selection
-              setEditingCreation(null)
-              setSelectedSpaceId(null) // Clear space selection
-              setCurrentView('my-projects')
-              const allProjects = await getProjects(userId, null, clerk) // null = all projects
-              if (updateProjectLists && typeof updateProjectLists === 'function') {
-                updateProjectLists(allProjects || [])
-              }
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${
-              currentView === 'my-projects'
-                ? 'bg-surface-elevated text-text-primary'
-                : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <rect width="7" height="7" x="3" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="3" rx="1" />
-              <rect width="7" height="7" x="14" y="14" rx="1" />
-              <rect width="7" height="7" x="3" y="14" rx="1" />
-            </svg>
-            <span className="text-sm font-medium">My Projects</span>
-          </button>
-          <a
-            href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M11 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
-              <path d="M11 2v6h6" />
-            </svg>
-            <span className="text-sm font-medium">Templates</span>
-          </a>
-          <a
-            href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-              <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
-              <line x1="12" y1="22.08" x2="12" y2="12" />
-            </svg>
-            <span className="text-sm font-medium">Assets</span>
-          </a>
-          <a
-            href="#"
-            className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
-            </svg>
-            <span className="text-sm font-medium">New features</span>
-          </a>
-
-          {/* My Projects Section */}
-          <div className="pt-8 pb-2 px-3 flex items-center justify-between group">
-            <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary group-hover:text-text-secondary transition-colors">My Projects</span>
-            <button
-              onClick={() => setShowCreateProjectModal(true)}
-              className="text-text-tertiary hover:text-text-primary transition-colors duration-micro ease-apple"
-              title="Create new project"
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${currentView === 'my-projects'
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
+                }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M5 12h14" />
-                <path d="M12 5v14" />
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect width="7" height="7" x="3" y="3" rx="1" />
+                <rect width="7" height="7" x="14" y="3" rx="1" />
+                <rect width="7" height="7" x="14" y="14" rx="1" />
+                <rect width="7" height="7" x="3" y="14" rx="1" />
               </svg>
+              <span className="text-sm font-medium">My Projects</span>
             </button>
-          </div>
-          <div className="space-y-0.5">
-            {/* Show last 10 projects in sidebar */}
-            {sidebarProjects.map((project) => (
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z" />
+                <path d="M11 2v6h6" />
+              </svg>
+              <span className="text-sm font-medium">Templates</span>
+            </a>
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+                <line x1="12" y1="22.08" x2="12" y2="12" />
+              </svg>
+              <span className="text-sm font-medium">Assets</span>
+            </a>
+            <a
+              href="#"
+              className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+              </svg>
+              <span className="text-sm font-medium">New features</span>
+            </a>
+
+            {/* My Projects Section */}
+            <div className="pt-8 pb-2 px-3 flex items-center justify-between group">
+              <span className="text-xs font-semibold uppercase tracking-wider text-text-tertiary group-hover:text-text-secondary transition-colors">My Projects</span>
+              <button
+                onClick={() => setShowCreateProjectModal(true)}
+                className="text-text-tertiary hover:text-text-primary transition-colors duration-micro ease-apple"
+                title="Create new project"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12h14" />
+                  <path d="M12 5v14" />
+                </svg>
+              </button>
+            </div>
+            <div className="space-y-0.5">
+              {/* Show last 10 projects in sidebar */}
+              {sidebarProjects.map((project) => (
                 <div
                   key={project.id}
-                  className={`group flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${
-                    selectedProjectId === project.id
+                  className={`group flex items-center gap-2 px-3 py-1.5 rounded transition-colors ${selectedProjectId === project.id
                       ? 'bg-surface-elevated text-text-primary'
                       : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                  }`}
+                    }`}
                 >
                   <button
                     onClick={() => {
@@ -641,199 +638,197 @@ export default function DashboardPage() {
                   </button>
                 </div>
               ))}
-          </div>
-          {/* See All Projects Link */}
-          {savedProjects.length > 10 && (
+            </div>
+            {/* See All Projects Link */}
+            {savedProjects.length > 10 && (
+              <button
+                onClick={() => {
+                  setCurrentView('my-projects')
+                  setSelectedProjectId(null)
+                  setEditingCreation(null)
+                }}
+                className="w-full px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple mt-2"
+              >
+                See all projects ({savedProjects.length})
+              </button>
+            )}
+          </nav>
+
+          {/* Bottom Actions */}
+          <div className="p-3 mt-auto space-y-1 border-t border-border">
             <button
               onClick={() => {
-                setCurrentView('my-projects')
-                setSelectedProjectId(null)
-                setEditingCreation(null)
+                setShowTrash(!showTrash)
+                if (!showTrash) {
+                  cleanupTrash(userId)
+                  const trashed = getTrashedSpaces(userId)
+                  const trashedProjs = getTrashedProjects(userId)
+                  setTrashedSpaces(trashed)
+                  setTrashedProjects(trashedProjs)
+                }
               }}
-              className="w-full px-3 py-2 text-xs font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple mt-2"
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${showTrash
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
+                }`}
             >
-              See all projects ({savedProjects.length})
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 6h18" />
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+              </svg>
+              <span className="text-sm font-medium">Trash</span>
+              {(trashedSpaces.length + trashedProjects.length) > 0 && (
+                <span className="ml-auto text-xs bg-surface-elevated text-text-secondary px-2 py-0.5 rounded-full">
+                  {trashedSpaces.length + trashedProjects.length}
+                </span>
+              )}
             </button>
-          )}
-        </nav>
 
-        {/* Bottom Actions */}
-        <div className="p-3 mt-auto space-y-1 border-t border-border">
-          <button
-            onClick={() => {
-              setShowTrash(!showTrash)
-              if (!showTrash) {
-                cleanupTrash(userId)
-                const trashed = getTrashedSpaces(userId)
-                const trashedProjs = getTrashedProjects(userId)
-                setTrashedSpaces(trashed)
-                setTrashedProjects(trashedProjs)
-              }
-            }}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              showTrash
-                ? 'bg-surface-elevated text-text-primary'
-                : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
-            }`}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-            <span className="text-sm font-medium">Trash</span>
-            {(trashedSpaces.length + trashedProjects.length) > 0 && (
-              <span className="ml-auto text-xs bg-surface-elevated text-text-secondary px-2 py-0.5 rounded-full">
-                {trashedSpaces.length + trashedProjects.length}
-              </span>
+            {/* Trash contents */}
+            {showTrash && (
+              <div className="mt-2 space-y-1">
+                {(trashedSpaces.length === 0 && trashedProjects.length === 0) ? (
+                  <p className="text-xs text-text-tertiary px-3 py-2">Trash is empty</p>
+                ) : (
+                  <>
+                    {/* Empty Trash Button */}
+                    <div className="px-3 py-2 mb-2">
+                      <button
+                        onClick={handleEmptyTrash}
+                        className="w-full px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center justify-center gap-2 border border-red-200"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        </svg>
+                        Empty Trash
+                      </button>
+                    </div>
+                    <div className="max-h-64 overflow-y-auto space-y-1">
+                      {trashedSpaces.map((space) => {
+                        const deletedAt = new Date(space.deletedAt)
+                        const daysLeft = Math.ceil((ONE_WEEK_MS - (Date.now() - deletedAt.getTime())) / (24 * 60 * 60 * 1000))
+
+                        return (
+                          <div
+                            key={space.id}
+                            className="px-3 py-2 bg-stone-50 rounded-lg border border-stone-200 mb-2"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-500">
+                                  <rect width="7" height="7" x="3" y="3" rx="1" />
+                                  <rect width="7" height="7" x="14" y="3" rx="1" />
+                                  <rect width="7" height="7" x="14" y="14" rx="1" />
+                                  <rect width="7" height="7" x="3" y="14" rx="1" />
+                                </svg>
+                                <span className="text-xs font-medium text-stone-900">Space: {space.name}</span>
+                              </div>
+                              <span className="text-xs text-stone-500">{daysLeft}d left</span>
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleRestoreSpace(space.id)}
+                                className="text-xs px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded transition-colors"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => handlePermanentlyDeleteSpace(space.id, space.name)}
+                                className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                      {trashedProjects.map((project) => {
+                        const deletedAt = new Date(project.deletedAt)
+                        const daysLeft = Math.ceil((ONE_WEEK_MS - (Date.now() - deletedAt.getTime())) / (24 * 60 * 60 * 1000))
+
+                        return (
+                          <div
+                            key={project.id}
+                            className="px-3 py-2 bg-stone-50 rounded-lg border border-stone-200 mb-2"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-500">
+                                  <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
+                                  <path d="M3 9h18" />
+                                  <path d="M9 21V9" />
+                                </svg>
+                                <span className="text-xs font-medium text-stone-900">Project: {project.name}</span>
+                              </div>
+                              <span className="text-xs text-stone-500">{daysLeft}d left</span>
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                              <button
+                                onClick={() => handleRestoreProject(project.id)}
+                                className="text-xs px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded transition-colors"
+                              >
+                                Restore
+                              </button>
+                              <button
+                                onClick={() => handlePermanentlyDeleteProject(project.id, project.name)}
+                                className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </div>
             )}
-          </button>
-          
-          {/* Trash contents */}
-          {showTrash && (
-            <div className="mt-2 space-y-1">
-              {(trashedSpaces.length === 0 && trashedProjects.length === 0) ? (
-                <p className="text-xs text-text-tertiary px-3 py-2">Trash is empty</p>
-              ) : (
-                <>
-                  {/* Empty Trash Button */}
-                  <div className="px-3 py-2 mb-2">
-                    <button
-                      onClick={handleEmptyTrash}
-                      className="w-full px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center justify-center gap-2 border border-red-200"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 6h18" />
-                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                      </svg>
-                      Empty Trash
-                    </button>
-                  </div>
-                  <div className="max-h-64 overflow-y-auto space-y-1">
-                  {trashedSpaces.map((space) => {
-                    const deletedAt = new Date(space.deletedAt)
-                    const daysLeft = Math.ceil((ONE_WEEK_MS - (Date.now() - deletedAt.getTime())) / (24 * 60 * 60 * 1000))
-                    
-                    return (
-                      <div
-                        key={space.id}
-                        className="px-3 py-2 bg-stone-50 rounded-lg border border-stone-200 mb-2"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-500">
-                              <rect width="7" height="7" x="3" y="3" rx="1" />
-                              <rect width="7" height="7" x="14" y="3" rx="1" />
-                              <rect width="7" height="7" x="14" y="14" rx="1" />
-                              <rect width="7" height="7" x="3" y="14" rx="1" />
-                            </svg>
-                            <span className="text-xs font-medium text-stone-900">Space: {space.name}</span>
-                          </div>
-                          <span className="text-xs text-stone-500">{daysLeft}d left</span>
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => handleRestoreSpace(space.id)}
-                            className="text-xs px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded transition-colors"
-                          >
-                            Restore
-                          </button>
-                          <button
-                            onClick={() => handlePermanentlyDeleteSpace(space.id, space.name)}
-                            className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  {trashedProjects.map((project) => {
-                    const deletedAt = new Date(project.deletedAt)
-                    const daysLeft = Math.ceil((ONE_WEEK_MS - (Date.now() - deletedAt.getTime())) / (24 * 60 * 60 * 1000))
-                    
-                    return (
-                      <div
-                        key={project.id}
-                        className="px-3 py-2 bg-stone-50 rounded-lg border border-stone-200 mb-2"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <div className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-500">
-                              <rect width="18" height="18" x="3" y="3" rx="2" ry="2" />
-                              <path d="M3 9h18" />
-                              <path d="M9 21V9" />
-                            </svg>
-                            <span className="text-xs font-medium text-stone-900">Project: {project.name}</span>
-                          </div>
-                          <span className="text-xs text-stone-500">{daysLeft}d left</span>
-                        </div>
-                        <div className="flex gap-2 mt-2">
-                          <button
-                            onClick={() => handleRestoreProject(project.id)}
-                            className="text-xs px-2 py-1 bg-stone-200 hover:bg-stone-300 text-stone-700 rounded transition-colors"
-                          >
-                            Restore
-                          </button>
-                          <button
-                            onClick={() => handlePermanentlyDeleteProject(project.id, project.name)}
-                            className="text-xs px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 rounded transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
 
-          <button
-            onClick={() => setCurrentView('account')}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-              currentView === 'account' 
-                ? 'bg-stone-100 text-stone-900' 
-                : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
-            }`}
-          >
-            <div className="w-6 h-6 rounded-full overflow-hidden bg-stone-200 ring-1 ring-stone-300">
-              {user?.imageUrl ? (
-                <img src={user.imageUrl} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full bg-stone-300 flex items-center justify-center text-stone-700 text-xs font-semibold">
-                  {userName.charAt(0).toUpperCase()}
-                </div>
-              )}
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-stone-900">Account</span>
-            </div>
-          </button>
+            <button
+              onClick={() => setCurrentView('account')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${currentView === 'account'
+                  ? 'bg-stone-100 text-stone-900'
+                  : 'hover:text-stone-900 hover:bg-stone-50 text-stone-600'
+                }`}
+            >
+              <div className="w-6 h-6 rounded-full overflow-hidden bg-stone-200 ring-1 ring-stone-300">
+                {user?.imageUrl ? (
+                  <img src={user.imageUrl} alt="Profile" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full bg-stone-300 flex items-center justify-center text-stone-700 text-xs font-semibold">
+                    {userName.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-stone-900">Account</span>
+              </div>
+            </button>
 
-          <button
-            onClick={async () => {
-              try {
-                await signOut()
-                navigate('/')
-              } catch (error) {
-                console.error('Error signing out:', error)
-              }
-            }}
-            className="w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span className="text-sm font-medium">Log out</span>
-          </button>
-        </div>
-      </aside>
+            <button
+              onClick={async () => {
+                try {
+                  await signOut()
+                  navigate('/')
+                } catch (error) {
+                  console.error('Error signing out:', error)
+                }
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 hover:text-stone-900 hover:bg-stone-50 rounded-lg transition-colors text-stone-600"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span className="text-sm font-medium">Log out</span>
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Main Content Area */}
@@ -856,10 +851,9 @@ export default function DashboardPage() {
                 onSave={async () => {
                   if (!userId) return
                   // Refresh all projects (for sidebar) and update recent projects
-                  const allProjects = await getProjects(userId, null, clerk)
-                  updateProjectLists(allProjects)
+                  const allProjects = getProjects(userId, selectedSpaceId, clerk).then(projects => updateProjectLists(projects))
                   // Refresh spaces to update project counts in sidebar
-                  const userSpaces = await getSpaces(userId)
+                  const userSpaces = await getSpaces(userId, clerk)
                   setSpaces(userSpaces)
                 }}
               />
@@ -910,239 +904,239 @@ export default function DashboardPage() {
 
               {/* Recent Projects Section */}
               <section className="mb-10">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-text-primary tracking-tight mb-1">Recent</h2>
-              <p className="text-sm text-text-tertiary">Continue where you left off</p>
-            </div>
-
-            <div className="grid grid-cols-5 gap-4">
-              {/* Card 1 - Build with AI */}
-              <div
-                onClick={() => setShowCreateProjectModal(true)}
-                className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
-              >
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M15 4V2" />
-                    <path d="M15 16v-2" />
-                    <path d="M8 9h2" />
-                    <path d="M20 9h2" />
-                    <path d="M17.8 11.8 19 13" />
-                    <path d="M15 9h0" />
-                    <path d="M17.8 6.2 19 5" />
-                    <path d="M3 21l3-3" />
-                    <path d="M21 3l-3 3" />
-                    <path d="M18 12l-3 3" />
-                    <path d="M6 18l-3 3" />
-                    <path d="M12 3v3" />
-                    <path d="M12 15v3" />
-                    <path d="M6 6 3 3" />
-                    <path d="M18 18l-3-3" />
-                  </svg>
+                <div className="mb-6">
+                  <h2 className="text-lg font-semibold text-text-primary tracking-tight mb-1">Recent</h2>
+                  <p className="text-sm text-text-tertiary">Continue where you left off</p>
                 </div>
-                <h3 className="font-semibold text-stone-900 text-base">Build with AI</h3>
-                <p className="text-sm text-stone-500 mt-1 leading-snug">Create personalized interior designs with AI</p>
-              </div>
 
-              {/* Card 2 - Upload Floor Plan */}
-              <div
-                onClick={() => setShowCreateProjectModal(true)}
-                className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
-              >
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="17 8 12 3 7 8" />
-                    <line x1="12" y1="3" x2="12" y2="15" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold text-stone-900 text-base">Upload Floor Plan</h3>
-                <p className="text-sm text-stone-500 mt-1 leading-snug">Upload your room or house layout</p>
-              </div>
-
-              {/* Card 3 - Browse Templates */}
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col">
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <rect width="18" height="18" x="3" y="3" rx="2" />
-                    <path d="M3 9h18" />
-                    <path d="M9 21V9" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold text-stone-900 text-base">Browse Templates</h3>
-                <p className="text-sm text-stone-500 mt-1 leading-snug">Explore design templates and styles</p>
-              </div>
-
-              {/* Card 4 - Saved Objects */}
-              <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col">
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
-                    <path d="M3 6h18" />
-                    <path d="M16 10a4 4 0 0 1-8 0" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold text-stone-900 text-base">Saved Objects</h3>
-                <p className="text-sm text-stone-500 mt-1 leading-snug">Access your saved furniture and decor</p>
-              </div>
-
-              {/* Card 5 - Tutorials */}
-              <div
-                onClick={() => navigate('/help')}
-                className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
-              >
-                <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <polygon points="10 8 16 12 10 16 10 8" />
-                  </svg>
-                </div>
-                <h3 className="font-semibold text-stone-900 text-base">Tutorials</h3>
-                <p className="text-sm text-stone-500 mt-1 leading-snug">Learn how to use the app effectively</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Recent Projects Section */}
-          <section className="mb-10">
-            <div className="mb-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-semibold text-stone-900 tracking-tight font-serif-ature">Your recent projects</h2>
-                <p className="text-base text-stone-500 mt-1">Projects you've been working on</p>
-              </div>
-              <div className="flex items-center gap-3">
-                {savedProjects.length > 4 && (
-                  <button
-                    onClick={() => {
-                      setCurrentView('my-projects')
-                      setSelectedProjectId(null)
-                      setEditingCreation(null)
-                    }}
-                    className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple"
-                  >
-                    View all ({savedProjects.length})
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {recentProjects.length > 0 ? (
-              <div className="grid grid-cols-4 gap-4">
-                {recentProjects.map((project) => {
-                  const thumbnail = canvasThumbnails[project.id] || project.workflow?.result?.url
-                  const updatedAt = project.updatedAt || project.updated_at || project.createdAt || project.created_at
-                  const timeAgo = updatedAt ? (() => {
-                    const diff = Date.now() - new Date(updatedAt).getTime()
-                    const minutes = Math.floor(diff / 60000)
-                    if (minutes < 1) return 'Just now'
-                    if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`
-                    const hours = Math.floor(minutes / 60)
-                    if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
-                    const days = Math.floor(hours / 24)
-                    return `${days} day${days !== 1 ? 's' : ''} ago`
-                  })() : 'Unknown'
-                  
-                  return (
+                <div className="grid grid-cols-5 gap-4">
+                  {/* Card 1 - Build with AI */}
                   <div
-                    key={project.id}
-                    onClick={() => {
-                      setCurrentView('workspace')
-                      setEditingCreation(null)
-                      setSelectedProjectId(project.id)
-                    }}
-                    className="group cursor-pointer"
+                    onClick={() => setShowCreateProjectModal(true)}
+                    className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
                   >
-                      <div className="bg-surface-base rounded-lg overflow-hidden border border-border shadow-sm group-hover:shadow-md transition-all duration-micro ease-apple group-hover:-translate-y-[1px]">
-                        <div className="aspect-[4/3] relative bg-background-elevated">
-                          {thumbnail ? (
-                            <img
-                              src={thumbnail}
-                              alt={project.name || 'Untitled'}
-                              className="w-full h-full object-cover"
-                              loading="lazy"
-                              decoding="async"
-                        />
-                      ) : (
-                            <div className="w-full h-full flex items-center justify-center bg-background-elevated">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
-                            <rect x="3" y="3" width="18" height="18" rx="2" />
-                            <circle cx="9" cy="9" r="2" />
-                            <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                          </svg>
-                        </div>
-                      )}
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M15 4V2" />
+                        <path d="M15 16v-2" />
+                        <path d="M8 9h2" />
+                        <path d="M20 9h2" />
+                        <path d="M17.8 11.8 19 13" />
+                        <path d="M15 9h0" />
+                        <path d="M17.8 6.2 19 5" />
+                        <path d="M3 21l3-3" />
+                        <path d="M21 3l-3 3" />
+                        <path d="M18 12l-3 3" />
+                        <path d="M6 18l-3 3" />
+                        <path d="M12 3v3" />
+                        <path d="M12 15v3" />
+                        <path d="M6 6 3 3" />
+                        <path d="M18 18l-3-3" />
+                      </svg>
                     </div>
-                        <div className="p-4">
-                          <h3 className="text-base font-medium text-text-primary mb-1 line-clamp-1">
-                            {project.name || 'Untitled'}
-                          </h3>
-                          <p className="text-xs text-text-tertiary">
-                            Modified {timeAgo}
-                          </p>
-                      </div>
-                      </div>
-                    </div>
-                  )
-                })}
+                    <h3 className="font-semibold text-stone-900 text-base">Build with AI</h3>
+                    <p className="text-sm text-stone-500 mt-1 leading-snug">Create personalized interior designs with AI</p>
                   </div>
-            ) : (
-              <div className="text-center py-16">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-base mb-4">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <circle cx="9" cy="9" r="2" />
-                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                  </svg>
-              </div>
-                <p className="text-text-secondary mb-4">No projects yet</p>
-                <button
-                  onClick={() => setShowCreateProjectModal(true)}
-                  className="px-4 py-2 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors duration-micro ease-apple focus-ring"
-                >
-                  Create your first project
-                </button>
-              </div>
-            )}
-          </section>
+
+                  {/* Card 2 - Upload Floor Plan */}
+                  <div
+                    onClick={() => setShowCreateProjectModal(true)}
+                    className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-stone-900 text-base">Upload Floor Plan</h3>
+                    <p className="text-sm text-stone-500 mt-1 leading-snug">Upload your room or house layout</p>
+                  </div>
+
+                  {/* Card 3 - Browse Templates */}
+                  <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col">
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <rect width="18" height="18" x="3" y="3" rx="2" />
+                        <path d="M3 9h18" />
+                        <path d="M9 21V9" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-stone-900 text-base">Browse Templates</h3>
+                    <p className="text-sm text-stone-500 mt-1 leading-snug">Explore design templates and styles</p>
+                  </div>
+
+                  {/* Card 4 - Saved Objects */}
+                  <div className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col">
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z" />
+                        <path d="M3 6h18" />
+                        <path d="M16 10a4 4 0 0 1-8 0" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-stone-900 text-base">Saved Objects</h3>
+                    <p className="text-sm text-stone-500 mt-1 leading-snug">Access your saved furniture and decor</p>
+                  </div>
+
+                  {/* Card 5 - Tutorials */}
+                  <div
+                    onClick={() => navigate('/help')}
+                    className="bg-white p-5 rounded-xl border border-stone-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer group h-full flex flex-col"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-stone-100 flex items-center justify-center text-stone-700 mb-4 group-hover:scale-105 transition-transform">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="12" cy="12" r="10" />
+                        <polygon points="10 8 16 12 10 16 10 8" />
+                      </svg>
+                    </div>
+                    <h3 className="font-semibold text-stone-900 text-base">Tutorials</h3>
+                    <p className="text-sm text-stone-500 mt-1 leading-snug">Learn how to use the app effectively</p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Recent Projects Section */}
+              <section className="mb-10">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold text-stone-900 tracking-tight font-serif-ature">Your recent projects</h2>
+                    <p className="text-base text-stone-500 mt-1">Projects you've been working on</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {savedProjects.length > 4 && (
+                      <button
+                        onClick={() => {
+                          setCurrentView('my-projects')
+                          setSelectedProjectId(null)
+                          setEditingCreation(null)
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple"
+                      >
+                        View all ({savedProjects.length})
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {recentProjects.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-4">
+                    {recentProjects.map((project) => {
+                      const thumbnail = canvasThumbnails[project.id] || project.workflow?.result?.url
+                      const updatedAt = project.updatedAt || project.updated_at || project.createdAt || project.created_at
+                      const timeAgo = updatedAt ? (() => {
+                        const diff = Date.now() - new Date(updatedAt).getTime()
+                        const minutes = Math.floor(diff / 60000)
+                        if (minutes < 1) return 'Just now'
+                        if (minutes < 60) return `${minutes} minute${minutes !== 1 ? 's' : ''} ago`
+                        const hours = Math.floor(minutes / 60)
+                        if (hours < 24) return `${hours} hour${hours !== 1 ? 's' : ''} ago`
+                        const days = Math.floor(hours / 24)
+                        return `${days} day${days !== 1 ? 's' : ''} ago`
+                      })() : 'Unknown'
+
+                      return (
+                        <div
+                          key={project.id}
+                          onClick={() => {
+                            setCurrentView('workspace')
+                            setEditingCreation(null)
+                            setSelectedProjectId(project.id)
+                          }}
+                          className="group cursor-pointer"
+                        >
+                          <div className="bg-surface-base rounded-lg overflow-hidden border border-border shadow-sm group-hover:shadow-md transition-all duration-micro ease-apple group-hover:-translate-y-[1px]">
+                            <div className="aspect-[4/3] relative bg-background-elevated">
+                              {thumbnail ? (
+                                <img
+                                  src={thumbnail}
+                                  alt={project.name || 'Untitled'}
+                                  className="w-full h-full object-cover"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center bg-background-elevated">
+                                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <circle cx="9" cy="9" r="2" />
+                                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-4">
+                              <h3 className="text-base font-medium text-text-primary mb-1 line-clamp-1">
+                                {project.name || 'Untitled'}
+                              </h3>
+                              <p className="text-xs text-text-tertiary">
+                                Modified {timeAgo}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-16">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-surface-base mb-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                        <circle cx="9" cy="9" r="2" />
+                        <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                      </svg>
+                    </div>
+                    <p className="text-text-secondary mb-4">No projects yet</p>
+                    <button
+                      onClick={() => setShowCreateProjectModal(true)}
+                      className="px-4 py-2 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors duration-micro ease-apple focus-ring"
+                    >
+                      Create your first project
+                    </button>
+                  </div>
+                )}
+              </section>
             </div>
           ) : currentView === 'my-projects' ? (
             <div className="px-8 pb-12 pt-8">
               <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="mb-8 flex items-center justify-between">
-                    <div>
+                  <div>
                     <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-1">All Projects</h1>
                     <p className="text-sm text-text-tertiary">{savedProjects.length} project{savedProjects.length !== 1 ? 's' : ''}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {savedProjects.length > 0 && (
-                        <button
-                          onClick={handleDeleteAllProjects}
-                          className="px-4 py-2 h-10 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2 border border-red-200"
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                            <path d="M3 6h18" />
-                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                          Delete All
-                        </button>
-                      )}
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {savedProjects.length > 0 && (
                       <button
-                        onClick={() => {
-                          setCurrentView('projects')
-                          setSelectedProjectId(null)
-                          setEditingCreation(null)
-                        }}
-                        className="px-4 py-2 h-10 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2"
+                        onClick={handleDeleteAllProjects}
+                        className="px-4 py-2 h-10 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2 border border-red-200"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 6L6 18" />
-                          <path d="M6 6l12 12" />
+                          <path d="M3 6h18" />
+                          <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                          <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
                         </svg>
-                        Back
+                        Delete All
                       </button>
-                    </div>
+                    )}
+                    <button
+                      onClick={() => {
+                        setCurrentView('projects')
+                        setSelectedProjectId(null)
+                        setEditingCreation(null)
+                      }}
+                      className="px-4 py-2 h-10 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M18 6L6 18" />
+                        <path d="M6 6l12 12" />
+                      </svg>
+                      Back
+                    </button>
+                  </div>
                 </div>
 
                 {/* Projects Grid */}
@@ -1161,17 +1155,17 @@ export default function DashboardPage() {
                         const days = Math.floor(hours / 24)
                         return `${days} day${days !== 1 ? 's' : ''} ago`
                       })() : 'Unknown'
-                      
+
                       return (
-                      <div
-                        key={project.id}
-                        onClick={() => {
-                      setCurrentView('workspace')
-                          setEditingCreation(null)
-                          setSelectedProjectId(project.id)
-                        }}
-                        className="group cursor-pointer"
-                      >
+                        <div
+                          key={project.id}
+                          onClick={() => {
+                            setCurrentView('workspace')
+                            setEditingCreation(null)
+                            setSelectedProjectId(project.id)
+                          }}
+                          className="group cursor-pointer"
+                        >
                           <div className="bg-surface-base rounded-lg overflow-hidden border border-border shadow-sm group-hover:shadow-md transition-all duration-micro ease-apple group-hover:-translate-y-[1px]">
                             <div className="aspect-[4/3] relative bg-background-elevated">
                               {thumbnail ? (
@@ -1181,17 +1175,17 @@ export default function DashboardPage() {
                                   className="w-full h-full object-cover"
                                   loading="lazy"
                                   decoding="async"
-                            />
-                          ) : (
+                                />
+                              ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-background-elevated">
                                   <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-text-tertiary">
-                                <rect x="3" y="3" width="18" height="18" rx="2" />
-                                <circle cx="9" cy="9" r="2" />
-                                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-                              </svg>
+                                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                                    <circle cx="9" cy="9" r="2" />
+                                    <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+                                  </svg>
+                                </div>
+                              )}
                             </div>
-                          )}
-                        </div>
                             <div className="p-4">
                               <h3 className="text-base font-medium text-text-primary mb-1 line-clamp-1">
                                 {project.name || 'Untitled'}
@@ -1199,7 +1193,7 @@ export default function DashboardPage() {
                               <p className="text-xs text-text-tertiary">
                                 Modified {timeAgo}
                               </p>
-                          </div>
+                            </div>
                           </div>
                         </div>
                       )

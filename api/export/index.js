@@ -65,3 +65,6 @@ async function handler(req, res, userId) {
   }
 }
 
+// Export with authentication middleware
+export default requireAuth(handler)
+

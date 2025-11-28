@@ -345,10 +345,10 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId, isSignedIn, isLoaded: authLoaded } = useAuth()
   const clerk = useClerk()
-  
+
   // Wait for Clerk to be fully loaded before using it
   const isClerkReady = authLoaded && clerk && (typeof clerk.getToken === 'function' || (clerk.loaded !== false))
-  
+
   // Import syncQueue for project syncing
   const syncQueueRef = useRef(null)
   useEffect(() => {
@@ -386,12 +386,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const selection = useCanvasStore((state) => state.selection)
   const setSelection = useCanvasStore((state) => state.setSelection)
   const clearSelection = useCanvasStore((state) => state.clearSelection)
-  
+
   // Legacy selection hooks (keeping for compatibility during migration)
   const { selectedItemId, selectedItemIds, setSelectedItemId, setSelectedItemIds, handleSelect } = useCanvasSelection()
   const { history, historyIndex, addToHistory, undo, redo, canUndo, canRedo } = useCanvasHistory(items)
   const [clipboard, setClipboard] = useState(null) // For copy/paste
-  
+
   // Dimensions are managed in the store, but we need to sync them from containerRef
   const [isGenerating, setIsGenerating] = useState(false)
   const [showGenerateModal, setShowGenerateModal] = useState(false)
@@ -467,6 +467,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Initialize loading and error states early to prevent TDZ issues
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [projectNotFound, setProjectNotFound] = useState(false)
 
   // All projects now use UUIDs - no need for auto-save logic
   // Canvas will work immediately for all projects
@@ -594,61 +595,61 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           console.log('✅ Project verified in database:', projectId)
         } catch (dbError) {
           console.warn('Project not in database, attempting sync...', dbError.message)
-          
+
           // Project doesn't exist in database - sync it
           const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
           const project = projects.find(p => p.id === projectId)
-          
+
           if (!project) {
             setError('Project not found. Please refresh the page.')
             return
           }
-          
+
           if (navigator.onLine && clerk && typeof clerk.getToken === 'function' && syncQueueRef.current) {
-          setError('Syncing project to cloud...')
-          
-          // Sync the project
-          await syncQueueRef.current.syncProject(projectId, clerk)
-          
-          // Wait for sync to complete and verify in database
-          let attempts = 0
-          const maxAttempts = 20 // 6 seconds total
-          let synced = false
-          
-          while (attempts < maxAttempts && !synced) {
-            await new Promise(resolve => setTimeout(resolve, 300))
-            
-            // Try to fetch project from database
-            try {
-              const { getProject: getProjectCheck } = await import('../utils/projectManager')
-              const verifiedProject = await getProjectCheck(userId, projectId, clerk)
-              if (verifiedProject && verifiedProject.id === projectId) {
-                synced = true
-                setError('')
-                console.log('✅ Project synced and verified in database')
-                break
+            setError('Syncing project to cloud...')
+
+            // Sync the project
+            await syncQueueRef.current.syncProject(projectId, clerk)
+
+            // Wait for sync to complete and verify in database
+            let attempts = 0
+            const maxAttempts = 20 // 6 seconds total
+            let synced = false
+
+            while (attempts < maxAttempts && !synced) {
+              await new Promise(resolve => setTimeout(resolve, 300))
+
+              // Try to fetch project from database
+              try {
+                const { getProject: getProjectCheck } = await import('../utils/projectManager')
+                const verifiedProject = await getProjectCheck(userId, projectId, clerk)
+                if (verifiedProject && verifiedProject.id === projectId) {
+                  synced = true
+                  setError('')
+                  console.log('✅ Project synced and verified in database')
+                  break
+                }
+              } catch (verifyError) {
+                // Project still not in database, keep waiting
+                if (attempts === maxAttempts - 1) {
+                  console.error('Project sync timeout - project still not in database')
+                }
               }
-            } catch (verifyError) {
-              // Project still not in database, keep waiting
-              if (attempts === maxAttempts - 1) {
-                console.error('Project sync timeout - project still not in database')
-              }
+
+              attempts++
             }
-            
-            attempts++
-          }
-          
-          if (!synced) {
-            setError('Project sync is taking longer than expected. Please wait a moment and try again, or refresh the page.')
+
+            if (!synced) {
+              setError('Project sync is taking longer than expected. Please wait a moment and try again, or refresh the page.')
+              return
+            }
+          } else if (!navigator.onLine) {
+            setError('Project needs to be synced to cloud, but you are offline. Please connect to the internet and try again.')
+            return
+          } else {
+            setError('Unable to sync project. Please refresh the page and try again.')
             return
           }
-        } else if (!navigator.onLine) {
-          setError('Project needs to be synced to cloud, but you are offline. Please connect to the internet and try again.')
-          return
-        } else {
-          setError('Unable to sync project. Please refresh the page and try again.')
-          return
-        }
         }
       } else {
         // Clerk not ready - skip verification and try to proceed (will fail at upload if needed)
@@ -668,18 +669,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         setError('Authentication required. Please refresh the page and sign in again.')
         return
       }
-      
+
       // Verify clerk has getToken method before proceeding
       if (typeof clerk.getToken !== 'function') {
-        console.error('Clerk instance is not ready:', { 
-          clerkType: typeof clerk, 
+        console.error('Clerk instance is not ready:', {
+          clerkType: typeof clerk,
           hasGetToken: typeof clerk.getToken,
           clerkKeys: Object.keys(clerk || {})
         })
         setError('Authentication is not ready. Please wait a moment and try again.')
         return
       }
-      
+
       const uploadResult = await uploadFileToCloud(file, clerk)
       const imageUrl = uploadResult.url
 
@@ -726,11 +727,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setItems((prev) => [...prev, newItem])
     } catch (error) {
       console.error('Error uploading file:', error)
-      
+
       // Check if it's a project not found error
       if (error.message?.includes('Project not found') || error.message?.includes('foreign key constraint') || error.message?.includes('does not exist')) {
         setError('Project not synced to cloud. Syncing now... Please try again in a moment.')
-        
+
         // Try to sync the project
         try {
           if (syncQueueRef.current && clerk) {
@@ -830,7 +831,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     setLoading(true)
     setError('')
-    
+
     // First, check if project exists in database, if not, try to sync it
     if (isClerkReady && clerk) {
       try {
@@ -842,7 +843,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         console.warn('Project not in database, attempting to sync...', projectError.message)
         const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
         const localProject = projects.find(p => p.id === projectId)
-        
+
         if (localProject && syncQueueRef.current) {
           try {
             console.log('Syncing project to cloud...')
@@ -868,7 +869,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const restoredZoom = data.state.zoom_level || 1
         const restoredPanX = data.state.pan_x || 0
         const restoredPanY = data.state.pan_y || 0
-        
+
         // Restore settings
         updateSettings({
           rulerEnabled: data.state.ruler_enabled || false,
@@ -2209,10 +2210,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     isSelecting,
     selectionBox,
   } = useCanvasInteractions(stageRef, dimensions)
-  
+
   // Use viewport culling for performance
   const visibleItemsFromHook = useViewportCulling(stageRef, 200)
-  
+
   // Add keyboard event listeners for spacebar panning
   useEffect(() => {
     document.addEventListener('keydown', handleInteractionsKeyDown)
@@ -2564,6 +2565,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           setProject(projectData)
         } catch (error) {
           console.error('Error loading project:', error)
+          if (error.message?.includes('not found') || error.message?.includes('404')) {
+            setProjectNotFound(true)
+          }
         }
       }
     }
@@ -2662,13 +2666,38 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [getCreations])
 
+  if (projectNotFound) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-[#FAFAF9]">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 bg-[#F1EBE4] rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#8E8B8A]">
+              <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+              <polyline points="14 2 14 8 20 8" />
+              <line x1="9" y1="15" x2="15" y2="15" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-display font-semibold text-[#2C2C2C] mb-3">Project Not Found</h2>
+          <p className="text-[#575655] mb-8">
+            The project you are trying to access does not exist or has been deleted.
+          </p>
+          <button
+            onClick={onBack}
+            className="px-6 py-3 bg-[#2C2C2C] text-white rounded-lg font-medium hover:bg-[#1a1a1a] transition-colors duration-200"
+          >
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
       {/* Left Sidebar - Project Info & Tabs */}
       <div
-        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${
-          sidebarOpen ? 'w-80' : 'w-0'
-        } overflow-hidden`}
+        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${sidebarOpen ? 'w-80' : 'w-0'
+          } overflow-hidden`}
       >
         {sidebarOpen && (
           <div className="h-full flex flex-col">

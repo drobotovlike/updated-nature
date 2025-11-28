@@ -2083,7 +2083,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       y: clampedY,
       zoom: camera.zoom,
     })
-  }, [dimensions.width, dimensions.height])
+  }, [dimensions.width, dimensions.height, camera.zoom, setCamera])
 
   // Use the new canvas interactions hook for zoom-to-cursor and panning
   const {

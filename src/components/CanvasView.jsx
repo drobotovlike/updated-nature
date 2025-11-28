@@ -550,19 +550,23 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           setError('Project is stored locally. Some features may require saving to cloud.')
           // Still set actualProjectId to the local projectId so canvas can load
           setActualProjectId(projectId)
+          // Ensure loading is set to false so canvas can render
+          setLoading(false)
           // Reset ref on error so user can retry later
           autoSaveAttemptedRef.current = false
         }
       } else {
         // Already a UUID, use it directly
         setActualProjectId(projectId)
+        // If it's already a UUID, we can set loading to false immediately
+        // The loadCanvas effect will handle loading the data
       }
     }
 
     autoSaveToCloud()
     // CRITICAL: Removed onSave from dependencies to prevent infinite loops
     // Only depend on projectId, userId, and clerk
-  }, [projectId, userId, clerk])
+  }, [projectId, userId, clerk, setLoading])
   
   // Reset auto-save ref when projectId changes to a different project
   useEffect(() => {
@@ -902,10 +906,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Load canvas data
   useEffect(() => {
     const currentProjectId = actualProjectId || projectId
-    if (currentProjectId && userId && isValidUUID(currentProjectId)) {
-      loadCanvas()
+    if (currentProjectId && userId) {
+      if (isValidUUID(currentProjectId)) {
+        // Valid UUID - load from API
+        loadCanvas()
+      } else {
+        // Non-UUID (local project) - load with empty state
+        console.log('Project is stored locally. Canvas will work but some features may be limited.')
+        setItems([])
+        setLoading(false)
+        setError('Project is stored locally. Save to cloud to enable all features.')
+      }
+    } else if (!currentProjectId && userId) {
+      // No projectId yet - wait for auto-save or set loading to false after timeout
+      const timeout = setTimeout(() => {
+        if (loading) {
+          console.warn('Canvas loading timeout - setting loading to false')
+          setLoading(false)
+          setError('Unable to load project. Please try refreshing the page.')
+        }
+      }, 5000) // 5 second timeout
+      
+      return () => clearTimeout(timeout)
     }
-  }, [actualProjectId, projectId, userId, loadCanvas])
+  }, [actualProjectId, projectId, userId, loadCanvas, loading, setItems, setLoading, setError])
 
   // Update dimensions on resize - fixed size, always full screen
   useEffect(() => {

@@ -183,14 +183,14 @@ function getProjectsFromLocalStorage(userId, spaceId = null) {
   }
 }
 
-export async function getProjects(userId, spaceId = null) {
+export async function getProjects(userId, spaceId = null, clerkInstance = null) {
   if (!userId) return []
   
   try {
-    // Try cloud first
-    if (await useCloud()) {
+    // Try cloud first (only if we have clerk instance)
+    if (await useCloud() && clerkInstance) {
       try {
-        const cloudProjects = await cloudManager.getProjectsFromCloud(userId, spaceId)
+        const cloudProjects = await cloudManager.getProjectsFromCloud(clerkInstance, spaceId)
         
         // Sync cloud projects to localStorage
         if (cloudProjects.length > 0) {
@@ -408,8 +408,11 @@ export async function deleteAllProjects(userId) {
   }
 }
 
-export function addFileToProject(userId, projectId, fileData) {
-  const project = getProject(userId, projectId)
+export function addFileToProject(userId, projectId, fileData, clerkInstance = null) {
+  // Note: This is a synchronous function, so we can't await getProject
+  // For now, we'll get from localStorage only
+  const projects = getProjectsFromLocalStorage(userId)
+  const project = projects.find(p => p.id === projectId)
   
   if (!project.workflow.files) {
     project.workflow.files = []

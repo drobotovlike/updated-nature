@@ -139,7 +139,7 @@ export default function DashboardPage() {
         setTrashedProjects(trashedProjs || [])
       
       // Load all projects for sidebar menu (regardless of space)
-      const allProjects = await getProjects(userId, null)
+      const allProjects = await getProjects(userId, null, clerk)
         if (updateProjectLists && typeof updateProjectLists === 'function') {
           updateProjectLists(allProjects || [])
         }
@@ -201,7 +201,7 @@ export default function DashboardPage() {
       // Auto-select the newly created space
       setSelectedSpaceId(newSpace.id)
       // Load all projects (for sidebar) and update recent projects
-      const allProjects = await getProjects(userId, null)
+      const allProjects = await getProjects(userId, null, clerk)
       if (updateProjectLists && typeof updateProjectLists === 'function') {
         updateProjectLists(allProjects || [])
       }
@@ -233,7 +233,7 @@ export default function DashboardPage() {
           setSelectedSpaceId(null)
         }
         // Always load all projects for sidebar (regardless of space)
-        const allProjects = await getProjects(userId, null)
+        const allProjects = await getProjects(userId, null, clerk)
         if (updateProjectLists && typeof updateProjectLists === 'function') {
           updateProjectLists(allProjects || [])
         }
@@ -279,7 +279,7 @@ export default function DashboardPage() {
   const handleRestoreProject = async (projectId) => {
     try {
       restoreProject(userId, projectId)
-      const allProjects = await getProjects(userId, null)
+      const allProjects = await getProjects(userId, null, clerk)
       const trashedProjs = getTrashedProjects(userId)
       if (updateProjectLists && typeof updateProjectLists === 'function') {
         updateProjectLists(allProjects || [])
@@ -447,7 +447,7 @@ export default function DashboardPage() {
       console.log('✅ Project created, view set to workspace for project:', project.id)
       
       // Refresh all projects (for sidebar) and update recent projects
-      const allProjects = await getProjects(userId, null)
+      const allProjects = await getProjects(userId, null, clerk)
       if (updateProjectLists && typeof updateProjectLists === 'function') {
         updateProjectLists(allProjects || [])
       }
@@ -483,7 +483,7 @@ export default function DashboardPage() {
               setSelectedSpaceId(null) // Show all projects on home
               // Refresh recent projects when going to home
               if (userId) {
-                const allProjects = await getProjects(userId, null)
+                const allProjects = await getProjects(userId, null, clerk)
                 if (updateProjectLists && typeof updateProjectLists === 'function') {
                   updateProjectLists(allProjects || [])
                 }
@@ -508,7 +508,7 @@ export default function DashboardPage() {
               setEditingCreation(null)
               setSelectedSpaceId(null) // Clear space selection
               setCurrentView('my-projects')
-              const allProjects = await getProjects(userId, null) // null = all projects
+              const allProjects = await getProjects(userId, null, clerk) // null = all projects
               if (updateProjectLists && typeof updateProjectLists === 'function') {
                 updateProjectLists(allProjects || [])
               }
@@ -612,7 +612,7 @@ export default function DashboardPage() {
                           try {
                             await deleteProject(userId, project.id)
                             // Refresh projects list
-                            const allProjects = await getProjects(userId, null)
+                            const allProjects = await getProjects(userId, null, clerk)
                             const trashedProjs = getTrashedProjects(userId)
                             if (updateProjectLists && typeof updateProjectLists === 'function') {
                               updateProjectLists(allProjects || [])
@@ -856,7 +856,7 @@ export default function DashboardPage() {
                 onSave={async () => {
                   if (!userId) return
                   // Refresh all projects (for sidebar) and update recent projects
-                  const allProjects = await getProjects(userId, null)
+                  const allProjects = await getProjects(userId, null, clerk)
                   updateProjectLists(allProjects)
                   // Refresh spaces to update project counts in sidebar
                   const userSpaces = await getSpaces(userId)

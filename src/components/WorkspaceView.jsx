@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
 import { getProject, updateProject, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import AssetLibrary from './AssetLibrary'
@@ -7,6 +7,7 @@ import ExportModal from './ExportModal'
 
 export default function WorkspaceView({ projectId, onBack, onSave, initialCreation = null }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [project, setProject] = useState(null)
   const [resultUrl, setResultUrl] = useState('')
   const [roomFile, setRoomFile] = useState(null)
@@ -40,7 +41,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         }
         
         try {
-          const projectData = await getProject(userId, projectId)
+          const projectData = await getProject(userId, projectId, clerk)
           if (projectData) {
             setProject(projectData)
             
@@ -59,7 +60,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       }
     }
     loadProject()
-  }, [projectId, userId])
+  }, [projectId, userId, clerk])
 
   // Load initial creation if editing
   useEffect(() => {

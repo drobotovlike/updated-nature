@@ -18,17 +18,23 @@ async function canvasApiRequest(endpoint, options = {}, userId) {
   if (!response.ok) {
     const contentType = response.headers.get('content-type')
     let errorMessage = `Canvas API error: ${response.status} ${response.statusText}`
+    let errorDetails = null
     
     if (contentType && contentType.includes('application/json')) {
       try {
         const error = await response.json()
         errorMessage = error.error || error.message || errorMessage
+        errorDetails = error.details || error.message
       } catch (parseError) {
         console.error('Failed to parse error response:', parseError)
       }
     }
     
-    throw new Error(errorMessage)
+    const error = new Error(errorMessage)
+    if (errorDetails) {
+      error.details = errorDetails
+    }
+    throw error
   }
 
   return response.json()

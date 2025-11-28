@@ -345,6 +345,14 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId, isSignedIn } = useAuth()
   const clerk = useClerk()
+  
+  // Import syncQueue for project syncing
+  const syncQueueRef = useRef(null)
+  useEffect(() => {
+    import('../utils/syncQueue').then(module => {
+      syncQueueRef.current = module.syncQueue
+    })
+  }, [])
   const stageRef = useRef(null)
   const containerRef = useRef(null)
   const maskLayerRef = useRef(null)
@@ -622,7 +630,35 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setItems((prev) => [...prev, newItem])
     } catch (error) {
       console.error('Error uploading file:', error)
-      setError('Failed to upload image. Please try again.')
+      
+      // Check if it's a project not found error
+      if (error.message?.includes('Project not found') || error.message?.includes('foreign key constraint') || error.message?.includes('does not exist')) {
+        setError('Project not synced to cloud. Syncing now... Please try again in a moment.')
+        
+        // Try to sync the project
+        try {
+          if (syncQueueRef.current && clerk) {
+            const projects = JSON.parse(localStorage.getItem('ature_projects') || '[]')
+            const project = projects.find(p => p.id === projectId)
+            if (project) {
+              await syncQueueRef.current.syncProject(projectId, clerk)
+              // Retry after a short delay
+              setTimeout(() => {
+                setError('Project synced. Please try uploading again.')
+              }, 2000)
+            } else {
+              setError('Project not found locally. Please refresh the page.')
+            }
+          } else {
+            setError('Project needs to be saved to cloud first. Please save the project and try again.')
+          }
+        } catch (syncError) {
+          console.error('Error syncing project:', syncError)
+          setError('Project needs to be saved to cloud first. Please save the project and try again.')
+        }
+      } else {
+        setError('Failed to upload image. Please try again.')
+      }
     } finally {
       setIsGenerating(false)
     }

@@ -255,6 +255,23 @@ async function handler(req, res, userId) {
         console.log('Creating canvas item:', { projectId, userId, imageUrl: image_url })
 
         try {
+          // First, verify the project exists in the database
+          const { data: project, error: projectError } = await supabase
+            .from('projects')
+            .select('id')
+            .eq('id', projectId)
+            .eq('user_id', userId)
+            .single()
+
+          if (projectError || !project) {
+            console.error('Project not found in database:', { projectId, userId, error: projectError })
+            return res.status(404).json({ 
+              error: 'Project not found',
+              message: 'The project does not exist in the database. Please save the project to cloud first.',
+              details: `Project ID "${projectId}" was not found. The project may need to be synced to the cloud.`
+            })
+          }
+
           // Build insert object, only including fields that exist
           const insertData = {
             project_id: projectId,
@@ -286,6 +303,15 @@ async function handler(req, res, userId) {
 
           if (insertError) {
             console.error('Error inserting canvas item:', insertError)
+            
+            // Check for foreign key constraint violation
+            if (insertError.code === '23503' || insertError.message?.includes('foreign key constraint')) {
+              return res.status(400).json({
+                error: 'Project not found',
+                message: 'The project does not exist in the database. Please save the project to cloud first.',
+                details: `Foreign key constraint violation: Project ID "${projectId}" does not exist in the projects table.`
+              })
+            }
             // Check if table doesn't exist
             if (insertError.code === '42P01' || insertError.message?.includes('does not exist')) {
               return res.status(500).json({ 

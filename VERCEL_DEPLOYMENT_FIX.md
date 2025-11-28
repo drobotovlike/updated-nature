@@ -10,9 +10,14 @@ on the Hobby plan.
 
 ---
 
-## ✅ Solution Applied
+## ✅ Solution Applied (Updated)
 
-### Moved Utility Files Outside `api/` Folder
+### Moved Utility Files to `api/_utils/` (Underscore Prefix)
+
+**Why underscore prefix?**
+- Vercel ignores folders starting with `_` when counting functions
+- BUT still includes them in the bundle for imports
+- This is the **official Vercel pattern** for shared utilities
 
 **Before:**
 ```
@@ -31,15 +36,13 @@ Total: 16 functions ❌
 
 **After:**
 ```
-lib/
-└── server-utils/   ← Vercel ignores this folder
-    ├── auth.js
-    ├── env.js
-    ├── logger.js
-    ├── rateLimit.js
-    └── dbMigration.js
-
 api/
+├── _utils/         ← Vercel IGNORES (underscore prefix) but BUNDLES
+│   ├── auth.js
+│   ├── env.js
+│   ├── logger.js
+│   ├── rateLimit.js
+│   └── dbMigration.js
 ├── projects/index.js
 ├── canvas/index.js
 └── ... (11 actual endpoints)
@@ -60,25 +63,22 @@ Total: 11 functions ✅
 
 ## 🔄 Changes Made
 
-### 1. Moved Files
+### 1. Final Location of Utility Files
 ```bash
-api/utils/auth.js         → lib/server-utils/auth.js
-api/utils/env.js          → lib/server-utils/env.js
-api/utils/logger.js       → lib/server-utils/logger.js
-api/utils/rateLimit.js    → lib/server-utils/rateLimit.js
-api/utils/dbMigration.js  → lib/server-utils/dbMigration.js
+api/_utils/auth.js        ← JWT verification with @clerk/backend
+api/_utils/env.js         ← Environment variable validation
+api/_utils/logger.js      ← Structured production logging
+api/_utils/rateLimit.js   ← API rate limiting middleware
+api/_utils/dbMigration.js ← Database setup verification
 ```
 
 ### 2. Updated Imports in 11 API Files
 
-**Before:**
+**Import Pattern:**
 ```javascript
-import { requireAuth } from '../utils/auth.js'
-```
-
-**After:**
-```javascript
-import { requireAuth } from '../../lib/server-utils/auth.js'
+import { requireAuth } from '../_utils/auth.js'
+import { getSupabaseConfig } from '../_utils/env.js'
+import { logger } from '../_utils/logger.js'
 ```
 
 **Files Updated:**

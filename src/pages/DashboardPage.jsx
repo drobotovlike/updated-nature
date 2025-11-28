@@ -316,9 +316,16 @@ export default function DashboardPage() {
     
     try {
       await deleteAllProjects(userId)
+      // Refresh all project lists
       if (updateProjectLists && typeof updateProjectLists === 'function') {
-      updateProjectLists([])
+        updateProjectLists([])
       }
+      // Refresh spaces to update project counts
+      const userSpaces = await getSpaces(userId)
+      setSpaces(userSpaces)
+      // Refresh trash
+      const trashedProjs = getTrashedProjects(userId)
+      setTrashedProjects(trashedProjs)
       alert('All projects deleted successfully')
     } catch (error) {
       console.error('Error deleting all projects:', error)
@@ -1011,20 +1018,35 @@ export default function DashboardPage() {
                     <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-1">All Projects</h1>
                     <p className="text-sm text-text-tertiary">{savedProjects.length} project{savedProjects.length !== 1 ? 's' : ''}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        setCurrentView('projects')
-                        setSelectedProjectId(null)
-                        setEditingCreation(null)
-                      }}
-                    className="px-4 py-2 h-10 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M18 6L6 18" />
-                        <path d="M6 6l12 12" />
-                      </svg>
-                    Back
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {savedProjects.length > 0 && (
+                        <button
+                          onClick={handleDeleteAllProjects}
+                          className="px-4 py-2 h-10 text-sm font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2 border border-red-200"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M3 6h18" />
+                            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                          </svg>
+                          Delete All
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          setCurrentView('projects')
+                          setSelectedProjectId(null)
+                          setEditingCreation(null)
+                        }}
+                        className="px-4 py-2 h-10 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-base rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M18 6L6 18" />
+                          <path d="M6 6l12 12" />
+                        </svg>
+                        Back
+                      </button>
+                    </div>
                 </div>
 
                 {/* Projects Grid */}

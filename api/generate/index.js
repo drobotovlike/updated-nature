@@ -1,5 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
-import { requireAuth } from '../utils/auth.js'
+import { requireAuth } from '../../lib/server-utils/auth.js'
 
 // Model configurations
 const MODELS = {

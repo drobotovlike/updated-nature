@@ -1,6 +1,6 @@
 // Image Editing API - Consolidates retouch and upscale
 // Supports multiple image editing operations
-import { requireAuth } from '../utils/auth.js'
+import { requireAuth } from '../../lib/server-utils/auth.js'
 
 async function handler(req, res, userId) {
   // userId is verified and safe to use

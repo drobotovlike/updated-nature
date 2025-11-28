@@ -1,6 +1,6 @@
 // Export API - Simplified version (high-res image export)
 import { createClient } from '@supabase/supabase-js'
-import { requireAuth } from '../utils/auth.js'
+import { requireAuth } from '../../lib/server-utils/auth.js'
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://ifvqkmpyknfezpxscnef.supabase.co'
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY

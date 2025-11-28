@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
-import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject } from '../utils/projectManager'
+import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject, emptyTrash } from '../utils/projectManager'
 import { getCanvasData } from '../utils/canvasManager'
 import WorkspaceView from '../components/WorkspaceView'
 import CanvasView from '../components/CanvasView'
@@ -333,6 +333,36 @@ export default function DashboardPage() {
     }
   }
 
+  const handleEmptyTrash = () => {
+    const totalItems = trashedSpaces.length + trashedProjects.length
+    if (totalItems === 0) {
+      return
+    }
+    
+    if (!window.confirm(`Are you sure you want to permanently delete all ${totalItems} item${totalItems !== 1 ? 's' : ''} in trash? This action cannot be undone.`)) {
+      return
+    }
+    
+    if (!window.confirm('This will permanently delete all trashed spaces and projects. Are you absolutely sure?')) {
+      return
+    }
+    
+    try {
+      const result = emptyTrash(userId)
+      // Refresh trash state
+      const trashed = getTrashedSpaces(userId)
+      const trashedProjs = getTrashedProjects(userId)
+      setTrashedSpaces(trashed)
+      setTrashedProjects(trashedProjs)
+      // Refresh spaces to update project counts
+      getSpaces(userId).then(userSpaces => setSpaces(userSpaces))
+      alert(`Successfully deleted ${result.deletedSpaces} space${result.deletedSpaces !== 1 ? 's' : ''} and ${result.deletedProjects} project${result.deletedProjects !== 1 ? 's' : ''} from trash.`)
+    } catch (error) {
+      console.error('Error emptying trash:', error)
+      alert('Failed to empty trash. Some items may still exist.')
+    }
+  }
+
   const handleCreateProject = async () => {
     if (!userId || !isSignedIn) {
       alert('Please sign in to create projects')
@@ -611,11 +641,26 @@ export default function DashboardPage() {
           
           {/* Trash contents */}
           {showTrash && (
-            <div className="mt-2 space-y-1 max-h-64 overflow-y-auto">
+            <div className="mt-2 space-y-1">
               {(trashedSpaces.length === 0 && trashedProjects.length === 0) ? (
                 <p className="text-xs text-text-tertiary px-3 py-2">Trash is empty</p>
               ) : (
                 <>
+                  {/* Empty Trash Button */}
+                  <div className="px-3 py-2 mb-2">
+                    <button
+                      onClick={handleEmptyTrash}
+                      className="w-full px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors duration-micro ease-apple focus-ring flex items-center justify-center gap-2 border border-red-200"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 6h18" />
+                        <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                        <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                      </svg>
+                      Empty Trash
+                    </button>
+                  </div>
+                  <div className="max-h-64 overflow-y-auto space-y-1">
                   {trashedSpaces.map((space) => {
                     const deletedAt = new Date(space.deletedAt)
                     const daysLeft = Math.ceil((ONE_WEEK_MS - (Date.now() - deletedAt.getTime())) / (24 * 60 * 60 * 1000))
@@ -691,6 +736,7 @@ export default function DashboardPage() {
                       </div>
                     )
                   })}
+                  </div>
                 </>
               )}
             </div>

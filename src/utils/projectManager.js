@@ -725,6 +725,43 @@ export function permanentlyDeleteProject(userId, projectId) {
   }
 }
 
+// Permanently delete all trashed items (spaces and projects)
+export function emptyTrash(userId) {
+  if (!userId) {
+    throw new Error('User must be authenticated to empty trash')
+  }
+  
+  try {
+    // Get all trashed items
+    const trashedSpaces = getTrashedSpaces(userId)
+    const trashedProjects = getTrashedProjects(userId)
+    
+    // Permanently delete all trashed spaces
+    const spacesStored = localStorage.getItem(SPACES_KEY)
+    if (spacesStored) {
+      const allSpaces = JSON.parse(spacesStored)
+      const updatedSpaces = allSpaces.filter(s => !(s.userId === userId && s.deleted))
+      localStorage.setItem(SPACES_KEY, JSON.stringify(updatedSpaces))
+    }
+    
+    // Permanently delete all trashed projects
+    const projectsStored = localStorage.getItem(STORAGE_KEY)
+    if (projectsStored) {
+      const allProjects = JSON.parse(projectsStored)
+      const updatedProjects = allProjects.filter(p => !(p.userId === userId && p.deleted))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProjects))
+    }
+    
+    return {
+      deletedSpaces: trashedSpaces.length,
+      deletedProjects: trashedProjects.length
+    }
+  } catch (error) {
+    console.error('Error emptying trash:', error)
+    throw error
+  }
+}
+
 // Auto-cleanup: Delete spaces and projects that have been in trash for more than 1 week
 // Each item is checked independently - deleted when its own 1-week period expires
 export function cleanupTrash(userId) {

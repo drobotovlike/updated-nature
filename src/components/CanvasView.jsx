@@ -343,8 +343,11 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 // UUID validation is now imported from utils/uuid
 
 export default function CanvasView({ projectId, onBack, onSave }) {
-  const { userId, isSignedIn } = useAuth()
+  const { userId, isSignedIn, isLoaded: authLoaded } = useAuth()
   const clerk = useClerk()
+  
+  // Wait for Clerk to be fully loaded before using it
+  const isClerkReady = authLoaded && clerk && (typeof clerk.getToken === 'function' || (clerk.loaded !== false))
   
   // Import syncQueue for project syncing
   const syncQueueRef = useRef(null)
@@ -584,7 +587,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       // First, try to verify project exists in database
       // Only verify if clerk is available and ready
-      if (clerk && typeof clerk.getToken === 'function') {
+      if (isClerkReady && clerk && typeof clerk.getToken === 'function') {
         const { getProject } = await import('../utils/projectManager')
         try {
           const dbProject = await getProject(userId, projectId, clerk)

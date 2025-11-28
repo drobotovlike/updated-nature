@@ -53,12 +53,12 @@ export default function AccountView() {
   useEffect(() => {
     async function loadProjects() {
       if (userId && activeTab === 'projects') {
-        const projects = await getProjects(userId)
+        const projects = await getProjects(userId, null, clerk)
         setSavedProjects(projects)
       }
     }
     loadProjects()
-  }, [userId, activeTab])
+  }, [userId, activeTab, clerk])
 
   const tabs = [
     { id: 'profile', label: 'Profile' },

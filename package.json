@@ -23,6 +23,8 @@
     "@google/genai": "^1.0.0",
     "@google/model-viewer": "^4.1.0",
     "@supabase/supabase-js": "^2.84.0",
+    "@syncedstore/core": "^0.6.0",
+    "@syncedstore/react": "^0.6.0",
     "@vercel/analytics": "^1.5.0",
     "express-rate-limit": "^8.2.1",
     "html2canvas": "^1.4.1",
@@ -33,6 +35,11 @@
     "react-konva": "^19.2.0",
     "react-router-dom": "^7.9.6",
     "use-image": "^1.1.4",
+    "y-indexeddb": "^9.0.12",
+    "y-supabase": "^0.0.4-7-alpha",
+    "y-utility": "^0.1.4",
+    "y-websocket": "^3.0.0",
+    "yjs": "^13.6.27",
     "zustand": "^5.0.8"
   },
   "devDependencies": {

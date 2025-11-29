@@ -44,12 +44,6 @@ export const useCanvasStore = create(
     // ============================================
 
     /**
-     * All canvas items in world coordinates
-     * @type {CanvasItem[]}
-     */
-    items: [],
-
-    /**
      * Camera/viewport state
      * @type {Camera}
      */
@@ -153,75 +147,8 @@ export const useCanvasStore = create(
       }))
     },
 
-    /**
-     * Set all items (used for loading/undo/redo)
-     * @param {CanvasItem[]} items - New items array
-     */
-    setItems: (items) => {
-      // DEFENSIVE: Ensure items is always an array
-      if (!items) {
-        console.warn('setItems called with null/undefined, defaulting to empty array')
-        set({ items: [] })
-        return
-      }
-
-      if (!Array.isArray(items)) {
-        console.error('setItems called with non-array value:', items)
-        console.trace('Stack trace for non-array setItems call')
-        set({ items: [] })
-        return
-      }
-
-      set({ items })
-    },
-
-    /**
-     * Add a new item
-     * @param {CanvasItem} item - Item to add
-     */
-    addItem: (item) => {
-      set((state) => ({
-        items: [...state.items, item],
-      }))
-    },
-
-    /**
-     * Update an item by ID
-     * @param {string} id - Item ID
-     * @param {Partial<CanvasItem>} update - Partial item update
-     */
-    updateItem: (id, update) => {
-      set((state) => ({
-        items: state.items.map((item) =>
-          item.id === id ? { ...item, ...update } : item
-        ),
-      }))
-    },
-
-    /**
-     * Delete an item by ID
-     * @param {string} id - Item ID
-     */
-    deleteItem: (id) => {
-      set((state) => ({
-        items: state.items.filter((item) => item.id !== id),
-        selection: new Set([...state.selection].filter((selectedId) => selectedId !== id)),
-      }))
-    },
-
-    /**
-     * Delete multiple items
-     * @param {string[]} ids - Array of item IDs
-     */
-    deleteItems: (ids) => {
-      set((state) => {
-        const idSet = new Set(ids)
-        return {
-          items: state.items.filter((item) => !idSet.has(item.id)),
-          selection: new Set([...state.selection].filter((id) => !idSet.has(id))),
-        }
-      })
-    },
+    // ITEMS STATE REMOVED - NOW MANAGED BY YJS (useYjsStore)
+    // Legacy actions removed: setItems, addItem, updateItem, deleteItem, deleteItems
 
     /**
      * Set selection (single or multiple)
@@ -326,22 +253,29 @@ export const useCanvasStore = create(
      * Get selected items
      * @returns {CanvasItem[]}
      */
+    /*
+    // Items are no longer in this store, so this selector is deprecated/removed
     getSelectedItems: () => {
       const state = get()
       const selectionArray = Array.from(state.selection)
-      return state.items.filter((item) => selectionArray.includes(item.id))
+      // return state.items.filter((item) => selectionArray.includes(item.id))
+      return [] // Placeholder
     },
+    */
 
     /**
      * Get primary selected item (first in selection)
      * @returns {CanvasItem|null}
      */
+    /*
     getPrimarySelectedItem: () => {
       const state = get()
       if (state.selection.size === 0) return null
       const firstId = Array.from(state.selection)[0]
-      return state.items.find((item) => item.id === firstId) || null
+      // return state.items.find((item) => item.id === firstId) || null
+      return null // Placeholder
     },
+    */
 
     /**
      * Check if an item is selected

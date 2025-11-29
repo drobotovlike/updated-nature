@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { useCanvasStore } from '../stores/useCanvasStore'
+import { useYjsStore } from './useYjsStore'
 import { toWorld, getWorldPointerPosition, zoomToCursor } from '../utils/coordinateSystem'
 
 const MIN_ZOOM = 0.25
@@ -22,8 +23,10 @@ export function useCanvasInteractions(stageRef, dimensions) {
   const zoomToCursorAction = useCanvasStore((state) => state.zoomToCursor)
   const panCamera = useCanvasStore((state) => state.panCamera)
   const setSelection = useCanvasStore((state) => state.setSelection)
-  const items = useCanvasStore((state) => state.items)
   const interactionMode = useCanvasStore((state) => state.interactionMode)
+
+  const yStore = useYjsStore()
+  const items = yStore.items
 
   // Pan state
   const [isPanning, setIsPanning] = useState(false)

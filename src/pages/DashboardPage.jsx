@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, useClerk } from '@clerk/clerk-react'
 import { getProjects, getSpaces, createSpace, deleteSpace, deleteAllProjects, getTrashedSpaces, restoreSpace, permanentlyDeleteSpace, cleanupTrash, ONE_WEEK_MS, saveProject, deleteProject, getTrashedProjects, restoreProject, permanentlyDeleteProject, emptyTrash } from '../utils/projectManager'
 import { getCanvasData } from '../utils/canvasManager'
+import { CollaborationProvider } from '../collaboration/CollaborationProvider'
 import WorkspaceView from '../components/WorkspaceView'
 import CanvasView from '../components/CanvasView'
 import AccountView from '../components/AccountView'
@@ -841,22 +842,24 @@ export default function DashboardPage() {
           */}
           {currentView === 'workspace' && selectedProjectId && userId && isSignedIn ? (
             <div className="h-full">
-              <CanvasView
-                projectId={selectedProjectId}
-                onBack={() => {
-                  setCurrentView('projects')
-                  setSelectedProjectId(null)
-                  setEditingCreation(null)
-                }}
-                onSave={async () => {
-                  if (!userId) return
-                  // Refresh all projects (for sidebar) and update recent projects
-                  const allProjects = getProjects(userId, selectedSpaceId, clerk).then(projects => updateProjectLists(projects))
-                  // Refresh spaces to update project counts in sidebar
-                  const userSpaces = await getSpaces(userId, clerk)
-                  setSpaces(userSpaces)
-                }}
-              />
+              <CollaborationProvider roomId={selectedProjectId}>
+                <CanvasView
+                  projectId={selectedProjectId}
+                  onBack={() => {
+                    setCurrentView('projects')
+                    setSelectedProjectId(null)
+                    setEditingCreation(null)
+                  }}
+                  onSave={async () => {
+                    if (!userId) return
+                    // Refresh all projects (for sidebar) and update recent projects
+                    const allProjects = getProjects(userId, selectedSpaceId, clerk).then(projects => updateProjectLists(projects))
+                    // Refresh spaces to update project counts in sidebar
+                    const userSpaces = await getSpaces(userId, clerk)
+                    setSpaces(userSpaces)
+                  }}
+                />
+              </CollaborationProvider>
             </div>
           ) : currentView === 'projects' ? (
             <div className="px-8 pb-12 pt-8">

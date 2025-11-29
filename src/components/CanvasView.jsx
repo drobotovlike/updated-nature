@@ -7,7 +7,8 @@ import AssetLibrary from './AssetLibrary'
 import ExportModal from './ExportModal'
 import CanvasExportModal from './CanvasExportModal'
 import LayersPanel from './LayersPanel'
-import { getCanvasData, createCanvasItem, updateCanvasItem, deleteCanvasItem, saveCanvasState } from '../utils/canvasManager'
+import { getCanvasData, saveCanvasState } from '../utils/canvasManager'
+import { useYjsStore, addItem, updateItem, deleteItem, setItems } from '../hooks/useYjsStore'
 import { getProject, saveProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
@@ -26,7 +27,28 @@ import { useViewportCulling } from '../hooks/useViewportCulling'
 import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
 import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
-import { isValidUUID } from '../utils/uuid'
+import { isValidUUID, generateUUID } from '../utils/uuid'
+
+// Adapters for Yjs (Transition from REST API)
+// These replace the canvasManager functions with local Yjs mutations
+const createCanvasItem = async (userId, projectId, data, clerk) => {
+  const newItem = {
+    id: generateUUID(),
+    ...data
+  };
+  addItem(newItem);
+  return newItem;
+};
+
+const updateCanvasItem = async (userId, itemId, updates, clerk) => {
+  updateItem(itemId, updates);
+  return { id: itemId, ...updates };
+};
+
+const deleteCanvasItem = async (userId, itemId, clerk) => {
+  deleteItem(itemId);
+  return true;
+};
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -375,8 +397,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }
 
   // Canvas state - Using Zustand store for core canvas state
-  const items = useCanvasStore((state) => state.items)
-  const setItems = useCanvasStore((state) => state.setItems)
+  const yStore = useYjsStore()
+  const items = yStore.items
+  // const items = useCanvasStore((state) => state.items) // REPLACED BY YJS
+  const setItemsState = useCanvasStore((state) => state.setItems) // Keep for now if needed, but likely unused
   const camera = useCanvasStore((state) => state.camera)
   const setCamera = useCanvasStore((state) => state.setCamera)
   const dimensions = useCanvasStore((state) => state.dimensions)
@@ -863,64 +887,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }
     }
 
+    // Yjs handles data loading automatically via provider
+    /*
     try {
       console.log('Loading canvas for project:', projectId, 'user:', userId)
       const data = await getCanvasData(userId, projectId, clerk)
-      console.log('Canvas data received:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
-
+      // ... (Legacy loading logic removed for Yjs migration)
       setItems(data.items || [])
-
-      if (data.state) {
-        // Restore camera state
-        const restoredZoom = data.state.zoom_level || 1
-        const restoredPanX = data.state.pan_x || 0
-        const restoredPanY = data.state.pan_y || 0
-
-        // Restore settings
-        updateSettings({
-          rulerEnabled: data.state.ruler_enabled || false,
-          showMeasurements: data.state.show_measurements !== false,
-          backgroundColor: data.state.background_color || '#fafaf9',
-          gridEnabled: data.state.grid_enabled !== false,
-          gridSize: data.state.grid_size || 20,
-        })
-
-        // Restore stage position and zoom
-        setTimeout(() => {
-          if (stageRef.current && dimensions.width > 0 && dimensions.height > 0) {
-            // Clamp pan to canvas bounds (canvas is 4x larger than viewport)
-            const currentCanvasWidth = dimensions.width * 4
-            const currentCanvasHeight = dimensions.height * 4
-            const maxX = currentCanvasWidth - dimensions.width
-            const maxY = currentCanvasHeight - dimensions.height
-            const clampedX = Math.max(0, Math.min(maxX, restoredPanX))
-            const clampedY = Math.max(0, Math.min(maxY, restoredPanY))
-
-            stageRef.current.position({ x: clampedX, y: clampedY })
-            stageRef.current.scale({ x: restoredZoom, y: restoredZoom })
-
-            // Update store
-            setCamera({
-              x: clampedX,
-              y: clampedY,
-              zoom: restoredZoom,
-            })
-          }
-        }, 100)
-      }
-      console.log('Canvas loaded successfully')
+      // ...
     } catch (error) {
-      console.error('Error loading canvas:', error)
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        projectId: projectId,
-        userId,
-      })
-
-      // For new projects or if API fails, allow canvas to load with empty state
-      // Check if it's a 404 (project not found) - this is expected for new projects
+       // ...
+    }
+    */
+    console.log('Canvas View Initialized with Yjs Store');
       if (error.message?.includes('404') || error.message?.includes('not found') || error.message?.includes('Project not found')) {
         console.log('Project not found in database (this is normal for new projects), loading with empty state')
       } else {
@@ -1104,69 +1083,40 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [projectId, userId, camera, settings])
 
   // Debounced save
+  // Yjs handles syncing automatically
+  /*
   useEffect(() => {
     const timer = setTimeout(() => {
       saveCanvasStateToServer()
     }, 1000)
     return () => clearTimeout(timer)
   }, [camera, settings, saveCanvasStateToServer])
+  */
 
-  const handleItemUpdate = useCallback(async (itemId, updates) => {
-    try {
-      const updatedItem = await updateCanvasItem(userId, itemId, updates, clerk)
+  const handleItemUpdate = useCallback((itemId, updates) => {
+    updateItem(itemId, updates)
+  }, [])
 
-      // DEFENSIVE: Validate response from API
-      if (!updatedItem || typeof updatedItem !== 'object') {
-        console.error('Invalid response from updateCanvasItem:', updatedItem)
-        setError('Failed to update item: Invalid response from server')
-        return
-      }
-
-      setItems((prev) => {
-        // DEFENSIVE: Ensure prev is an array
-        const safePrev = Array.isArray(prev) ? prev : []
-        return safePrev.map((item) => (item.id === itemId ? updatedItem : item))
-      })
-    } catch (error) {
-      console.error('Error updating item:', error)
-      setError('Failed to update item. Please try again.')
+  const handleItemDelete = useCallback((itemId) => {
+    // Yjs handles history automatically if we set it up, but for now we just delete
+    deleteItem(itemId)
+    if (selectedItemId === itemId) {
+      setSelectedItemId(null)
     }
-  }, [userId])
-
-  const handleItemDelete = useCallback(async (itemId) => {
-    try {
-      // Save current state to history before delete
-      saveToHistory(items)
-
-      await deleteCanvasItem(userId, itemId, clerk)
-      // DEFENSIVE: Ensure items is an array before filtering
-      const safeItems = Array.isArray(items) ? items : []
-      const newItems = safeItems.filter((item) => item.id !== itemId)
-      setItems(newItems)
-      if (selectedItemId === itemId) {
-        setSelectedItemId(null)
-      }
-      setPopupMenuPosition({ x: 0, y: 0, visible: false })
-    } catch (error) {
-      console.error('Error deleting item:', error)
-      setError('Failed to delete item. Please try again.')
-    }
-  }, [userId, selectedItemId, items, saveToHistory])
+    setPopupMenuPosition({ x: 0, y: 0, visible: false })
+  }, [selectedItemId])
 
   // Layer panel handlers
-  const handleReorderLayers = useCallback(async (reorderedItems) => {
-    try {
-      // Update all items with new z_index values
-      const updatePromises = reorderedItems.map((item) =>
-        updateCanvasItem(userId, item.id, { z_index: item.z_index }, clerk)
-      )
-      await Promise.all(updatePromises)
-      setItems(reorderedItems)
-    } catch (error) {
-      console.error('Error reordering layers:', error)
-      setError('Failed to reorder layers. Please try again.')
-    }
-  }, [userId])
+  const handleReorderLayers = useCallback((reorderedItems) => {
+    // Update Yjs array order and properties
+    // Ideally we just update the array order
+    setItems(reorderedItems)
+    
+    // If we rely on z_index property:
+    reorderedItems.forEach(item => {
+       updateItem(item.id, { z_index: item.z_index })
+    })
+  }, [])
 
 
 

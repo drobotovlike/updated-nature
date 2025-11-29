@@ -18,6 +18,9 @@ async function canvasApiRequest(endpoint, options = {}, clerkInstance) {
     ...options.headers,
   }
 
+  // Debug: Log headers (careful not to log full token in prod)
+  // console.log('Canvas API Request Headers:', { ...headers, Authorization: `Bearer ${token.substring(0, 10)}...` })
+
   const response = await fetch(`${CANVAS_API}${endpoint}`, {
     ...options,
     headers,

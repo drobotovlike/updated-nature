@@ -34,19 +34,28 @@ export async function getAuthToken(clerkInstance) {
   // Check if getToken method exists
   if (typeof clerkInstance.getToken !== 'function') {
     // Try alternative methods for getting token
-    if (clerkInstance.session && typeof clerkInstance.session.getToken === 'function') {
-      try {
-        const token = await clerkInstance.session.getToken()
-        return token
-      } catch (error) {
-        console.error('Error getting token from session:', error)
-        return null
+    if (clerkInstance.session) {
+      if (typeof clerkInstance.session.getToken === 'function') {
+        try {
+          // Log template request if useful for debugging (removed for now)
+          const token = await clerkInstance.session.getToken()
+          if (!token) {
+             console.warn('Clerk session.getToken() returned empty token')
+          }
+          return token
+        } catch (error) {
+          console.error('Error getting token from session:', error)
+          return null
+        }
+      } else {
+         console.warn('Clerk session exists but getToken is not a function')
       }
+    } else {
+       console.warn('Clerk session is null or undefined')
     }
     
-    console.error('Clerk instance does not have getToken method. Clerk may not be fully initialized.')
-    console.error('Clerk instance type:', typeof clerkInstance, 'Keys:', Object.keys(clerkInstance || {}))
-    console.error('Clerk loaded:', clerkInstance.loaded, 'Has session:', !!clerkInstance.session)
+    console.error('Clerk instance does not have getToken method and session fallback failed.')
+    // console.error('Clerk instance type:', typeof clerkInstance, 'Keys:', Object.keys(clerkInstance || {}))
     return null
   }
 

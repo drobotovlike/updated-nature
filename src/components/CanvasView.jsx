@@ -3526,47 +3526,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           onDrop={handleDrop}
           onDragOver={handleDragOver}
         >
-          {/* Grid Background - CSS-based, fixed to viewport, behind Stage */}
-          {settings.gridEnabled && dimensions.width > 0 && dimensions.height > 0 && (() => {
-            // Get current stage position in real-time for smooth grid updates
-            const stage = stageRef.current
-            const currentPanX = stage ? stage.x() : camera.x
-            const currentPanY = stage ? stage.y() : camera.y
-            const currentZoom = stage ? stage.scaleX() : camera.zoom
-
-            // Convert grid size based on unit
-            let baseGridSize = settings.gridSize || 20
-            if (settings.gridUnit === 'in') {
-              baseGridSize = baseGridSize * 96 // 1 inch = 96px at 96 DPI
-            } else if (settings.gridUnit === 'cm') {
-              baseGridSize = baseGridSize * 37.8 // 1 cm ≈ 37.8px at 96 DPI
-            }
-
-            // Calculate grid spacing in screen pixels (scales with zoom)
-            const screenGridSize = baseGridSize * currentZoom
-            const effectiveGridSize = Math.max(10, screenGridSize)
-
-            // Calculate grid offset based on current pan position (real-time)
-            const offsetX = currentPanX % effectiveGridSize
-            const offsetY = currentPanY % effectiveGridSize
-            const normalizedOffsetX = offsetX < 0 ? offsetX + effectiveGridSize : offsetX
-            const normalizedOffsetY = offsetY < 0 ? offsetY + effectiveGridSize : offsetY
-
-            return (
-              <div
-                className="absolute inset-0 pointer-events-none z-0"
-                key={`grid - ${currentPanX} -${currentPanY} -${currentZoom} `}
-                style={{
-                  backgroundImage: `
-  linear - gradient(to right, #e5e7eb 1px, transparent 1px),
-    linear - gradient(to bottom, #e5e7eb 1px, transparent 1px)
-      `,
-                  backgroundSize: `${effectiveGridSize}px ${effectiveGridSize} px`,
-                  backgroundPosition: `${normalizedOffsetX}px ${normalizedOffsetY} px`,
-                }}
-              />
-            )
-          })()}
+          {/* Grid is rendered inside the Konva Stage via InfiniteGrid component */}
 
           {loading ? (
             <div className="absolute inset-0 flex items-center justify-center">

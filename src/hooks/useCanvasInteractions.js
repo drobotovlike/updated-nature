@@ -45,7 +45,11 @@ export function useCanvasInteractions(stageRef, dimensions) {
   const [isSpacePressed, setIsSpacePressed] = useState(false)
 
   /**
-   * Handle wheel event for zoom-to-cursor
+   * Handle wheel event - Apple-style natural scrolling
+   * 
+   * - Two-finger scroll (no modifier) → Pan the canvas (natural direction)
+   * - Pinch gesture (ctrlKey on trackpad) → Zoom to cursor
+   * - Cmd/Ctrl + scroll → Zoom to cursor (for mouse users)
    */
   const handleWheel = useCallback(
     (e) => {
@@ -57,38 +61,66 @@ export function useCanvasInteractions(stageRef, dimensions) {
       const pointer = stage.getPointerPosition()
       if (!pointer) return
 
-      const oldScale = stage.scaleX()
-      const deltaY = e.evt.deltaY
-      const absDelta = Math.abs(deltaY)
+      // Detect if this is a pinch-to-zoom gesture
+      // On Mac trackpads, pinch gestures send wheel events with ctrlKey = true
+      const isPinchZoom = e.evt.ctrlKey || e.evt.metaKey
+      
+      if (isPinchZoom) {
+        // ZOOM mode - pinch or Ctrl+scroll
+        const oldScale = stage.scaleX()
+        const deltaY = e.evt.deltaY
+        
+        // Smooth zoom factor - smaller for trackpad, feels more natural
+        // Negative deltaY = zoom in (fingers apart), positive = zoom out (fingers together)
+        const zoomIntensity = 0.01
+        const zoomFactor = Math.exp(-deltaY * zoomIntensity)
+        
+        const proposedScale = oldScale * zoomFactor
+        const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
-      // Calculate zoom factor based on scroll amount
-      const baseZoomFactor = 0.001
-      const sensitivity = Math.min(absDelta / 10, 50)
-      const zoomFactor = 1 + baseZoomFactor * sensitivity
+        // Zoom to cursor position
+        const oldCamera = {
+          x: stage.x(),
+          y: stage.y(),
+          zoom: oldScale,
+        }
 
-      // Apply zoom in the correct direction
-      const proposedScale = deltaY > 0 ? oldScale / zoomFactor : oldScale * zoomFactor
-      const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
+        const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
 
-      // Use zoom-to-cursor math
-      const oldCamera = {
-        x: stage.x(),
-        y: stage.y(),
-        zoom: oldScale,
+        // Update stage
+        stage.scale({ x: clampedScale, y: clampedScale })
+        stage.position({ x: newCamera.x, y: newCamera.y })
+
+        // Update store
+        setCamera({
+          x: newCamera.x,
+          y: newCamera.y,
+          zoom: clampedScale,
+        })
+      } else {
+        // PAN mode - two-finger scroll (natural scrolling like Apple)
+        // Natural scrolling: content follows finger direction
+        // deltaX > 0 means finger moved left, so pan right (content moves left)
+        // deltaY > 0 means finger moved up, so pan down (content moves up)
+        const deltaX = e.evt.deltaX
+        const deltaY = e.evt.deltaY
+        
+        // Sensitivity for panning - adjust for smooth feel
+        const panSensitivity = 1
+        
+        const newX = stage.x() - deltaX * panSensitivity
+        const newY = stage.y() - deltaY * panSensitivity
+
+        // Update stage position
+        stage.position({ x: newX, y: newY })
+
+        // Update store
+        setCamera({
+          x: newX,
+          y: newY,
+          zoom: stage.scaleX(),
+        })
       }
-
-      const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
-
-      // Update stage
-      stage.scale({ x: clampedScale, y: clampedScale })
-      stage.position({ x: newCamera.x, y: newCamera.y })
-
-      // Update store
-      setCamera({
-        x: newCamera.x,
-        y: newCamera.y,
-        zoom: clampedScale,
-      })
     },
     [stageRef, dimensions, setCamera]
   )

@@ -117,7 +117,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       
       // Upload to server and add to asset library
       try {
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         const permanentUrl = uploadResult.url
         
         if (!permanentUrl) {
@@ -175,7 +175,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       
       // Upload to server and add to asset library
       try {
-        const uploadResult = await uploadFileToCloud(file, userId)
+        const uploadResult = await uploadFileToCloud(file, clerk)
         const permanentUrl = uploadResult.url
         
         if (!permanentUrl) {
@@ -306,7 +306,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
             const response = await fetch(data.imageUrl)
             const blob = await response.blob()
             const file = new File([blob], `generated-${Date.now()}.png`, { type: 'image/png' })
-            const uploadResult = await uploadFileToCloud(file, userId)
+            const uploadResult = await uploadFileToCloud(file, clerk)
             
             // Add to asset library
             await addAssetToLibrary(
@@ -479,7 +479,7 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
             const imgResponse = await fetch(data.imageUrl)
             const blob = await imgResponse.blob()
             const file = new File([blob], `variation-${i + 1}-${Date.now()}.png`, { type: 'image/png' })
-            const uploadResult = await uploadFileToCloud(file, userId)
+            const uploadResult = await uploadFileToCloud(file, clerk)
             resultUrl = uploadResult.url
           }
 

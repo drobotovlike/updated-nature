@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
 import { getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 
 export default function AssetLibrary({ onSelectAsset, projectId }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [assets, setAssets] = useState([])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedTags, setSelectedTags] = useState([])
@@ -68,7 +69,7 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
 
     setUploadingAsset(true)
     try {
-      const uploadResult = await uploadFileToCloud(file, userId)
+      const uploadResult = await uploadFileToCloud(file, clerk)
       const permanentUrl = uploadResult.url
 
       if (!permanentUrl) {

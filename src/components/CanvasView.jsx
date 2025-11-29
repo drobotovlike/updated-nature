@@ -369,7 +369,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const clerk = useClerk()
 
   // Wait for Clerk to be fully loaded before using it
-  const isClerkReady = authLoaded && clerk && (typeof clerk.getToken === 'function' || (clerk.loaded !== false))
+  // Note: clerk.getToken doesn't exist directly - it's on clerk.session
+  const isClerkReady = authLoaded && clerk && clerk.loaded !== false && clerk.session
 
   // Import syncQueue for project syncing
   const syncQueueRef = useRef(null)
@@ -694,12 +695,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         return
       }
 
-      // Verify clerk has getToken method before proceeding
-      if (typeof clerk.getToken !== 'function') {
-        console.error('Clerk instance is not ready:', {
-          clerkType: typeof clerk,
-          hasGetToken: typeof clerk.getToken,
-          clerkKeys: Object.keys(clerk || {})
+      // Verify clerk session is ready before proceeding
+      if (!clerk.session || typeof clerk.session.getToken !== 'function') {
+        console.error('Clerk session is not ready:', {
+          clerkLoaded: clerk.loaded,
+          hasSession: !!clerk.session,
+          sessionGetToken: typeof clerk.session?.getToken
         })
         setError('Authentication is not ready. Please wait a moment and try again.')
         return

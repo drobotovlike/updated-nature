@@ -757,6 +757,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         const safePrev = Array.isArray(prev) ? prev : []
         return [...safePrev, newItem]
       })
+
+      // Also save to assets library for future reuse
+      try {
+        await addAssetToLibrary(
+          userId,
+          file.name || `Uploaded ${new Date().toLocaleDateString()}`,
+          imageUrl,
+          'image',
+          `Uploaded to canvas from device`,
+          clerk
+        )
+        console.log('Asset saved to library:', file.name)
+      } catch (assetError) {
+        // Don't fail the upload if asset library save fails
+        console.warn('Failed to save asset to library:', assetError)
+      }
     } catch (error) {
       console.error('Error uploading file:', error)
 

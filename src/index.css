@@ -11,7 +11,7 @@
     font-feature-settings: 'ss01', 'cv11';
     
     /* Design tokens */
-    --bg-canvas: #F6F2EE;
+    --bg-canvas: #F0F2F5; /* Miro-like light gray */
     --surface-1: #FFFFFF;
     --surface-2: #F1EBE4;
     --accent-clay: #D97757;

@@ -1,13 +1,13 @@
 import { useMemo } from 'react'
-import { Line } from 'react-konva'
+import { Circle } from 'react-konva' // Changed from Line to Circle
 import { useCanvasStore } from '../stores/useCanvasStore'
 import { toScreen } from '../utils/coordinateSystem'
 
 /**
- * Infinite Grid Component
+ * Infinite Grid Component (Dot Pattern)
  * 
- * Renders a grid that scales with zoom and extends infinitely.
- * Uses Konva Lines for crisp rendering at any zoom level.
+ * Renders a dot grid that scales with zoom.
+ * Used by Miro, Figma, etc. for a cleaner look.
  */
 export function InfiniteGrid() {
   const camera = useCanvasStore((state) => state.camera)
@@ -20,9 +20,9 @@ export function InfiniteGrid() {
 
   const gridSize = settings.gridSize || 20
 
-  // Calculate grid lines in world space
-  const gridLines = useMemo(() => {
-    const lines = []
+  // Calculate grid dots in world space
+  const gridDots = useMemo(() => {
+    const dots = []
 
     // Get viewport bounds in world space
     const topLeft = { x: -camera.x / camera.zoom, y: -camera.y / camera.zoom }
@@ -37,46 +37,35 @@ export function InfiniteGrid() {
     const endX = Math.ceil(bottomRight.x / gridSize) * gridSize
     const endY = Math.ceil(bottomRight.y / gridSize) * gridSize
 
-    // Generate vertical lines
+    // Generate dots
     for (let x = startX; x <= endX; x += gridSize) {
-      const topScreen = toScreen({ x, y: topLeft.y }, camera)
-      const bottomScreen = toScreen({ x, y: bottomRight.y }, camera)
-
-      lines.push({
-        key: `v-${x}`,
-        points: [topScreen.x, topScreen.y, bottomScreen.x, bottomScreen.y],
-        stroke: '#e5e7eb',
-        strokeWidth: 1 / camera.zoom, // Scale stroke width inversely with zoom
-        listening: false,
-      })
+      for (let y = startY; y <= endY; y += gridSize) {
+        const screenPos = toScreen({ x, y }, camera)
+        
+        dots.push({
+          key: `${x}-${y}`,
+          x: screenPos.x,
+          y: screenPos.y,
+          radius: 1, // Small dot size
+          fill: '#C7C7C7', // Subtle gray (Miro-like)
+          listening: false,
+        })
+      }
     }
 
-    // Generate horizontal lines
-    for (let y = startY; y <= endY; y += gridSize) {
-      const leftScreen = toScreen({ x: topLeft.x, y }, camera)
-      const rightScreen = toScreen({ x: bottomRight.x, y }, camera)
-
-      lines.push({
-        key: `h-${y}`,
-        points: [leftScreen.x, leftScreen.y, rightScreen.x, rightScreen.y],
-        stroke: '#e5e7eb',
-        strokeWidth: 1 / camera.zoom,
-        listening: false,
-      })
-    }
-
-    return lines
+    return dots
   }, [camera, dimensions, gridSize])
 
   return (
     <>
-      {gridLines.map((line) => (
-        <Line
-          key={line.key}
-          points={line.points}
-          stroke={line.stroke}
-          strokeWidth={line.strokeWidth}
-          listening={line.listening}
+      {gridDots.map((dot) => (
+        <Circle
+          key={dot.key}
+          x={dot.x}
+          y={dot.y}
+          radius={dot.radius}
+          fill={dot.fill}
+          listening={dot.listening}
         />
       ))}
     </>

@@ -82,9 +82,9 @@ export const useCanvasStore = create(
      * @type {Object}
      */
     settings: {
-      backgroundColor: '#F6F2EE',
+      backgroundColor: '#F0F2F5', // Match CSS variable
       gridEnabled: true,
-      gridSize: 20,
+      gridSize: 50, // Increase grid size (dots should be spaced out more than lines)
       rulerEnabled: false,
       showMeasurements: true,
     },

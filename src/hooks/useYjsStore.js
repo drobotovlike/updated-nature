@@ -35,19 +35,36 @@ export const useYjsStore = () => {
   return store;
 };
 
+// Helper to deep clone an object to avoid Yjs "already in tree" errors
+const deepClone = (obj) => {
+  if (obj === null || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj.map(deepClone);
+  const cloned = {};
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      cloned[key] = deepClone(obj[key]);
+    }
+  }
+  return cloned;
+};
+
 // Helper functions for common mutations
 // These can be used inside or outside components
 
 export const addItem = (item) => {
-  store.items.push(item);
+  // Deep clone to ensure we're not adding an object already in the Yjs tree
+  const clonedItem = deepClone(item);
+  store.items.push(clonedItem);
 };
 
 export const updateItem = (id, updates) => {
   const index = store.items.findIndex(item => item.id === id);
   if (index !== -1) {
     // SyncedStore allows direct mutation of properties
+    // Deep clone updates to avoid "already in tree" errors
+    const clonedUpdates = deepClone(updates);
     const item = store.items[index];
-    Object.assign(item, updates);
+    Object.assign(item, clonedUpdates);
   }
 };
 
@@ -81,7 +98,8 @@ export const deleteItems = (ids) => {
 export const setItems = (items) => {
   // Clear array
   store.items.splice(0, store.items.length);
-  // Add new items
-  store.items.push(...items);
+  // Deep clone each item to avoid "already in tree" errors
+  const clonedItems = items.map(deepClone);
+  store.items.push(...clonedItems);
 };
 

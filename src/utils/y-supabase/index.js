@@ -38,6 +38,7 @@ export class SupabaseProvider extends Observable {
     this.channelName = channel
     this.awareness = awareness || new Awareness(doc)
     this.connected = false
+    this.resyncInterval = null
     
     // Create channel
     this.channel = this.supabase.channel(this.channelName)

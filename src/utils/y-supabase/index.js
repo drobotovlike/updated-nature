@@ -30,13 +30,13 @@ export class SupabaseProvider extends Observable {
    * @param {Object} supabase - Supabase client instance
    * @param {SupabaseProviderOptions} [options]
    */
-  constructor(doc, supabase, { channel = 'default', resyncInterval = 5000, awareness = new Awareness(doc) } = {}) {
+  constructor(doc, supabase, { channel = 'default', resyncInterval = 5000, awareness = null } = {}) {
     super()
 
     this.doc = doc
     this.supabase = supabase
     this.channelName = channel
-    this.awareness = awareness
+    this.awareness = awareness || new Awareness(doc)
     this.connected = false
     
     // Create channel

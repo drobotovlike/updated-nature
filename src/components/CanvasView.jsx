@@ -29,6 +29,8 @@ import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
 import { isValidUUID, generateUUID } from '../utils/uuid'
 import { getAuthToken } from '../utils/authToken'
+import CanvasToolbar from './CanvasToolbar'
+import ZoomControls from './ZoomControls'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -1119,17 +1121,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const handleItemDelete = useCallback((itemId) => {
     // Yjs handles history automatically if we set it up, but for now we just delete
     deleteItem(itemId)
-    if (selectedItemId === itemId) {
-      setSelectedItemId(null)
-    }
-    setPopupMenuPosition({ x: 0, y: 0, visible: false })
+      if (selectedItemId === itemId) {
+        setSelectedItemId(null)
+      }
+      setPopupMenuPosition({ x: 0, y: 0, visible: false })
   }, [selectedItemId])
 
   // Layer panel handlers
   const handleReorderLayers = useCallback((reorderedItems) => {
     // Update Yjs array order and properties
     // Ideally we just update the array order
-    setItems(reorderedItems)
+      setItems(reorderedItems)
     
     // If we rely on z_index property:
     reorderedItems.forEach(item => {
@@ -3813,324 +3815,88 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           })()}
         </div>
 
-        {/* Unified Menu Bar */}
-        <div className="absolute bottom-0 left-0 right-0 z-40 flex items-center justify-center pb-4">
-          <div className="flex items-center gap-2 bg-[#FFFFFF]/95 backdrop-blur-sm rounded-full px-4 py-2 shadow-oak border border-[#F1EBE4] max-w-[95vw] overflow-x-auto linen-texture">
-            {/* Back Button */}
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
-                title="Go back to dashboard"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                  <path d="m12 19-7-7 7-7" />
-                  <path d="M19 12H5" />
-                </svg>
-              </button>
-            )}
-
-            {/* Canvas Controls */}
-            <div className="flex items-center gap-1 bg-[#F1EBE4] rounded-full p-1">
-              <button
-                onClick={() => updateSettings({ gridEnabled: !settings.gridEnabled })}
-                className={`p - 1.5 rounded - full transition - colors ${settings.gridEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
-                  } `}
-                title="Toggle grid overlay - Show/hide alignment grid on canvas"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" />
-                  <rect x="14" y="3" width="7" height="7" />
-                  <rect x="14" y="14" width="7" height="7" />
-                  <rect x="3" y="14" width="7" height="7" />
-                </svg>
-              </button>
-              <button
-                onClick={() => updateSettings({ rulerEnabled: !settings.rulerEnabled })}
-                className={`p - 1.5 rounded - full transition - colors ${settings.rulerEnabled ? 'bg-white text-[#2C2C2C] shadow-sm' : 'text-[#7C7C7C] hover:bg-white/50'
-                  } `}
-                title="Toggle ruler - Show/hide measurement ruler on canvas edges"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Undo/Redo Buttons */}
-            <button
-              onClick={handleUndo}
-              disabled={historyIndex <= 0}
-              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Undo last action - Revert the last change you made (Keyboard: Cmd/Ctrl+Z)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <path d="M3 7v6h6" />
-                <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-              </svg>
-            </button>
-            <button
-              onClick={handleRedo}
-              disabled={historyIndex >= history.length - 1}
-              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="Redo action - Restore the change you just undid (Keyboard: Cmd/Ctrl+Shift+Z)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <path d="M21 7v6h-6" />
-                <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-              </svg>
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Tool Buttons */}
-            <button
-              onClick={() => {
-                setDimensionMode(true)
-                setError('Dimension mode: Click two points to measure distance. Press M to start.')
-              }}
-              className={`p - 2 rounded - full hover: bg - [#F1EBE4] text - [#7C7C7C] hover: text - [#2C2C2C] transition - colors ${dimensionMode ? 'bg-[#F1EBE4]' : ''
-                } `}
-              title="Dimension tool - Measure distances between two points on the canvas (Keyboard: M)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <path d="M3 12l4-4" />
-                <path d="M3 12l4 4" />
-                <path d="M21 12l-4-4" />
-                <path d="M21 12l-4 4" />
-                <line x1="12" y1="3" x2="12" y2="21" />
-              </svg>
-            </button>
-            <button
-              onClick={() => {
-                setTextMode(true)
-                setError('Text mode: Click on canvas to place text, then type and press Enter')
-              }}
-              className={`p - 2 rounded - full hover: bg - [#F1EBE4] text - [#7C7C7C] hover: text - [#2C2C2C] transition - colors ${textMode ? 'bg-[#F1EBE4]' : ''
-                } `}
-              title="Text tool - Add text labels to your canvas (Keyboard: T)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 20h16" />
-                <path d="M6 4v8a6 6 0 0 0 12 0V4" />
-                <line x1="6" y1="4" x2="6" y2="20" />
-              </svg>
-            </button>
-            <button
-              onClick={(e) => {
-                const stage = stageRef.current
-                if (stage) {
-                  const pos = stage.getPointerPosition()
-                  if (pos) {
-                    const worldX = (pos.x - stage.x()) / stage.scaleX()
-                    const worldY = (pos.y - stage.y()) / stage.scaleY()
-                    createBudgetSticker({ x: worldX, y: worldY })
-                  } else {
-                    // Fallback to center
-                    const canvasWidth = dimensions.width * 4
-                    const canvasHeight = dimensions.height * 4
-                    createBudgetSticker({ x: canvasWidth / 2, y: canvasHeight / 2 })
-                  }
-                }
-              }}
-              className="p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors"
-              title="Budget sticker - Add a budget tracking sticker to your design (Keyboard: B)"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <path d="M14 2v6h6" />
-                <path d="M16 13H8" />
-                <path d="M16 17H8" />
-                <path d="M10 9H8" />
-              </svg>
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Action Buttons */}
-            <button
-              onClick={() => {
-                // Use selected item as reference if available
-                if (selectedItem) {
-                  setReferenceImage(selectedItem.image_url)
-                } else {
-                  // Open file picker
+        {/* Miro-Style Toolbar */}
+        <CanvasToolbar
+          onUndo={handleUndo}
+          onRedo={handleRedo}
+          canUndo={historyIndex > 0}
+          canRedo={historyIndex < history.length - 1}
+          onUpload={() => {
                   const input = document.createElement('input')
                   input.type = 'file'
                   input.accept = 'image/*'
-                  input.onchange = (e) => {
-                    const file = e.target.files[0]
-                    if (file) {
-                      const reader = new FileReader()
-                      reader.onloadend = () => {
-                        setReferenceImage(reader.result)
-                      }
-                      reader.readAsDataURL(file)
-                    }
-                  }
-                  input.click()
-                }
-              }}
-              className={`p - 2 hover: bg - [#F1EBE4] rounded - full transition - colors ${referenceImage ? 'bg-[#F1EBE4]' : ''
-                } `}
-              title="Add reference image - Use an image as a style reference for AI generation"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <circle cx="9" cy="9" r="2" />
-                <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
-              </svg>
-            </button>
-
-            {/* File Upload Button */}
-            <button
-              onClick={() => {
-                // Create hidden file input
-                const input = document.createElement('input')
-                input.type = 'file'
-                input.accept = 'image/*'
-                input.multiple = true // Allow multiple file selection
+            input.multiple = true
                 input.onchange = async (e) => {
                   const files = Array.from(e.target.files || [])
                   for (const file of files) {
-                    await handleFileUpload(file, null) // null = center position
+                await handleFileUpload(file, null)
                   }
                 }
                 input.click()
               }}
-              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
-              title="Upload images - Click to select image files from your computer"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                <polyline points="17 8 12 3 7 8" />
-                <line x1="12" y1="3" x2="12" y2="15" />
-              </svg>
-            </button>
+          onExport={() => setShowExportModal(true)}
+          onToggleAssetLibrary={() => setShowAssetLibrary(!showAssetLibrary)}
+          onToggleLayersPanel={() => setShowLayersPanel(!showLayersPanel)}
+          showAssetLibrary={showAssetLibrary}
+          showLayersPanel={showLayersPanel}
+          hasItems={items.length > 0}
+        />
 
-            <button
-              onClick={() => setShowAssetLibrary(true)}
-              className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
-              title="Asset library - Browse and add furniture, decor, and design assets to your canvas"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M9 9h6v6H9z" />
-              </svg>
-            </button>
+        {/* Zoom Controls - Bottom Right */}
+        <ZoomControls stageRef={stageRef} />
 
-            {items.length > 0 && (
-              <>
-                <button
-                  onClick={() => setShowLayersPanel(!showLayersPanel)}
-                  className="p-2 rounded-full hover:bg-[#F1EBE4] text-[#7C7C7C] hover:text-[#2C2C2C] transition-colors"
-                  title="Layers panel - View and manage all layers in your design"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setShowExportModal(true)}
-                  className="p-2 hover:bg-[#F1EBE4] rounded-full transition-colors"
-                  title="Export design - Save your canvas as an image file"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                </button>
-              </>
-            )}
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Model & Style Selection */}
+        {/* AI Prompt Input - Floating */}
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-40">
+          <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
+            <div className="flex items-center bg-white rounded-2xl shadow-[0_2px_20px_rgba(0,0,0,0.08)] border border-[#e5e5ed] px-4 py-2">
+              {/* Model Selector - Compact */}
             <select
               value={selectedModel}
               onChange={(e) => setSelectedModel(e.target.value)}
-              className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm font-medium"
-              title="AI model selection - Choose which AI model to use for image generation"
+                className="text-xs text-[#6b7280] bg-transparent border-none focus:outline-none cursor-pointer pr-2 font-medium"
+                title="AI Model"
             >
               <option value="gemini">Gemini 2.5 Flash</option>
-              <option value="gpt-image" disabled>GPT Image (Coming Soon)</option>
-              <option value="flux" disabled>Flux Ultra (Coming Soon)</option>
-              <option value="imagen" disabled>Imagen 4 (Coming Soon)</option>
+                <option value="gpt-image" disabled>GPT Image</option>
+                <option value="flux" disabled>Flux Ultra</option>
             </select>
 
+              <div className="w-px h-5 bg-[#e5e5ed] mx-2" />
+              
+              {/* Style Selector - Compact */}
             <select
               value={selectedStyle?.id || ''}
               onChange={(e) => {
                 const style = styles.find(s => s.id === e.target.value)
                 setSelectedStyle(style || null)
               }}
-              className="px-3 py-1.5 text-xs bg-white border border-[#F1EBE4] rounded-lg text-[#2C2C2C] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[120px] font-medium"
-              title="Style selection - Apply a design style to your generated images"
+                className="text-xs text-[#6b7280] bg-transparent border-none focus:outline-none cursor-pointer pr-2 font-medium min-w-[80px]"
+                title="Style"
             >
               <option value="">No Style</option>
               {styles.map((style) => (
-                <option key={style.id} value={style.id}>
-                  {style.name} {style.is_public ? '(Public)' : ''}
-                </option>
+                  <option key={style.id} value={style.id}>{style.name}</option>
               ))}
             </select>
 
-            <button
-              onClick={() => setShowStyleLibrary(true)}
-              className="p-1.5 hover:bg-[#F1EBE4] rounded-lg transition-colors bg-white border border-[#F1EBE4] shadow-sm"
-              title="Style library - Browse and manage design styles for AI generation"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
-            </button>
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Zoom Display */}
-            <div className="px-3 py-1 text-xs text-[#7C7C7C] font-medium whitespace-nowrap" title="Current zoom level - Use mouse wheel to zoom in/out">
-              {Math.round(camera.zoom * 100)}%
-            </div>
-
-            {/* Performance Indicator (dev mode) */}
-            {process.env.NODE_ENV === 'development' && items.length > 10 && (
-              <div className="px-3 py-1 text-xs text-[#A8A8A8] font-medium whitespace-nowrap" title="Performance indicator - Shows how many items are currently visible in the viewport">
-                {visibleItemsCount}/{items.length} visible
-              </div>
-            )}
-
-            {/* Divider */}
-            <div className="w-px h-6 bg-[#F1EBE4]" />
-
-            {/* Chat Input */}
-            <form onSubmit={handleChatSubmit} className="flex items-center gap-2">
+              <div className="w-px h-5 bg-[#e5e5ed] mx-2" />
+              
+              {/* Prompt Input */}
               <input
                 type="text"
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 placeholder="What would you like to create?"
-                className="px-4 py-1.5 bg-white border border-[#F1EBE4] rounded-full text-sm text-[#2C2C2C] placeholder:text-[#A8A8A8] focus:outline-none focus:ring-2 focus:ring-[#D97757]/20 shadow-sm min-w-[200px] font-medium"
+                className="flex-1 min-w-[240px] text-sm text-[#1a1a2e] placeholder:text-[#9ca3af] bg-transparent border-none focus:outline-none"
               />
-              <div className="flex items-center gap-1">
+              
+              {/* Reference Image Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    // Use selected item as reference if available
                     if (selectedItem) {
                       setReferenceImage(selectedItem.image_url)
                     } else {
-                      // Open file picker
                       const input = document.createElement('input')
                       input.type = 'file'
                       input.accept = 'image/*'
@@ -4138,53 +3904,59 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         const file = e.target.files[0]
                         if (file) {
                           const reader = new FileReader()
-                          reader.onloadend = () => {
-                            setReferenceImage(reader.result)
-                          }
+                        reader.onloadend = () => setReferenceImage(reader.result)
                           reader.readAsDataURL(file)
                         }
                       }
                       input.click()
                     }
                   }}
-                  className={`p - 1.5 hover: bg - [#F1EBE4] rounded - full transition - colors ${referenceImage ? 'bg-[#F1EBE4]' : ''
-                    } `}
-                  title="Add reference image - Use an image as a style reference for AI generation"
+                className={`p-1.5 rounded-lg transition-colors ${referenceImage ? 'bg-[#f0f0f5] text-[#4262FF]' : 'text-[#9ca3af] hover:text-[#6b7280] hover:bg-[#f5f5f5]'}`}
+                title="Add reference image"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="2" />
                     <circle cx="9" cy="9" r="2" />
                     <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
                   </svg>
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAssetLibrary(true)}
-                  className="p-1.5 hover:bg-[#F1EBE4] rounded-full transition-colors"
-                  title="Add asset - Browse and add furniture, decor, and design assets to your canvas"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                    <rect x="3" y="3" width="18" height="18" rx="2" />
-                    <path d="M9 9h6v6H9z" />
-                  </svg>
-                </button>
+              
+              {/* Generate Button */}
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || isGenerating || generatingVariations}
-                  className="clay-button p-2 text-white rounded-full hover:opacity-90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  title="Generate image - Create a new image based on your prompt using the selected AI model and style"
+                className="ml-2 flex items-center justify-center w-9 h-9 bg-gradient-to-br from-[#FF6B6B] to-[#FF8E53] text-white rounded-xl hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-md"
+                title="Generate"
                 >
                   {isGenerating || generatingVariations ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   ) : (
-                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                       <polygon points="5 3 19 12 5 21 5 3" />
                     </svg>
                   )}
                 </button>
               </div>
             </form>
+          
+          {/* Reference Image Preview */}
+          {referenceImage && (
+            <div className="mt-2 flex items-center justify-center">
+              <div className="relative inline-flex items-center bg-white rounded-lg shadow-sm border border-[#e5e5ed] px-2 py-1">
+                <img src={referenceImage} alt="Reference" className="w-8 h-8 object-cover rounded" />
+                <span className="ml-2 text-xs text-[#6b7280]">Reference</span>
+                <button
+                  onClick={() => setReferenceImage(null)}
+                  className="ml-2 p-1 hover:bg-[#f5f5f5] rounded transition-colors"
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
           </div>
+            </div>
+          )}
         </div>
       </div>
 

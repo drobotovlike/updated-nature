@@ -83,9 +83,10 @@ export const useCanvasStore = create(
      * @type {Object}
      */
     settings: {
-      backgroundColor: '#F8F7F4',
+      // Miro uses a warm off-white: #F5F5F5 or #FAFAFA
+      backgroundColor: '#FAFAFA',
       gridEnabled: true,
-      gridSize: 50,
+      gridSize: 24, // Miro-style 24px grid
       rulerEnabled: false,
       showMeasurements: true,
       snapToGrid: false,

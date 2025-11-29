@@ -7,8 +7,7 @@ import AssetLibrary from './AssetLibrary'
 import ExportModal from './ExportModal'
 import CanvasExportModal from './CanvasExportModal'
 import LayersPanel from './LayersPanel'
-import { getCanvasData, saveCanvasState } from '../utils/canvasManager'
-import { useYjsStore, addItem, updateItem, deleteItem, setItems } from '../hooks/useYjsStore'
+import { getCanvasData, saveCanvasState, createCanvasItem as apiCreateCanvasItem, updateCanvasItem as apiUpdateCanvasItem, deleteCanvasItem as apiDeleteCanvasItem } from '../utils/canvasManager'
 import { getProject, saveProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
@@ -20,8 +19,9 @@ import VariationsComparisonView from './VariationsComparisonView'
 import { useCanvasHotkeys } from '../hooks/useCanvasHotkeys'
 import { useCanvasSelection } from '../hooks/useCanvasSelection'
 import { useCanvasHistory } from '../hooks/useCanvasHistory'
-// New imports for the Visual Electric Canvas Engine
+// Canvas Engine imports
 import { useCanvasStore } from '../stores/useCanvasStore'
+import { useCanvasSync } from '../hooks/useCanvasSync'
 import { toWorld, getWorldPointerPosition } from '../utils/coordinateSystem'
 import { useViewportCulling } from '../hooks/useViewportCulling'
 import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
@@ -29,27 +29,6 @@ import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
 import { isValidUUID, generateUUID } from '../utils/uuid'
 import { getAuthToken } from '../utils/authToken'
-
-// Adapters for Yjs (Transition from REST API)
-// These replace the canvasManager functions with local Yjs mutations
-const createCanvasItem = async (userId, projectId, data, clerk) => {
-  const newItem = {
-    id: generateUUID(),
-    ...data
-  };
-  addItem(newItem);
-  return newItem;
-};
-
-const updateCanvasItem = async (userId, itemId, updates, clerk) => {
-  updateItem(itemId, updates);
-  return { id: itemId, ...updates };
-};
-
-const deleteCanvasItem = async (userId, itemId, clerk) => {
-  deleteItem(itemId);
-  return true;
-};
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -398,13 +377,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     )
   }
 
-  // Canvas state - Using Zustand store for core canvas state
-  const yStore = useYjsStore()
-  // Ensure items is always an array - SyncedStore proxy might not pass Array.isArray in some states
-  const rawItems = yStore.items
-  const items = Array.isArray(rawItems) ? rawItems : (rawItems && typeof rawItems[Symbol.iterator] === 'function' ? [...rawItems] : [])
-  // const items = useCanvasStore((state) => state.items) // REPLACED BY YJS
-  const setItemsState = useCanvasStore((state) => state.setItems) // Keep for now if needed, but likely unused
+  // Canvas state - Using Zustand store (single source of truth)
+  const items = useCanvasStore((state) => state.items)
+  const setItems = useCanvasStore((state) => state.setItems)
+  const addItem = useCanvasStore((state) => state.addItem)
+  const updateItem = useCanvasStore((state) => state.updateItem)
+  const deleteItem = useCanvasStore((state) => state.deleteItem)
   const camera = useCanvasStore((state) => state.camera)
   const setCamera = useCanvasStore((state) => state.setCamera)
   const dimensions = useCanvasStore((state) => state.dimensions)
@@ -414,6 +392,55 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const selection = useCanvasStore((state) => state.selection)
   const setSelection = useCanvasStore((state) => state.setSelection)
   const clearSelection = useCanvasStore((state) => state.clearSelection)
+  const interactionMode = useCanvasStore((state) => state.interactionMode)
+  const setInteractionMode = useCanvasStore((state) => state.setInteractionMode)
+  const showAIPrompt = useCanvasStore((state) => state.ui.showAIPrompt)
+  const aiPrompt = useCanvasStore((state) => state.aiPrompt)
+  const setAIPrompt = useCanvasStore((state) => state.setAIPrompt)
+  const openAIPrompt = useCanvasStore((state) => state.openAIPrompt)
+  const closeAIPrompt = useCanvasStore((state) => state.closeAIPrompt)
+  const aiSelectionBounds = useCanvasStore((state) => state.aiSelectionBounds)
+  
+  // Canvas sync hook - handles loading/saving to Supabase
+  const { isLoading: isSyncing, syncError } = useCanvasSync(projectId)
+  
+  // Adapter functions that update both local state and sync to database
+  const createCanvasItem = useCallback(async (userId, projectId, data, clerk) => {
+    const newItem = {
+      id: generateUUID(),
+      ...data
+    }
+    addItem(newItem)
+    // Sync to database in background
+    try {
+      await apiCreateCanvasItem(userId, projectId, data, clerk)
+    } catch (error) {
+      console.error('Failed to sync item to database:', error)
+    }
+    return newItem
+  }, [addItem])
+
+  const updateCanvasItem = useCallback(async (userId, itemId, updates, clerk) => {
+    updateItem(itemId, updates)
+    // Sync to database in background
+    try {
+      await apiUpdateCanvasItem(userId, itemId, updates, clerk)
+    } catch (error) {
+      console.error('Failed to sync item update to database:', error)
+    }
+    return { id: itemId, ...updates }
+  }, [updateItem])
+
+  const deleteCanvasItem = useCallback(async (userId, itemId, clerk) => {
+    deleteItem(itemId)
+    // Sync to database in background
+    try {
+      await apiDeleteCanvasItem(userId, itemId, clerk)
+    } catch (error) {
+      console.error('Failed to sync item deletion to database:', error)
+    }
+    return true
+  }, [deleteItem])
 
   // Legacy selection hooks (keeping for compatibility during migration)
   const { selectedItemId, selectedItemIds, setSelectedItemId, setSelectedItemIds, handleSelect } = useCanvasSelection()

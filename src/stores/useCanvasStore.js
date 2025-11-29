@@ -12,8 +12,9 @@ import { subscribeWithSelector } from 'zustand/middleware'
  * @property {string} image_url - URL of the image
  * @property {number} [rotation] - Rotation in degrees
  * @property {number} [opacity] - Opacity 0-1
- * @property {string} [type] - Item type (e.g., 'image', 'text', 'shape')
+ * @property {string} [type] - Item type (e.g., 'image', 'text', 'shape', 'sticky', 'arrow')
  * @property {Object} [metadata] - Additional metadata
+ * @property {number} [z_index] - Layer order
  */
 
 /**
@@ -25,8 +26,8 @@ import { subscribeWithSelector } from 'zustand/middleware'
  */
 
 /**
- * Interaction Mode
- * @typedef {'select' | 'pan' | 'draw' | 'text' | 'eraser' | 'outpaint' | 'dimension'} InteractionMode
+ * Interaction Mode - Updated with new tools
+ * @typedef {'select' | 'pan' | 'generate' | 'rectangle' | 'arrow' | 'text' | 'sticky' | 'measure'} InteractionMode
  */
 
 /**
@@ -35,13 +36,19 @@ import { subscribeWithSelector } from 'zustand/middleware'
  * Centralized state management for the infinite canvas engine.
  * All canvas state lives here - no prop drilling, no useState chains.
  * 
- * Performance: Updates are instant (16ms), but database sync is debounced (500ms).
+ * Architecture: Single source of truth (Zustand) → REST API → Supabase
  */
 export const useCanvasStore = create(
   subscribeWithSelector((set, get) => ({
     // ============================================
     // STATE: The "Truth"
     // ============================================
+
+    /**
+     * Canvas items - THE source of truth for all objects on canvas
+     * @type {CanvasItem[]}
+     */
+    items: [],
 
     /**
      * Camera/viewport state
@@ -76,11 +83,12 @@ export const useCanvasStore = create(
      * @type {Object}
      */
     settings: {
-      backgroundColor: '#F0F2F5', // Match CSS variable
+      backgroundColor: '#F8F7F4',
       gridEnabled: true,
-      gridSize: 50, // Increase grid size (dots should be spaced out more than lines)
+      gridSize: 50,
       rulerEnabled: false,
       showMeasurements: true,
+      snapToGrid: false,
     },
 
     /**
@@ -92,11 +100,138 @@ export const useCanvasStore = create(
       showExportModal: false,
       showLayersPanel: false,
       showGenerateModal: false,
+      showAIPrompt: false,
       sidebarOpen: true,
     },
 
+    /**
+     * Loading and sync state
+     */
+    isLoading: false,
+    isSyncing: false,
+    lastSyncedAt: null,
+    syncError: null,
+
+    /**
+     * AI Generation state
+     */
+    aiPrompt: '',
+    aiGenerating: false,
+    aiSelectionBounds: null, // { x, y, width, height } for the AI generation area
+
     // ============================================
-    // ACTIONS: Mutations
+    // ITEM ACTIONS
+    // ============================================
+
+    /**
+     * Set all items (used for loading from database)
+     * Supports both direct array and callback function pattern
+     * @param {CanvasItem[]|Function} itemsOrUpdater
+     */
+    setItems: (itemsOrUpdater) => {
+      if (typeof itemsOrUpdater === 'function') {
+        set((state) => ({
+          items: itemsOrUpdater(state.items)
+        }))
+      } else {
+        set({ items: Array.isArray(itemsOrUpdater) ? itemsOrUpdater : [] })
+      }
+    },
+
+    /**
+     * Add a new item to the canvas
+     * @param {CanvasItem} item
+     */
+    addItem: (item) => {
+      set((state) => ({
+        items: [...state.items, item],
+      }))
+    },
+
+    /**
+     * Update an existing item
+     * @param {string} id - Item ID
+     * @param {Partial<CanvasItem>} updates - Partial updates
+     */
+    updateItem: (id, updates) => {
+      set((state) => ({
+        items: state.items.map((item) =>
+          item.id === id ? { ...item, ...updates } : item
+        ),
+      }))
+    },
+
+    /**
+     * Delete a single item
+     * @param {string} id - Item ID
+     */
+    deleteItem: (id) => {
+      set((state) => ({
+        items: state.items.filter((item) => item.id !== id),
+        selection: (() => {
+          const newSelection = new Set(state.selection)
+          newSelection.delete(id)
+          return newSelection
+        })(),
+      }))
+    },
+
+    /**
+     * Delete multiple items
+     * @param {string[]} ids - Array of item IDs
+     */
+    deleteItems: (ids) => {
+      const idSet = new Set(ids)
+      set((state) => ({
+        items: state.items.filter((item) => !idSet.has(item.id)),
+        selection: new Set([...state.selection].filter((id) => !idSet.has(id))),
+      }))
+    },
+
+    /**
+     * Reorder items (for z-index changes)
+     * @param {CanvasItem[]} reorderedItems
+     */
+    reorderItems: (reorderedItems) => {
+      set({ items: reorderedItems })
+    },
+
+    /**
+     * Bring item to front
+     * @param {string} id
+     */
+    bringToFront: (id) => {
+      set((state) => {
+        const item = state.items.find((i) => i.id === id)
+        if (!item) return state
+        const maxZ = Math.max(...state.items.map((i) => i.z_index || 0))
+        return {
+          items: state.items.map((i) =>
+            i.id === id ? { ...i, z_index: maxZ + 1 } : i
+          ),
+        }
+      })
+    },
+
+    /**
+     * Send item to back
+     * @param {string} id
+     */
+    sendToBack: (id) => {
+      set((state) => {
+        const item = state.items.find((i) => i.id === id)
+        if (!item) return state
+        const minZ = Math.min(...state.items.map((i) => i.z_index || 0))
+        return {
+          items: state.items.map((i) =>
+            i.id === id ? { ...i, z_index: minZ - 1 } : i
+          ),
+        }
+      })
+    },
+
+    // ============================================
+    // CAMERA ACTIONS
     // ============================================
 
     /**
@@ -118,7 +253,6 @@ export const useCanvasStore = create(
       const state = get()
       const { camera } = state
 
-      // Calculate new camera position using zoom-to-cursor math
       const zoomRatio = newZoom / camera.zoom
       const newX = mousePoint.x - (mousePoint.x - camera.x) * zoomRatio
       const newY = mousePoint.y - (mousePoint.y - camera.y) * zoomRatio
@@ -147,8 +281,59 @@ export const useCanvasStore = create(
       }))
     },
 
-    // ITEMS STATE REMOVED - NOW MANAGED BY YJS (useYjsStore)
-    // Legacy actions removed: setItems, addItem, updateItem, deleteItem, deleteItems
+    /**
+     * Reset camera to default position
+     */
+    resetCamera: () => {
+      set({
+        camera: { x: 0, y: 0, zoom: 1 },
+      })
+    },
+
+    /**
+     * Fit all items in view
+     */
+    fitToScreen: () => {
+      const state = get()
+      if (state.items.length === 0) {
+        set({ camera: { x: 0, y: 0, zoom: 1 } })
+        return
+      }
+
+      // Calculate bounding box of all items
+      const bounds = state.items.reduce(
+        (acc, item) => ({
+          minX: Math.min(acc.minX, item.x_position || 0),
+          minY: Math.min(acc.minY, item.y_position || 0),
+          maxX: Math.max(acc.maxX, (item.x_position || 0) + (item.width || 100)),
+          maxY: Math.max(acc.maxY, (item.y_position || 0) + (item.height || 100)),
+        }),
+        { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity }
+      )
+
+      const padding = 100
+      const contentWidth = bounds.maxX - bounds.minX + padding * 2
+      const contentHeight = bounds.maxY - bounds.minY + padding * 2
+
+      const zoomX = state.dimensions.width / contentWidth
+      const zoomY = state.dimensions.height / contentHeight
+      const zoom = Math.min(zoomX, zoomY, 1) // Don't zoom in more than 100%
+
+      const centerX = (bounds.minX + bounds.maxX) / 2
+      const centerY = (bounds.minY + bounds.maxY) / 2
+
+      set({
+        camera: {
+          x: state.dimensions.width / 2 - centerX * zoom,
+          y: state.dimensions.height / 2 - centerY * zoom,
+          zoom,
+        },
+      })
+    },
+
+    // ============================================
+    // SELECTION ACTIONS
+    // ============================================
 
     /**
      * Set selection (single or multiple)
@@ -210,12 +395,29 @@ export const useCanvasStore = create(
     },
 
     /**
+     * Select all items
+     */
+    selectAll: () => {
+      set((state) => ({
+        selection: new Set(state.items.map((item) => item.id)),
+      }))
+    },
+
+    // ============================================
+    // INTERACTION MODE ACTIONS
+    // ============================================
+
+    /**
      * Set interaction mode
      * @param {InteractionMode} mode - New interaction mode
      */
     setInteractionMode: (mode) => {
       set({ interactionMode: mode })
     },
+
+    // ============================================
+    // DIMENSION ACTIONS
+    // ============================================
 
     /**
      * Set canvas dimensions
@@ -224,6 +426,10 @@ export const useCanvasStore = create(
     setDimensions: (dimensions) => {
       set({ dimensions })
     },
+
+    // ============================================
+    // SETTINGS ACTIONS
+    // ============================================
 
     /**
      * Update canvas settings
@@ -235,6 +441,10 @@ export const useCanvasStore = create(
       }))
     },
 
+    // ============================================
+    // UI ACTIONS
+    // ============================================
+
     /**
      * Update UI state
      * @param {Partial<typeof ui>} update - Partial UI update
@@ -245,37 +455,87 @@ export const useCanvasStore = create(
       }))
     },
 
+    /**
+     * Toggle asset library panel
+     */
+    toggleAssetLibrary: () => {
+      set((state) => ({
+        ui: { ...state.ui, showAssetLibrary: !state.ui.showAssetLibrary },
+      }))
+    },
+
+    /**
+     * Toggle layers panel
+     */
+    toggleLayersPanel: () => {
+      set((state) => ({
+        ui: { ...state.ui, showLayersPanel: !state.ui.showLayersPanel },
+      }))
+    },
+
     // ============================================
-    // SELECTORS: Computed values
+    // SYNC STATE ACTIONS
+    // ============================================
+
+    setIsLoading: (isLoading) => set({ isLoading }),
+    setIsSyncing: (isSyncing) => set({ isSyncing }),
+    setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
+    setSyncError: (syncError) => set({ syncError }),
+
+    // ============================================
+    // AI GENERATION ACTIONS
+    // ============================================
+
+    setAIPrompt: (aiPrompt) => set({ aiPrompt }),
+    setAIGenerating: (aiGenerating) => set({ aiGenerating }),
+    setAISelectionBounds: (aiSelectionBounds) => set({ aiSelectionBounds }),
+
+    /**
+     * Open AI prompt modal with optional selection bounds
+     */
+    openAIPrompt: (bounds = null) => {
+      set({
+        ui: { ...get().ui, showAIPrompt: true },
+        aiSelectionBounds: bounds,
+        aiPrompt: '',
+      })
+    },
+
+    /**
+     * Close AI prompt modal
+     */
+    closeAIPrompt: () => {
+      set({
+        ui: { ...get().ui, showAIPrompt: false },
+        aiSelectionBounds: null,
+        aiPrompt: '',
+      })
+    },
+
+    // ============================================
+    // SELECTORS (Computed values)
     // ============================================
 
     /**
      * Get selected items
      * @returns {CanvasItem[]}
      */
-    /*
-    // Items are no longer in this store, so this selector is deprecated/removed
     getSelectedItems: () => {
       const state = get()
       const selectionArray = Array.from(state.selection)
-      // return state.items.filter((item) => selectionArray.includes(item.id))
-      return [] // Placeholder
+      return state.items.filter((item) => selectionArray.includes(item.id))
     },
-    */
 
     /**
      * Get primary selected item (first in selection)
      * @returns {CanvasItem|null}
      */
-    /*
     getPrimarySelectedItem: () => {
       const state = get()
       if (state.selection.size === 0) return null
       const firstId = Array.from(state.selection)[0]
-      // return state.items.find((item) => item.id === firstId) || null
-      return null // Placeholder
+      return state.items.find((item) => item.id === firstId) || null
     },
-    */
 
     /**
      * Check if an item is selected
@@ -285,6 +545,13 @@ export const useCanvasStore = create(
     isSelected: (id) => {
       return get().selection.has(id)
     },
+
+    /**
+     * Get items sorted by z-index
+     * @returns {CanvasItem[]}
+     */
+    getItemsSortedByZIndex: () => {
+      return [...get().items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+    },
   }))
 )
-

@@ -79,6 +79,8 @@ export function requireAuth(handler, options = {}) {
     const allowedOrigins = [
       'https://ature.studio',
       'https://www.ature.studio',
+      'https://ature.ru',
+      'https://www.ature.ru',
       'http://localhost:5173',  // Development
       'http://localhost:3000'   // Development
     ]

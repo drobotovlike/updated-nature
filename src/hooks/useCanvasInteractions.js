@@ -1,34 +1,31 @@
 import { useCallback, useRef, useState } from 'react'
 import { useCanvasStore } from '../stores/useCanvasStore'
-import { useYjsStore } from './useYjsStore'
 import { toWorld, getWorldPointerPosition, zoomToCursor } from '../utils/coordinateSystem'
 
-const MIN_ZOOM = 0.25
-const MAX_ZOOM = 3
+const MIN_ZOOM = 0.1
+const MAX_ZOOM = 5
 
 /**
  * Canvas Interactions Hook
  * 
  * Handles all canvas-level interactions:
  * - Zoom to cursor (wheel)
- * - Pan with spacebar + drag
+ * - Pan with spacebar + drag or middle mouse
  * - Rubber band selection (Shift + drag)
+ * - AI generation area selection
  * 
  * @param {Object} stageRef - Ref to the Konva Stage
  * @param {Object} dimensions - { width: number, height: number }
  */
 export function useCanvasInteractions(stageRef, dimensions) {
+  // Store selectors
   const camera = useCanvasStore((state) => state.camera)
   const setCamera = useCanvasStore((state) => state.setCamera)
-  const zoomToCursorAction = useCanvasStore((state) => state.zoomToCursor)
   const panCamera = useCanvasStore((state) => state.panCamera)
   const setSelection = useCanvasStore((state) => state.setSelection)
   const interactionMode = useCanvasStore((state) => state.interactionMode)
-
-  const yStore = useYjsStore()
-  // Ensure items is always an array - SyncedStore proxy might not pass Array.isArray in some states
-  const rawItems = yStore.items
-  const items = Array.isArray(rawItems) ? rawItems : (rawItems && typeof rawItems[Symbol.iterator] === 'function' ? [...rawItems] : [])
+  const items = useCanvasStore((state) => state.items)
+  const openAIPrompt = useCanvasStore((state) => state.openAIPrompt)
 
   // Pan state
   const [isPanning, setIsPanning] = useState(false)
@@ -38,6 +35,14 @@ export function useCanvasInteractions(stageRef, dimensions) {
   const [isSelecting, setIsSelecting] = useState(false)
   const [selectionBox, setSelectionBox] = useState(null)
   const selectionStartRef = useRef(null)
+
+  // AI generation area state
+  const [isDrawingAIArea, setIsDrawingAIArea] = useState(false)
+  const [aiAreaBox, setAIAreaBox] = useState(null)
+  const aiAreaStartRef = useRef(null)
+
+  // Spacebar state
+  const [isSpacePressed, setIsSpacePressed] = useState(false)
 
   /**
    * Handle wheel event for zoom-to-cursor
@@ -57,7 +62,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
       const absDelta = Math.abs(deltaY)
 
       // Calculate zoom factor based on scroll amount
-      const baseZoomFactor = 1.001
+      const baseZoomFactor = 0.001
       const sensitivity = Math.min(absDelta / 10, 50)
       const zoomFactor = 1 + baseZoomFactor * sensitivity
 
@@ -89,65 +94,93 @@ export function useCanvasInteractions(stageRef, dimensions) {
   )
 
   /**
-   * Handle spacebar + drag for panning
+   * Handle mouse down on stage
    */
   const handleStageMouseDown = useCallback(
     (e) => {
       const stage = stageRef.current
       if (!stage) return
 
-      // Check if spacebar is pressed
-      const isSpacePressed = e.evt.shiftKey === false && e.evt.button === 0 // Left click without shift
+      const pointer = stage.getPointerPosition()
+      if (!pointer) return
 
-      // For now, we'll use a different approach: detect spacebar keydown
-      // This will be handled by keyboard event listeners
-      if (interactionMode === 'pan' || e.evt.button === 1) {
-        // Middle mouse button or pan mode
+      // Middle mouse button or pan mode or spacebar pressed - start panning
+      if (interactionMode === 'pan' || e.evt.button === 1 || isSpacePressed) {
         setIsPanning(true)
-        const pointer = stage.getPointerPosition()
-        if (pointer) {
-          panStartRef.current = {
-            x: pointer.x - stage.x(),
-            y: pointer.y - stage.y(),
-          }
+        panStartRef.current = {
+          x: pointer.x - stage.x(),
+          y: pointer.y - stage.y(),
         }
         stage.draggable(true)
-      } else if (e.evt.shiftKey && e.target === stage) {
-        // Shift + click on empty space = start rubber band selection
+        return
+      }
+
+      // AI generation mode - draw selection area
+      if (interactionMode === 'generate' && e.target === stage) {
+        setIsDrawingAIArea(true)
+        const worldPos = getWorldPointerPosition(stage)
+        aiAreaStartRef.current = worldPos
+        setAIAreaBox({
+          x: worldPos.x,
+          y: worldPos.y,
+          width: 0,
+          height: 0,
+        })
+        return
+      }
+
+      // Shift + click on empty space = start rubber band selection
+      if (e.evt.shiftKey && e.target === stage) {
         setIsSelecting(true)
-        const pointer = stage.getPointerPosition()
-        if (pointer) {
-          const worldPos = getWorldPointerPosition(stage)
-          selectionStartRef.current = worldPos
-          setSelectionBox({
-            x: worldPos.x,
-            y: worldPos.y,
-            width: 0,
-            height: 0,
-          })
-        }
+        const worldPos = getWorldPointerPosition(stage)
+        selectionStartRef.current = worldPos
+        setSelectionBox({
+          x: worldPos.x,
+          y: worldPos.y,
+          width: 0,
+          height: 0,
+        })
+        return
+      }
+
+      // Click on empty canvas - clear selection
+      if (e.target === stage && interactionMode === 'select') {
+        setSelection(null)
       }
     },
-    [interactionMode]
+    [interactionMode, isSpacePressed, setSelection, stageRef]
   )
 
   /**
-   * Handle mouse move for panning and rubber band selection
+   * Handle mouse move for panning, rubber band selection, and AI area
    */
   const handleStageMouseMove = useCallback(
     (e) => {
       const stage = stageRef.current
       if (!stage) return
 
+      // Panning is handled by Konva's draggable
       if (isPanning) {
-        // Panning is handled by Konva's draggable
         return
       }
 
-      if (isSelecting && selectionStartRef.current) {
-        const pointer = stage.getPointerPosition()
-        if (!pointer) return
+      // AI area drawing
+      if (isDrawingAIArea && aiAreaStartRef.current) {
+        const currentWorldPos = getWorldPointerPosition(stage)
+        if (!currentWorldPos) return
 
+        const start = aiAreaStartRef.current
+        const x = Math.min(start.x, currentWorldPos.x)
+        const y = Math.min(start.y, currentWorldPos.y)
+        const width = Math.abs(currentWorldPos.x - start.x)
+        const height = Math.abs(currentWorldPos.y - start.y)
+
+        setAIAreaBox({ x, y, width, height })
+        return
+      }
+
+      // Rubber band selection
+      if (isSelecting && selectionStartRef.current) {
         const currentWorldPos = getWorldPointerPosition(stage)
         if (!currentWorldPos) return
 
@@ -182,17 +215,18 @@ export function useCanvasInteractions(stageRef, dimensions) {
         setSelection(selectedIds)
       }
     },
-    [isPanning, isSelecting, items, setSelection]
+    [isPanning, isDrawingAIArea, isSelecting, items, setSelection, stageRef]
   )
 
   /**
-   * Handle mouse up to end panning/selection
+   * Handle mouse up to end interactions
    */
   const handleStageMouseUp = useCallback(() => {
+    const stage = stageRef.current
+
     if (isPanning) {
       setIsPanning(false)
-      const stage = stageRef.current
-      if (stage) {
+      if (stage && !isSpacePressed) {
         stage.draggable(false)
       }
     }
@@ -202,7 +236,31 @@ export function useCanvasInteractions(stageRef, dimensions) {
       setSelectionBox(null)
       selectionStartRef.current = null
     }
-  }, [isPanning, isSelecting])
+
+    if (isDrawingAIArea && aiAreaBox) {
+      setIsDrawingAIArea(false)
+      // Only open AI prompt if area is large enough
+      if (aiAreaBox.width > 20 && aiAreaBox.height > 20) {
+        openAIPrompt(aiAreaBox)
+      }
+      setAIAreaBox(null)
+      aiAreaStartRef.current = null
+    }
+  }, [isPanning, isSelecting, isDrawingAIArea, aiAreaBox, isSpacePressed, openAIPrompt, stageRef])
+
+  /**
+   * Handle drag end for panning
+   */
+  const handleStageDragEnd = useCallback(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    // Update store with new camera position
+    setCamera({
+      x: stage.x(),
+      y: stage.y(),
+    })
+  }, [setCamera, stageRef])
 
   /**
    * Handle keyboard events for spacebar panning
@@ -211,38 +269,48 @@ export function useCanvasInteractions(stageRef, dimensions) {
     (e) => {
       if (e.code === 'Space' && !e.repeat) {
         e.preventDefault()
+        setIsSpacePressed(true)
         const stage = stageRef.current
         if (stage) {
           stage.draggable(true)
+          stage.container().style.cursor = 'grab'
         }
       }
     },
-    []
+    [stageRef]
   )
 
   const handleKeyUp = useCallback(
     (e) => {
       if (e.code === 'Space') {
         e.preventDefault()
+        setIsSpacePressed(false)
         const stage = stageRef.current
         if (stage && !isPanning) {
           stage.draggable(false)
+          stage.container().style.cursor = 'default'
         }
       }
     },
-    [isPanning]
+    [isPanning, stageRef]
   )
 
   return {
+    // Event handlers
     handleWheel,
     handleStageMouseDown,
     handleStageMouseMove,
     handleStageMouseUp,
+    handleStageDragEnd,
     handleKeyDown,
     handleKeyUp,
+    
+    // State
     isPanning,
     isSelecting,
     selectionBox,
+    isDrawingAIArea,
+    aiAreaBox,
+    isSpacePressed,
   }
 }
-

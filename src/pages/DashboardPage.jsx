@@ -75,13 +75,21 @@ export default function DashboardPage() {
   // Get canvas thumbnail for a project
   const getCanvasThumbnail = useCallback(async (projectId) => {
     if (!userId || !projectId) return null
+    // Check if clerk session is ready before making API calls
+    if (!clerk?.session) {
+      console.log('Clerk session not ready, skipping thumbnail load')
+      return null
+    }
     try {
       const canvasData = await getCanvasData(userId, projectId, clerk)
       // Get the first visible item's image as thumbnail
       const firstItem = canvasData.items?.find(item => item.is_visible !== false && item.image_url)
       return firstItem?.image_url || null
     } catch (error) {
-      console.error('Error getting canvas thumbnail:', error)
+      // Don't log error for auth issues - this is expected when session is not ready
+      if (!error.message?.includes('Unauthorized')) {
+        console.error('Error getting canvas thumbnail:', error)
+      }
       return null
     }
   }, [userId, clerk])
@@ -91,7 +99,7 @@ export default function DashboardPage() {
 
   // Load thumbnails for projects
   useEffect(() => {
-    if (!userId || !isSignedIn) return
+    if (!userId || !isSignedIn || !clerk?.session) return
 
     const loadThumbnails = async () => {
       const thumbnails = {}
@@ -114,7 +122,7 @@ export default function DashboardPage() {
     if (recentProjects.length > 0 || savedProjects.length > 0) {
       loadThumbnails()
     }
-  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasThumbnail])
+  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasThumbnail, clerk?.session])
 
   // Load spaces and projects on mount
   useEffect(() => {
@@ -123,6 +131,12 @@ export default function DashboardPage() {
     // Ensure updateProjectLists is available before using it
     if (typeof updateProjectLists !== 'function') {
       console.warn('updateProjectLists not available yet')
+      return
+    }
+
+    // Wait for clerk session to be ready
+    if (!clerk?.session) {
+      console.log('Waiting for clerk session...')
       return
     }
 
@@ -160,7 +174,7 @@ export default function DashboardPage() {
     loadData()
     // Remove selectedSpaceId from dependencies to prevent infinite loops
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isSignedIn, updateProjectLists])
+  }, [userId, isSignedIn, updateProjectLists, clerk?.session])
 
   // Auto-cleanup trash every 5 minutes to check individual items
   // Each item is deleted independently when its own 1-week period expires

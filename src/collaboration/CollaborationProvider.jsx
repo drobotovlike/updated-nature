@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { SupabaseProvider } from 'y-supabase';
+// import { SupabaseProvider } from 'y-supabase'; // Replaced with local implementation
+import { SupabaseProvider } from '../utils/y-supabase';
 import { IndexeddbPersistence } from 'y-indexeddb';
 import { store } from './store';
 import { getYjsValue } from '@syncedstore/core';

@@ -6,15 +6,12 @@ export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
     exclude: ['@google/model-viewer'],
-    include: ['react', 'react-dom', 'react-router-dom', 'y-supabase'],
+    include: ['react', 'react-dom', 'react-router-dom'],
   },
   build: {
     outDir: 'dist',
     sourcemap: false,
     minify: 'esbuild',
-    commonjsOptions: {
-      include: [/y-supabase/, /node_modules/],
-    },
     rollupOptions: {
       output: {
         manualChunks: {

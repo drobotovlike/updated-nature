@@ -3,11 +3,11 @@
  */
 
 import * as Y from 'yjs'
-import * as awarenessProtocol from 'y-protocols/awareness'
+import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness'
 import { Observable } from 'lib0/observable'
 import * as encoding from 'lib0/encoding'
 import * as decoding from 'lib0/decoding'
-import * as syncProtocol from 'y-protocols/sync'
+import { writeUpdate, readSyncMessage, writeSyncStep1 } from 'y-protocols/sync'
 
 const messageSync = 0
 const messageAwareness = 1
@@ -30,7 +30,7 @@ export class SupabaseProvider extends Observable {
    * @param {Object} supabase - Supabase client instance
    * @param {SupabaseProviderOptions} [options]
    */
-  constructor(doc, supabase, { channel = 'default', resyncInterval = 5000, awareness = new awarenessProtocol.Awareness(doc) } = {}) {
+  constructor(doc, supabase, { channel = 'default', resyncInterval = 5000, awareness = new Awareness(doc) } = {}) {
     super()
 
     this.doc = doc
@@ -62,7 +62,7 @@ export class SupabaseProvider extends Observable {
           // Start sync
           this.sendSyncStep1()
           if (this.awareness.getLocalState() !== null) {
-            const awarenessUpdate = awarenessProtocol.encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
+            const awarenessUpdate = encodeAwarenessUpdate(this.awareness, [this.doc.clientID])
             this.sendAwarenessUpdate(awarenessUpdate)
           }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -93,7 +93,7 @@ export class SupabaseProvider extends Observable {
     if (origin !== this) {
       const encoder = encoding.createEncoder()
       encoding.writeVarUint(encoder, messageSync)
-      syncProtocol.writeUpdate(encoder, update)
+      writeUpdate(encoder, update)
       this.broadcast(encoding.toUint8Array(encoder))
     }
   }
@@ -106,7 +106,7 @@ export class SupabaseProvider extends Observable {
     const changedClients = added.concat(updated).concat(removed)
     const encoder = encoding.createEncoder()
     encoding.writeVarUint(encoder, messageAwareness)
-    encoding.writeVarUint8Array(encoder, awarenessProtocol.encodeAwarenessUpdate(this.awareness, changedClients))
+    encoding.writeVarUint8Array(encoder, encodeAwarenessUpdate(this.awareness, changedClients))
     this.broadcast(encoding.toUint8Array(encoder))
   }
 
@@ -120,10 +120,10 @@ export class SupabaseProvider extends Observable {
     switch (messageType) {
       case messageSync:
         encoding.writeVarUint(encoding.createEncoder(), messageSync)
-        syncProtocol.readSyncMessage(decoder, encoding.createEncoder(), this.doc, this)
+        readSyncMessage(decoder, encoding.createEncoder(), this.doc, this)
         break
       case messageAwareness:
-        awarenessProtocol.applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(decoder), this)
+        applyAwarenessUpdate(this.awareness, decoding.readVarUint8Array(decoder), this)
         break
       default:
         console.error('Unknown message type:', messageType)
@@ -133,7 +133,7 @@ export class SupabaseProvider extends Observable {
   sendSyncStep1() {
     const encoder = encoding.createEncoder()
     encoding.writeVarUint(encoder, messageSync)
-    syncProtocol.writeSyncStep1(encoder, this.doc)
+    writeSyncStep1(encoder, this.doc)
     this.broadcast(encoding.toUint8Array(encoder))
   }
 

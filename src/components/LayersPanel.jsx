@@ -56,7 +56,7 @@ const LayerItemContent = forwardRef(({ item, isSelected, isHovered, setIsHovered
       {/* Layer Info */}
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium text-stone-700 truncate">
-          {item.name || `Layer ${item.id.slice(0, 8)}`}
+          {item.name || `Layer ${item.id ? item.id.slice(0, 8) : 'Unknown'}`}
         </div>
         <div className="text-xs text-stone-500">
           {Math.round(item.width || 0)} × {Math.round(item.height || 0)}
@@ -211,8 +211,10 @@ export default function LayersPanel({ items, selectedItemId, onSelectItem, onReo
   )
 
   // Sort items by z_index (highest first, so top layer is first in list)
-  // Sort items by z_index (descending) so highest z_index appears at top of list
-  const sortedItems = Array.isArray(items) ? [...items].sort((a, b) => (b.z_index || 0) - (a.z_index || 0)) : []
+  // Filter out any invalid items (without id) and sort by z_index (descending)
+  const sortedItems = Array.isArray(items) 
+    ? [...items].filter(item => item && item.id).sort((a, b) => (b.z_index || 0) - (a.z_index || 0)) 
+    : []
 
   const handleDragEnd = (event) => {
     const { active, over } = event

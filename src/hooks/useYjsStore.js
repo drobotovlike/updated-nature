@@ -1,6 +1,9 @@
-import { useSyncExternalStore, useCallback, useRef } from 'react';
+import { useSyncExternalStore, useCallback, useRef, useMemo } from 'react';
 import { store } from '../collaboration/store';
 import { getYjsValue } from '@syncedstore/core';
+
+// Get the doc once at module level to avoid recreating on every render
+const doc = getYjsValue(store);
 
 /**
  * Hook to access the shared Yjs store
@@ -9,7 +12,6 @@ import { getYjsValue } from '@syncedstore/core';
  * Returns the store proxy - changes to the store will trigger re-renders
  */
 export const useYjsStore = () => {
-  const doc = getYjsValue(store);
   const versionRef = useRef(0);
   
   const subscribe = useCallback((callback) => {
@@ -20,7 +22,7 @@ export const useYjsStore = () => {
     
     doc.on('update', handler);
     return () => doc.off('update', handler);
-  }, [doc]);
+  }, []);
   
   const getSnapshot = useCallback(() => {
     // Return a new object reference when doc updates to trigger re-render

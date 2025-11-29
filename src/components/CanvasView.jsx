@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Stage, Layer, Image, Group, Rect, Text, Circle, Line, Arrow, Transformer } from 'react-konva'
+import { Stage, Layer, Image as KonvaImage, Group, Rect, Text, Circle, Line, Arrow, Transformer } from 'react-konva'
 import { useAuth, useClerk } from '@clerk/clerk-react'
 import Konva from 'konva'
 import useImage from 'use-image'
@@ -287,7 +287,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       opacity={item.opacity || 1}
       style={{ cursor: blendMode ? 'crosshair' : 'default' }}
     >
-      <Image
+      <KonvaImage
         image={image}
         width={item.width || image.width}
         height={item.height || image.height}

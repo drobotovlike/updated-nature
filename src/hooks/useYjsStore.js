@@ -1,12 +1,38 @@
-import { useSyncedStore } from '@syncedstore/react';
+import { useSyncExternalStore, useCallback, useRef } from 'react';
 import { store } from '../collaboration/store';
+import { getYjsValue } from '@syncedstore/core';
 
 /**
  * Hook to access the shared Yjs store
- * Returns a reactive proxy of the store state
+ * Compatible with React 19 (replaces @syncedstore/react which has compatibility issues)
+ * 
+ * Returns the store proxy - changes to the store will trigger re-renders
  */
 export const useYjsStore = () => {
-  return useSyncedStore(store);
+  const doc = getYjsValue(store);
+  const versionRef = useRef(0);
+  
+  const subscribe = useCallback((callback) => {
+    const handler = () => {
+      versionRef.current++;
+      callback();
+    };
+    
+    doc.on('update', handler);
+    return () => doc.off('update', handler);
+  }, [doc]);
+  
+  const getSnapshot = useCallback(() => {
+    // Return a new object reference when doc updates to trigger re-render
+    // The actual data is accessed via the store proxy
+    return versionRef.current;
+  }, []);
+  
+  // Subscribe to Yjs doc updates
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  
+  // Return the store proxy - it's always the same reference but its contents change
+  return store;
 };
 
 // Helper functions for common mutations

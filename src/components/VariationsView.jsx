@@ -1,23 +1,28 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
+import { getAuthToken } from '../utils/authToken'
 
 export default function VariationsView({ projectId, onSelectVariation }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [variations, setVariations] = useState([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState(null)
 
   useEffect(() => {
-    if (projectId && userId) {
+    if (projectId && userId && clerk?.session) {
       loadVariations()
     }
-  }, [projectId, userId])
+  }, [projectId, userId, clerk])
 
   const loadVariations = async () => {
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) return
+
       const response = await fetch(`/api/projects?action=variations&projectId=${projectId}`, {
         headers: {
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
 
@@ -36,11 +41,14 @@ export default function VariationsView({ projectId, onSelectVariation }) {
 
   const markAsSelected = async (variationId) => {
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) return
+
       const response = await fetch(`/api/projects?action=variations&variationId=${variationId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ is_selected: true }),
       })

@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
+import { getAuthToken } from '../utils/authToken'
 
 export default function ProjectMetadataForm({ projectId, onSave }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [metadata, setMetadata] = useState({
     description: '',
     client_name: '',
@@ -19,16 +21,19 @@ export default function ProjectMetadataForm({ projectId, onSave }) {
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (projectId && userId) {
+    if (projectId && userId && clerk?.session) {
       loadMetadata()
     }
-  }, [projectId, userId])
+  }, [projectId, userId, clerk])
 
   const loadMetadata = async () => {
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) return
+
       const response = await fetch(`/api/projects?projectId=${projectId}&action=metadata`, {
         headers: {
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
 
@@ -57,11 +62,14 @@ export default function ProjectMetadataForm({ projectId, onSave }) {
   const handleSave = async () => {
     setLoading(true)
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch(`/api/projects?projectId=${projectId}&action=metadata`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify(metadata),
       })

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth, useClerk } from '@clerk/clerk-react'
 import { getProject, updateProject, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
+import { getAuthToken } from '../utils/authToken'
 import AssetLibrary from './AssetLibrary'
 import ExportModal from './ExportModal'
 
@@ -134,7 +135,8 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
             file.name,
             permanentUrl,
             'image',
-            `Room image uploaded from project: ${project?.name || 'Untitled'}`
+            `Room image uploaded from project: ${project?.name || 'Untitled'}`,
+            clerk
           )
           console.log('Asset added to library:', file.name)
         } catch (assetError) {
@@ -192,7 +194,8 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
             file.name,
             permanentUrl,
             'image',
-            `Furniture asset uploaded from project: ${project?.name || 'Untitled'}`
+            `Furniture asset uploaded from project: ${project?.name || 'Untitled'}`,
+            clerk
           )
           console.log('Asset added to library:', file.name)
         } catch (assetError) {
@@ -314,7 +317,8 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
               `Generated: ${project?.name || 'Design'}`,
               uploadResult.url,
               'image',
-              prompt || 'AI-generated design'
+              prompt || 'AI-generated design',
+              clerk
             )
             setResultUrl(uploadResult.url) // Update to permanent URL
           } else {
@@ -324,7 +328,8 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
               `Generated: ${project?.name || 'Design'}`,
               data.imageUrl,
               'image',
-              prompt || 'AI-generated design'
+              prompt || 'AI-generated design',
+              clerk
             )
           }
         } catch (assetError) {
@@ -500,11 +505,12 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
 
       // Save all variations to database
       if (variations.length > 0) {
+        const token = await getAuthToken(clerk)
         const response = await fetch('/api/projects?action=variations', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userId}`,
+            'Authorization': `Bearer ${token}`,
           },
           body: JSON.stringify({ variations }),
         })

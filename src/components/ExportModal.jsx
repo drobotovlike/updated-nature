@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
+import { getAuthToken } from '../utils/authToken'
 
 export default function ExportModal({ projectId, projectName, onClose }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [format, setFormat] = useState('png')
   const [resolution, setResolution] = useState('4k')
   const [exporting, setExporting] = useState(false)
@@ -11,11 +13,14 @@ export default function ExportModal({ projectId, projectName, onClose }) {
     setExporting(true)
 
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch('/api/export', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           projectId,

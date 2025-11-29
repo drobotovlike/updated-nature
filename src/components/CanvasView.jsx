@@ -28,6 +28,7 @@ import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
 import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
 import { isValidUUID, generateUUID } from '../utils/uuid'
+import { getAuthToken } from '../utils/authToken'
 
 // Adapters for Yjs (Transition from REST API)
 // These replace the canvasManager functions with local Yjs mutations
@@ -944,13 +945,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Load styles on mount
   useEffect(() => {
-    if (!userId) return
+    if (!userId || !clerk?.session) return
 
     const loadStyles = async () => {
       try {
+        const token = await getAuthToken(clerk)
+        if (!token) return
+        
         const response = await fetch('/api/generate?action=styles', {
           headers: {
-            'Authorization': `Bearer ${userId}`,
+            'Authorization': `Bearer ${token}`,
           },
         })
         if (response.ok) {
@@ -963,7 +967,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
 
     loadStyles()
-  }, [userId])
+  }, [userId, clerk])
 
   // Attach Transformer to selected item
   useEffect(() => {
@@ -1104,12 +1108,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(true)
       setPopupMenuPosition({ x: 0, y: 0, visible: false })
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       // Call upscale API
       const response = await fetch('/api/image-editing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'upscale',
@@ -1205,12 +1212,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       // Call blend API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'blend',
@@ -1333,12 +1343,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setIsGenerating(true)
       setShowStyleTransfer(false)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       // Call style transfer API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'style-transfer',
@@ -1497,12 +1510,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       // Call remove background API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'remove-bg',
@@ -1567,12 +1583,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       // Call inpainting API
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'inpaint',
@@ -1646,11 +1665,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'loop',
@@ -1696,11 +1718,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       setIsGenerating(true)
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'text2svg',
@@ -1861,11 +1886,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         return
       }
 
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch('/api/image-processing', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId} `,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           operation: 'outpaint',

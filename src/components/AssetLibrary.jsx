@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useAuth, useClerk } from '@clerk/clerk-react'
 import { getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
+import { getAuthToken } from '../utils/authToken'
 
 export default function AssetLibrary({ onSelectAsset, projectId }) {
   const { userId } = useAuth()
@@ -15,15 +16,18 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
   const assetUploadInputRef = useRef(null)
 
   useEffect(() => {
-    if (userId) {
+    if (userId && clerk?.session) {
       loadAssets()
       loadTags()
     }
-  }, [userId, searchQuery, selectedTags])
+  }, [userId, searchQuery, selectedTags, clerk])
 
   const loadAssets = async () => {
     setLoading(true)
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) return
+
       const params = new URLSearchParams()
       if (searchQuery) params.append('search', searchQuery)
       if (selectedTags.length > 0) {
@@ -32,7 +36,7 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
 
       const response = await fetch(`/api/assets?${params.toString()}`, {
         headers: {
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
 
@@ -49,9 +53,12 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
 
   const loadTags = async () => {
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) return
+
       const response = await fetch('/api/assets?action=tags', {
         headers: {
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
       })
 
@@ -81,7 +88,8 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
         file.name,
         permanentUrl,
         'image',
-        `Uploaded from asset library`
+        `Uploaded from asset library`,
+        clerk
       )
 
       loadAssets()

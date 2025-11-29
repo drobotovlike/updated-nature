@@ -5,6 +5,7 @@
 import * as cloudManager from './cloudProjectManager'
 import { generateUUID, isValidUUID } from './uuid'
 import { syncQueue } from './syncQueue'
+import { getAuthToken } from './authToken'
 
 const STORAGE_KEY = 'ature_projects'
 const SPACES_KEY = 'ature_spaces'
@@ -894,17 +895,26 @@ export function updateSpace(userId, spaceId, updates) {
 }
 
 // Asset Library Functions (Shared across all users)
-export async function getAssets(userId) {
+export async function getAssets(userId, clerkInstance = null) {
   if (!userId) {
     return []
   }
 
   try {
+    // Get proper auth token if clerk instance provided
+    let authHeader = `Bearer ${userId}` // Fallback for backwards compatibility
+    if (clerkInstance) {
+      const token = await getAuthToken(clerkInstance)
+      if (token) {
+        authHeader = `Bearer ${token}`
+      }
+    }
+
     const response = await fetch(ASSETS_API, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userId}`,
+        'Authorization': authHeader,
       },
     })
 
@@ -921,17 +931,26 @@ export async function getAssets(userId) {
   }
 }
 
-export async function addAssetToLibrary(userId, name, url, type = 'image', description = null) {
+export async function addAssetToLibrary(userId, name, url, type = 'image', description = null, clerkInstance = null) {
   if (!userId) {
     throw new Error('User must be authenticated to add assets')
   }
 
   try {
+    // Get proper auth token if clerk instance provided
+    let authHeader = `Bearer ${userId}` // Fallback for backwards compatibility
+    if (clerkInstance) {
+      const token = await getAuthToken(clerkInstance)
+      if (token) {
+        authHeader = `Bearer ${token}`
+      }
+    }
+
     const response = await fetch(ASSETS_API, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userId}`,
+        'Authorization': authHeader,
       },
       body: JSON.stringify({
         name,

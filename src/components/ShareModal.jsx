@@ -1,8 +1,10 @@
 import { useState } from 'react'
-import { useAuth } from '@clerk/clerk-react'
+import { useAuth, useClerk } from '@clerk/clerk-react'
+import { getAuthToken } from '../utils/authToken'
 
 export default function ShareModal({ projectId, creationId, onClose }) {
   const { userId } = useAuth()
+  const clerk = useClerk()
   const [accessType, setAccessType] = useState('view')
   const [expiresAt, setExpiresAt] = useState('')
   const [password, setPassword] = useState('')
@@ -15,11 +17,14 @@ export default function ShareModal({ projectId, creationId, onClose }) {
     setError('')
 
     try {
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
       const response = await fetch(`/api/sharing?projectId=${projectId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${userId}`,
+          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
           projectId,

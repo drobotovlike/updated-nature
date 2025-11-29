@@ -43,13 +43,29 @@ export default function SignUpPage() {
       })
 
       console.log('Sign-up result:', result.status, result)
+      console.log('Missing fields:', result.missingFields)
+      console.log('Unverified fields:', result.unverifiedFields)
+      console.log('Verifications:', result.verifications)
 
       // Check if email verification is required
       if (result.status === 'missing_requirements') {
-        // User is created but needs verification
-        console.log('User created, preparing email verification...')
-        await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
-        setPendingVerification(true)
+        // Check what's required
+        const unverifiedFields = result.unverifiedFields || []
+        
+        if (unverifiedFields.includes('email_address')) {
+          // User is created but needs email verification
+          console.log('User created, preparing email verification...')
+          await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+          setPendingVerification(true)
+        } else if (result.verifications?.captcha?.status === 'unverified') {
+          // CAPTCHA is required
+          setError('Please complete the CAPTCHA verification above before continuing.')
+        } else {
+          // Other missing requirements
+          console.log('Other requirements missing:', result.missingFields, unverifiedFields)
+          await signUp.prepareEmailAddressVerification({ strategy: 'email_code' })
+          setPendingVerification(true)
+        }
       } else if (result.status === 'complete') {
         // User is created and verified
         console.log('User created and verified, setting session...')
@@ -77,14 +93,41 @@ export default function SignUpPage() {
       const result = await signUp.attemptEmailAddressVerification({ code })
 
       console.log('Verification result:', result.status, result)
+      console.log('Missing fields:', result.missingFields)
+      console.log('Unverified fields:', result.unverifiedFields)
+      console.log('Verifications:', result.verifications)
 
       if (result.status === 'complete') {
         console.log('Email verified, setting session...')
         await setActive({ session: result.createdSessionId })
         navigate('/dashboard', { replace: true })
+      } else if (result.status === 'missing_requirements') {
+        // Check what's still required
+        const missingFields = result.missingFields || []
+        const unverifiedFields = result.unverifiedFields || []
+        
+        console.log('Still missing:', missingFields, unverifiedFields)
+        
+        // Check if it's CAPTCHA that's missing
+        if (result.verifications?.captcha?.status === 'unverified') {
+          setError('CAPTCHA verification required. Please complete the CAPTCHA challenge above.')
+        } else if (missingFields.length > 0) {
+          setError(`Additional information required: ${missingFields.join(', ')}`)
+        } else if (unverifiedFields.length > 0) {
+          setError(`Additional verification required: ${unverifiedFields.join(', ')}`)
+        } else {
+          // Email might be verified, try to complete sign-up
+          console.log('Email verified but status not complete, checking session...')
+          if (result.createdSessionId) {
+            await setActive({ session: result.createdSessionId })
+            navigate('/dashboard', { replace: true })
+          } else {
+            setError('Verification incomplete. Please try again or contact support.')
+          }
+        }
       } else {
         console.log('Verification incomplete, status:', result.status)
-        setError('Verification incomplete. Please try again.')
+        setError(`Verification status: ${result.status}. Please try again.`)
       }
     } catch (err) {
       console.error('Verification error:', err)

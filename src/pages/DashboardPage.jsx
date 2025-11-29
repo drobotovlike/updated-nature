@@ -75,7 +75,7 @@ export default function DashboardPage() {
   const getCanvasThumbnail = useCallback(async (projectId) => {
     if (!userId || !projectId) return null
     try {
-      const canvasData = await getCanvasData(userId, projectId)
+      const canvasData = await getCanvasData(userId, projectId, clerk)
       // Get the first visible item's image as thumbnail
       const firstItem = canvasData.items?.find(item => item.is_visible !== false && item.image_url)
       return firstItem?.image_url || null
@@ -83,7 +83,7 @@ export default function DashboardPage() {
       console.error('Error getting canvas thumbnail:', error)
       return null
     }
-  }, [userId])
+  }, [userId, clerk])
 
   // State to store canvas thumbnails
   const [canvasThumbnails, setCanvasThumbnails] = useState({})

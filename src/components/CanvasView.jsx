@@ -724,7 +724,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         height: img.height,
         z_index: maxZIndex + 1,
         is_visible: true,
-      })
+      }, clerk)
 
       setItems((prev) => {
         // DEFENSIVE: Ensure prev is an array before spreading
@@ -865,7 +865,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     try {
       console.log('Loading canvas for project:', projectId, 'user:', userId)
-      const data = await getCanvasData(userId, projectId)
+      const data = await getCanvasData(userId, projectId, clerk)
       console.log('Canvas data received:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
 
       setItems(data.items || [])
@@ -1096,7 +1096,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         background_color: settings.backgroundColor,
         grid_enabled: settings.gridEnabled,
         grid_size: settings.gridSize,
-      })
+      }, clerk)
     } catch (error) {
       console.error('Error saving canvas state:', error)
       // Don't show error to user - canvas state save is non-critical
@@ -1113,7 +1113,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   const handleItemUpdate = useCallback(async (itemId, updates) => {
     try {
-      const updatedItem = await updateCanvasItem(userId, itemId, updates)
+      const updatedItem = await updateCanvasItem(userId, itemId, updates, clerk)
 
       // DEFENSIVE: Validate response from API
       if (!updatedItem || typeof updatedItem !== 'object') {
@@ -1138,7 +1138,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       // Save current state to history before delete
       saveToHistory(items)
 
-      await deleteCanvasItem(userId, itemId)
+      await deleteCanvasItem(userId, itemId, clerk)
       // DEFENSIVE: Ensure items is an array before filtering
       const safeItems = Array.isArray(items) ? items : []
       const newItems = safeItems.filter((item) => item.id !== itemId)
@@ -1158,7 +1158,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       // Update all items with new z_index values
       const updatePromises = reorderedItems.map((item) =>
-        updateCanvasItem(userId, item.id, { z_index: item.z_index })
+        updateCanvasItem(userId, item.id, { z_index: item.z_index }, clerk)
       )
       await Promise.all(updatePromises)
       setItems(reorderedItems)
@@ -1340,11 +1340,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         name: `Blend: ${sourceItem.name || 'Image 1'} + ${targetItem.name || 'Image 2'}`,
         z_index: maxZIndex + 1,
         is_visible: true,
-      })
+      }, clerk)
 
       // Delete both original items
-      await deleteCanvasItem(userId, sourceId)
-      await deleteCanvasItem(userId, targetId)
+      await deleteCanvasItem(userId, sourceId, clerk)
+      await deleteCanvasItem(userId, targetId, clerk)
 
       // Update items list
       setItems((prev) => prev.filter(item => item.id !== sourceId && item.id !== targetId).concat(newItem))
@@ -1483,7 +1483,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     // In a real app, we might want to batch this or only update changed items
     try {
       await Promise.all(reorderedItems.map(item =>
-        updateCanvasItem(userId, item.id, { z_index: item.z_index })
+        updateCanvasItem(userId, item.id, { z_index: item.z_index }, clerk)
       ))
     } catch (error) {
       console.error('Error reordering items:', error)
@@ -1504,7 +1504,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     ))
 
     try {
-      await updateCanvasItem(userId, itemId, { is_visible: newVisibility })
+      await updateCanvasItem(userId, itemId, { is_visible: newVisibility }, clerk)
     } catch (error) {
       console.error('Error toggling visibility:', error)
     }
@@ -1522,7 +1522,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     ))
 
     try {
-      await updateCanvasItem(userId, itemId, { is_locked: newLockState })
+      await updateCanvasItem(userId, itemId, { is_locked: newLockState }, clerk)
     } catch (error) {
       console.error('Error toggling lock:', error)
     }
@@ -1536,7 +1536,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
     // Debounce the API call would be better here, but for now direct update
     try {
-      await updateCanvasItem(userId, itemId, { opacity })
+      await updateCanvasItem(userId, itemId, { opacity }, clerk)
     } catch (error) {
       console.error('Error updating opacity:', error)
     }
@@ -1808,7 +1808,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         },
         z_index: maxZIndex + 1,
         is_visible: true,
-      })
+      }, clerk)
 
       const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
       setItems(newItems)
@@ -1911,7 +1911,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           },
           z_index: maxZIndex + i + 1,
           is_visible: true,
-        })
+        }, clerk)
         newItems.push(swatchItem)
       }
 
@@ -1998,7 +1998,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         },
         z_index: maxZIndex + 1,
         is_visible: true,
-      })
+      }, clerk)
 
       const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
       setItems(newItems)
@@ -2337,7 +2337,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''} `,
           z_index: maxZIndex + 1,
           is_visible: true,
-        })
+        }, clerk)
 
         setItems((prev) => [...prev, newItem])
         setShowGenerateModal(false)
@@ -2500,7 +2500,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             prompt: variationPrompt,
             z_index: maxZIndex + i + 1,
             is_visible: true,
-          })
+          }, clerk)
 
           newItems.push(newItem)
         }
@@ -4300,7 +4300,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       description: asset.description,
                       z_index: maxZIndex + 1,
                       is_visible: true,
-                    })
+                    }, clerk)
                     console.log('Asset added successfully:', newItem)
                     const newItems = Array.isArray(items) ? [...items, newItem] : [newItem]
                     setItems(newItems)

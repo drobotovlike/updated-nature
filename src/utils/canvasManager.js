@@ -1,12 +1,20 @@
 // Canvas Management Utility
 // Handles all canvas-related API calls
 
+import { getAuthToken } from './authToken.js'
+
 const CANVAS_API = '/api/canvas'
 
-async function canvasApiRequest(endpoint, options = {}, userId) {
+async function canvasApiRequest(endpoint, options = {}, clerkInstance) {
+  const token = await getAuthToken(clerkInstance)
+  
+  if (!token) {
+    throw new Error('Authentication failed. Please refresh the page and sign in again.')
+  }
+
   const headers = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${userId}`,
+    'Authorization': `Bearer ${token}`,
     ...options.headers,
   }
 
@@ -41,14 +49,14 @@ async function canvasApiRequest(endpoint, options = {}, userId) {
 }
 
 // Get all canvas items and state for a project
-export async function getCanvasData(userId, projectId) {
+export async function getCanvasData(userId, projectId, clerkInstance) {
   if (!userId || !projectId) {
     throw new Error('userId and projectId are required')
   }
 
   try {
     console.log('Loading canvas data for project:', projectId, 'user:', userId)
-    const data = await canvasApiRequest(`?projectId=${projectId}`, { method: 'GET' }, userId)
+    const data = await canvasApiRequest(`?projectId=${projectId}`, { method: 'GET' }, clerkInstance)
     console.log('Canvas data loaded:', { itemsCount: data.items?.length || 0, hasState: !!data.state })
     return {
       items: data.items || [],
@@ -67,13 +75,13 @@ export async function getCanvasData(userId, projectId) {
 }
 
 // Get single canvas item
-export async function getCanvasItem(userId, itemId) {
+export async function getCanvasItem(userId, itemId, clerkInstance) {
   if (!userId || !itemId) {
     throw new Error('userId and itemId are required')
   }
 
   try {
-    return await canvasApiRequest(`?itemId=${itemId}`, { method: 'GET' }, userId)
+    return await canvasApiRequest(`?itemId=${itemId}`, { method: 'GET' }, clerkInstance)
   } catch (error) {
     console.error('Error loading canvas item:', error)
     throw error
@@ -81,7 +89,7 @@ export async function getCanvasItem(userId, itemId) {
 }
 
 // Create new canvas item
-export async function createCanvasItem(userId, projectId, itemData) {
+export async function createCanvasItem(userId, projectId, itemData, clerkInstance) {
   if (!userId || !projectId || !itemData.image_url) {
     throw new Error('userId, projectId, and image_url are required')
   }
@@ -97,7 +105,7 @@ export async function createCanvasItem(userId, projectId, itemData) {
           ...itemData,
         }),
       },
-      userId
+      clerkInstance
     )
     console.log('Canvas item created successfully:', result)
     return result
@@ -115,7 +123,7 @@ export async function createCanvasItem(userId, projectId, itemData) {
 }
 
 // Update canvas item
-export async function updateCanvasItem(userId, itemId, updates) {
+export async function updateCanvasItem(userId, itemId, updates, clerkInstance) {
   if (!userId || !itemId) {
     throw new Error('userId and itemId are required')
   }
@@ -127,7 +135,7 @@ export async function updateCanvasItem(userId, itemId, updates) {
         method: 'PUT',
         body: JSON.stringify(updates),
       },
-      userId
+      clerkInstance
     )
   } catch (error) {
     console.error('Error updating canvas item:', error)
@@ -136,13 +144,13 @@ export async function updateCanvasItem(userId, itemId, updates) {
 }
 
 // Delete canvas item
-export async function deleteCanvasItem(userId, itemId) {
+export async function deleteCanvasItem(userId, itemId, clerkInstance) {
   if (!userId || !itemId) {
     throw new Error('userId and itemId are required')
   }
 
   try {
-    await canvasApiRequest(`?itemId=${itemId}`, { method: 'DELETE' }, userId)
+    await canvasApiRequest(`?itemId=${itemId}`, { method: 'DELETE' }, clerkInstance)
     return true
   } catch (error) {
     console.error('Error deleting canvas item:', error)
@@ -151,13 +159,13 @@ export async function deleteCanvasItem(userId, itemId) {
 }
 
 // Get canvas state
-export async function getCanvasState(userId, projectId) {
+export async function getCanvasState(userId, projectId, clerkInstance) {
   if (!userId || !projectId) {
     throw new Error('userId and projectId are required')
   }
 
   try {
-    return await canvasApiRequest(`?projectId=${projectId}&type=state`, { method: 'GET' }, userId)
+    return await canvasApiRequest(`?projectId=${projectId}&type=state`, { method: 'GET' }, clerkInstance)
   } catch (error) {
     console.error('Error loading canvas state:', error)
     return null
@@ -165,7 +173,7 @@ export async function getCanvasState(userId, projectId) {
 }
 
 // Save canvas state
-export async function saveCanvasState(userId, projectId, stateData) {
+export async function saveCanvasState(userId, projectId, stateData, clerkInstance) {
   if (!userId || !projectId) {
     throw new Error('userId and projectId are required')
   }
@@ -177,11 +185,10 @@ export async function saveCanvasState(userId, projectId, stateData) {
         method: 'POST',
         body: JSON.stringify(stateData),
       },
-      userId
+      clerkInstance
     )
   } catch (error) {
     console.error('Error saving canvas state:', error)
     throw error
   }
 }
-

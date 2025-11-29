@@ -259,6 +259,9 @@ export default function SignUpPage() {
                       </div>
                     )}
 
+                    {/* Clerk CAPTCHA container for bot protection */}
+                    <div id="clerk-captcha" className="flex justify-center"></div>
+
                     <button
                       type="submit"
                       disabled={loading}

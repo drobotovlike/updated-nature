@@ -47,6 +47,7 @@ async function verifyClerkToken(authHeader) {
     // Verify the token signature using Clerk's public keys
     const verified = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY,
+      jwtKey: process.env.CLERK_JWT_KEY, // Optional performance optimization
     })
     
     // Extract user ID from verified token

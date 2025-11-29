@@ -110,6 +110,14 @@ The project is configured for Vercel deployment with Supabase cloud storage for 
 - **Environment**: Select all (Production, Preview, Development)
 - Get from [Clerk Dashboard](https://dashboard.clerk.com/last-active?path=api-keys)
 
+- **Name**: `CLERK_SECRET_KEY`
+- **Value**: Your Clerk secret key (starts with `sk_test_` or `sk_live_`)
+- **Environment**: Select all (Production, Preview, Development)
+
+- **Name**: `CLERK_JWT_KEY`
+- **Value**: Your Clerk JWT key (optional, for performance optimization)
+- **Environment**: Select all (Production, Preview, Development)
+
 #### Supabase (Cloud Storage)
 - **Name**: `VITE_SUPABASE_URL`
 - **Value**: `https://ifvqkmpyknfezpxscnef.supabase.co`

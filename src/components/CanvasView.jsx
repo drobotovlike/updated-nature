@@ -400,7 +400,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Canvas state - Using Zustand store for core canvas state
   const yStore = useYjsStore()
-  const items = yStore.items
+  // Ensure items is always an array - SyncedStore proxy might not pass Array.isArray in some states
+  const rawItems = yStore.items
+  const items = Array.isArray(rawItems) ? rawItems : (rawItems && typeof rawItems[Symbol.iterator] === 'function' ? [...rawItems] : [])
   // const items = useCanvasStore((state) => state.items) // REPLACED BY YJS
   const setItemsState = useCanvasStore((state) => state.setItems) // Keep for now if needed, but likely unused
   const camera = useCanvasStore((state) => state.camera)

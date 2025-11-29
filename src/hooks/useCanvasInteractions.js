@@ -26,7 +26,9 @@ export function useCanvasInteractions(stageRef, dimensions) {
   const interactionMode = useCanvasStore((state) => state.interactionMode)
 
   const yStore = useYjsStore()
-  const items = yStore.items
+  // Ensure items is always an array - SyncedStore proxy might not pass Array.isArray in some states
+  const rawItems = yStore.items
+  const items = Array.isArray(rawItems) ? rawItems : (rawItems && typeof rawItems[Symbol.iterator] === 'function' ? [...rawItems] : [])
 
   // Pan state
   const [isPanning, setIsPanning] = useState(false)

@@ -888,42 +888,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
 
     // Yjs handles data loading automatically via provider
-    /*
-    try {
-      console.log('Loading canvas for project:', projectId, 'user:', userId)
-      const data = await getCanvasData(userId, projectId, clerk)
-      // ... (Legacy loading logic removed for Yjs migration)
-      setItems(data.items || [])
-      // ...
-    } catch (error) {
-       // ...
-    }
-    */
     console.log('Canvas View Initialized with Yjs Store');
-      if (error.message?.includes('404') || error.message?.includes('not found') || error.message?.includes('Project not found')) {
-        console.log('Project not found in database (this is normal for new projects), loading with empty state')
-      } else {
-        console.warn('Canvas API error, loading with empty state:', error.message)
-      }
-      setItems([])
-
-      // Only show error if it's a critical issue
-      if (error.message?.includes('401') || error.message?.includes('Unauthorized')) {
-        setError('Authentication failed. Please refresh the page and sign in again.')
-      } else if (error.message?.includes('Network') || error.message?.includes('fetch')) {
-        setError('Network error. Please check your connection and try again.')
-      } else if (error.message?.includes('does not exist') || error.message?.includes('42P01')) {
-        // Don't show error for missing tables - canvas will work with local state
-        // Tables will be created automatically when first item is saved
-        console.log('Canvas tables not found yet - working with local state. Tables will be created on first save.')
-        setError('') // Clear error - canvas can work without tables initially
-      } else {
-        console.log('Non-critical error, continuing with empty canvas state')
-      }
-    } finally {
-      setLoading(false)
-    }
-  }, [projectId, userId, dimensions.width, dimensions.height, setItems, setError, setLoading, updateSettings, setCamera, stageRef])
+    
+    // Previous error handling block is removed as it was part of the removed try-catch
+    setLoading(false);
+  }, [projectId, userId, dimensions.width, dimensions.height, setError, setLoading, updateSettings, setCamera, stageRef])
 
   // Load canvas data
   useEffect(() => {

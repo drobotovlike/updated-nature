@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 // import { SupabaseProvider } from 'y-supabase'; // Replaced with local implementation
 import { SupabaseProvider } from '../utils/y-supabase';
 import { IndexeddbPersistence } from 'y-indexeddb';
-import { store } from './store';
+import { store, initializeDefaults } from './store';
 import { getYjsValue } from '@syncedstore/core';
 import { supabase } from '../utils/supabaseClient';
 
@@ -33,6 +33,8 @@ export const CollaborationProvider = ({ children, roomId = 'ature-demo-room' }) 
     
     indexeddbProvider.on('synced', () => {
       console.log('Content loaded from local database');
+      // Initialize default values if this is a fresh document
+      initializeDefaults();
     });
 
     // 2. Setup Supabase Provider (Sync Layer)

@@ -3,10 +3,10 @@
  */
 
 import * as Y from 'yjs'
-import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness.js'
-import * as encoding from 'lib0/encoding.js'
-import * as decoding from 'lib0/decoding.js'
-import { writeUpdate, readSyncMessage, writeSyncStep1 } from 'y-protocols/sync.js'
+import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness'
+import * as encoding from 'lib0/encoding'
+import * as decoding from 'lib0/decoding'
+import { writeUpdate, readSyncMessage, writeSyncStep1 } from 'y-protocols/sync'
 
 // Minimal Observable implementation to replace lib0/observable.js dependency
 class SimpleObservable {

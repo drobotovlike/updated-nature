@@ -22,36 +22,46 @@ import { verifyToken } from '@clerk/backend'
  * @returns {Promise<{userId: string} | null>}
  */
 async function verifyClerkToken(authHeader) {
+  // DEBUG: Check environment (remove in production later)
+  if (!process.env.CLERK_SECRET_KEY) {
+    console.error('❌ CLERK_SECRET_KEY is missing in environment variables!')
+  } else {
+    // Log partial key for verification (safe to log first few chars)
+    console.log('✅ CLERK_SECRET_KEY is present:', process.env.CLERK_SECRET_KEY.substring(0, 7) + '...')
+  }
+
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('❌ No valid Authorization header found')
     return null
   }
 
   const token = authHeader.replace('Bearer ', '').trim()
   
   if (!token) {
+    console.log('❌ Token is empty')
     return null
   }
 
   try {
+    console.log('🔍 Verifying token...')
     // Verify the token signature using Clerk's public keys
-    // This fetches Clerk's JWKS and verifies the signature
     const verified = await verifyToken(token, {
-      // Clerk automatically fetches the JWKS from their servers
-      // No need to manually configure public keys
+      secretKey: process.env.CLERK_SECRET_KEY,
     })
     
     // Extract user ID from verified token
     const userId = verified.sub
     
     if (!userId) {
-      console.error('Token verified but no user ID found')
+      console.error('❌ Token verified but no user ID found')
       return null
     }
     
+    console.log('✅ Token verified for user:', userId)
     return { userId }
   } catch (error) {
-    // Token verification failed (invalid signature, expired, etc.)
-    console.error('Token verification failed:', error.message)
+    console.error('❌ JWT verification failed:', error.message)
+    if (error.reason) console.error('Reason:', error.reason)
     return null
   }
 }

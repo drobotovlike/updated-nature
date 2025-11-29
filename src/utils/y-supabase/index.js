@@ -4,10 +4,50 @@
 
 import * as Y from 'yjs'
 import { Awareness, encodeAwarenessUpdate, applyAwarenessUpdate } from 'y-protocols/awareness.js'
-import { Observable } from 'lib0/observable.js'
 import * as encoding from 'lib0/encoding.js'
 import * as decoding from 'lib0/decoding.js'
 import { writeUpdate, readSyncMessage, writeSyncStep1 } from 'y-protocols/sync.js'
+
+// Minimal Observable implementation to replace lib0/observable.js dependency
+class SimpleObservable {
+  constructor() {
+    this._observers = new Map()
+  }
+
+  on(name, f) {
+    let observers = this._observers.get(name)
+    if (observers === undefined) {
+      this._observers.set(name, (observers = new Set()))
+    }
+    observers.add(f)
+  }
+
+  once(name, f) {
+    const _f = (...args) => {
+      this.off(name, _f)
+      f(...args)
+    }
+    this.on(name, _f)
+  }
+
+  off(name, f) {
+    const observers = this._observers.get(name)
+    if (observers !== undefined) {
+      observers.delete(f)
+      if (observers.size === 0) {
+        this._observers.delete(name)
+      }
+    }
+  }
+
+  emit(name, args) {
+    return Array.from(this._observers.get(name) || []).forEach(f => f(...args))
+  }
+
+  removeAllListeners() {
+    this._observers = new Map()
+  }
+}
 
 const messageSync = 0
 const messageAwareness = 1
@@ -24,7 +64,7 @@ const messageQueryAwareness = 3
  * Supabase Provider for Yjs
  * Connects Yjs to Supabase Realtime
  */
-export class SupabaseProvider extends Observable {
+export class SupabaseProvider extends SimpleObservable {
   /**
    * @param {Y.Doc} doc
    * @param {Object} supabase - Supabase client instance

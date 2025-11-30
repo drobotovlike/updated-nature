@@ -88,18 +88,17 @@ export function useCanvasInteractions(stageRef, dimensions) {
   }, [stageRef, setCamera])
 
   /**
-   * Handle wheel event - Apple-style natural scrolling
+   * Handle wheel event - Fixed zoom and scroll
    * 
    * PERFORMANCE: Uses RAF throttling to prevent excessive React updates
    * 
    * - Two-finger scroll (no modifier) → Pan the canvas (natural direction)
    * - Pinch gesture (ctrlKey on trackpad) → Zoom to cursor
    * - Cmd/Ctrl + scroll → Zoom to cursor (for mouse users)
+   * - Shift + scroll → Horizontal pan (for horizontal scroll)
    */
   const handleWheel = useCallback(
     (e) => {
-      e.evt.preventDefault()
-
       const stage = stageRef.current
       if (!stage || !dimensions.width || !dimensions.height) return
 
@@ -112,16 +111,21 @@ export function useCanvasInteractions(stageRef, dimensions) {
       
       if (isPinchZoom) {
         // ZOOM mode - pinch or Ctrl+scroll
+        e.evt.preventDefault() // Only prevent default for zoom
+        
         const oldScale = stage.scaleX()
         const deltaY = e.evt.deltaY
         
-        // Smooth zoom factor - smaller for trackpad, feels more natural
-        // Negative deltaY = zoom in (fingers apart), positive = zoom out (fingers together)
-        const zoomIntensity = 0.01
-        const zoomFactor = Math.exp(-deltaY * zoomIntensity)
+        // Improved zoom factor calculation
+        // Use deltaY sign: negative = zoom in, positive = zoom out
+        const zoomSpeed = 0.001 // More sensitive zoom
+        const zoomFactor = 1 - (deltaY * zoomSpeed)
         
         const proposedScale = oldScale * zoomFactor
         const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
+
+        // Only update if zoom actually changed
+        if (Math.abs(clampedScale - oldScale) < 0.001) return
 
         // Zoom to cursor position
         const oldCamera = {
@@ -132,25 +136,40 @@ export function useCanvasInteractions(stageRef, dimensions) {
 
         const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
 
-        // Use throttled update instead of immediate state update
-        updateCameraThrottled(newCamera)
+        // Use throttled update
+        updateCameraThrottled({
+          ...newCamera,
+          zoom: clampedScale,
+        })
       } else {
-        // PAN mode - two-finger scroll (natural scrolling like Apple)
-        // Natural scrolling: content follows finger direction
+        // PAN mode - two-finger scroll (natural scrolling)
+        // Only prevent default if we're actually panning (not just hovering)
+        if (Math.abs(e.evt.deltaX) > 0 || Math.abs(e.evt.deltaY) > 0) {
+          e.evt.preventDefault()
+        }
+        
         const deltaX = e.evt.deltaX
         const deltaY = e.evt.deltaY
         
-        // Sensitivity for panning - adjust for smooth feel
-        const panSensitivity = 1
+        // Handle shift+scroll for horizontal pan
+        const panX = e.evt.shiftKey ? deltaY : deltaX
+        const panY = e.evt.shiftKey ? 0 : deltaY
         
-        const newX = stage.x() - deltaX * panSensitivity
-        const newY = stage.y() - deltaY * panSensitivity
+        // Smooth panning sensitivity
+        const panSensitivity = 1.0
+        
+        const currentX = stage.x()
+        const currentY = stage.y()
+        const currentZoom = stage.scaleX()
+        
+        const newX = currentX - panX * panSensitivity
+        const newY = currentY - panY * panSensitivity
 
         // Use throttled update
         updateCameraThrottled({
           x: newX,
           y: newY,
-          zoom: stage.scaleX(),
+          zoom: currentZoom,
         })
       }
     },

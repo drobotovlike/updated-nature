@@ -201,7 +201,7 @@ function LayerItemExpanded({ item, onOpacityChange, onClose }) {
   )
 }
 
-export default function LayersPanel({ items, selectedItemId, onSelectItem, onReorderItems, onToggleVisibility, onToggleLock, onOpacityChange, onDeleteItem, isOpen, onClose }) {
+export default function LayersPanel({ items, selectedItemId, onSelectItem, onReorderItems, onToggleVisibility, onToggleLock, onOpacityChange, onDeleteItem, isOpen, onClose, embedded = false }) {
   const [expandedItemId, setExpandedItemId] = useState(null)
   const sensors = useSensors(
     useSensor(PointerSensor),
@@ -235,26 +235,31 @@ export default function LayersPanel({ items, selectedItemId, onSelectItem, onReo
     }
   }
 
-  if (!isOpen) return null
+  // If embedded, don't check isOpen and don't render wrapper
+  if (!embedded && !isOpen) return null
 
-  return (
-    <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-stone-200 shadow-xl z-50 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
-        <h2 className="text-lg font-semibold text-stone-800">Layers</h2>
-        <button
-          onClick={onClose}
-          className="p-1.5 rounded hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
-      </div>
+  const content = (
+    <>
+      {/* Header - only show if not embedded */}
+      {!embedded && (
+        <div className="flex items-center justify-between px-4 py-3 border-b border-stone-200">
+          <h2 className="text-lg font-semibold text-stone-800">Layers</h2>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded hover:bg-stone-100 text-stone-600 hover:text-stone-800 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Layers List */}
-      <div className="flex-1 overflow-y-auto p-3">
+      <div className={`flex-1 overflow-y-auto ${embedded ? 'p-3' : 'p-3'}`}>
         {sortedItems.length === 0 ? (
           <div className="text-center py-12 text-stone-500">
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 opacity-50">
@@ -303,6 +308,17 @@ export default function LayersPanel({ items, selectedItemId, onSelectItem, onReo
           </DndContext>
         )}
       </div>
+    </>
+  )
+
+  // If embedded, return content directly; otherwise wrap in fixed container
+  if (embedded) {
+    return content
+  }
+
+  return (
+    <div className="fixed right-0 top-0 h-full w-80 bg-white border-l border-stone-200 shadow-xl z-50 flex flex-col">
+      {content}
     </div>
   )
 }

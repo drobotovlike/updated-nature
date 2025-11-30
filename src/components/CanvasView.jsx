@@ -22,6 +22,7 @@ import { useCanvasHistory } from '../hooks/useCanvasHistory'
 // Canvas Engine imports
 import { useCanvasStore } from '../stores/useCanvasStore'
 import { useCanvasSync } from '../hooks/useCanvasSync'
+import { useCanvasRealtime } from '../hooks/useCanvasRealtime'
 import { toWorld, getWorldPointerPosition } from '../utils/coordinateSystem'
 import { useViewportCulling } from '../hooks/useViewportCulling'
 import { useCanvasInteractions } from '../hooks/useCanvasInteractions'
@@ -31,6 +32,7 @@ import { isValidUUID, generateUUID } from '../utils/uuid'
 import { getAuthToken } from '../utils/authToken'
 import CanvasToolbar from './CanvasToolbar'
 import ZoomControls from './ZoomControls'
+import PresenceIndicator from './PresenceIndicator'
 
 // Zoom constants
 const MIN_ZOOM = 0.25
@@ -441,6 +443,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   // Canvas sync hook - handles loading/saving to Supabase
   const { isLoading: isSyncing, syncError } = useCanvasSync(projectId)
   
+  // Real-time collaboration hook - enables instant sync and presence
+  const { isConnected, onlineUsers } = useCanvasRealtime(projectId)
+  
   // Adapter functions that update both local state and sync to database
   const createCanvasItem = useCallback(async (userId, projectId, data, clerk) => {
     const newItem = {
@@ -550,7 +555,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   // Project sidebar state
   const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeTab, setActiveTab] = useState('overview') // 'overview', 'assets', 'creations', 'variations', 'details'
+  const [activeTab, setActiveTab] = useState('layers') // 'layers', 'assets', 'properties', 'collaboration', 'tools'
   const [project, setProject] = useState(null)
   const [sharedAssets, setSharedAssets] = useState([])
   const [loadingAssets, setLoadingAssets] = useState(true)
@@ -1001,6 +1006,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     return () => window.removeEventListener('resize', updateDimensions)
   }, [])
 
+  // CRITICAL: Sync stage position/scale with camera state
+  // This ensures the stage always reflects the camera, regardless of how it was updated
+  useEffect(() => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    // Only update if stage is out of sync (prevents feedback loops)
+    const currentX = stage.x()
+    const currentY = stage.y()
+    const currentZoom = stage.scaleX()
+    
+    const threshold = 0.01 // Small threshold to avoid jitter
+    
+    const needsUpdate = 
+      Math.abs(currentX - camera.x) > threshold ||
+      Math.abs(currentY - camera.y) > threshold ||
+      Math.abs(currentZoom - camera.zoom) > threshold
+
+    if (needsUpdate) {
+      stage.position({ x: camera.x, y: camera.y })
+      stage.scale({ x: camera.zoom, y: camera.zoom })
+    }
+  }, [camera.x, camera.y, camera.zoom])
+
   // Initialize stage position to center of 4x canvas (only if not already loaded from database)
   useEffect(() => {
     if (stageRef.current && dimensions.width > 0 && dimensions.height > 0 && !loading) {
@@ -1149,9 +1178,17 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [camera, settings, saveCanvasStateToServer])
   */
 
-  const handleItemUpdate = useCallback((itemId, updates) => {
+  const handleItemUpdate = useCallback(async (itemId, updates) => {
     updateItem(itemId, updates)
-  }, [])
+    // Sync to database in background
+    if (userId && clerk) {
+      try {
+        await apiUpdateCanvasItem(userId, itemId, updates, clerk)
+      } catch (error) {
+        console.error('Failed to sync item update to database:', error)
+      }
+    }
+  }, [updateItem, userId, clerk])
 
   const handleItemDelete = useCallback((itemId) => {
     // Yjs handles history automatically if we set it up, but for now we just delete
@@ -2779,279 +2816,487 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
-      {/* Left Sidebar - Project Info & Tabs */}
+      {/* Left Sidebar - Figma/Miro Style */}
       <div
-        className={`absolute left-0 top-0 bottom-0 z-50 bg-[#FFFFFF] border-r border-[#F1EBE4] transition-all duration-macro ease-apple ${sidebarOpen ? 'w-80' : 'w-0'
-          } overflow-hidden`}
+        className={`absolute left-0 top-0 bottom-0 z-50 bg-white border-r border-stone-200 transition-all duration-300 ease-out ${sidebarOpen ? 'w-80' : 'w-0'
+          } overflow-hidden shadow-sm`}
       >
         {sidebarOpen && (
           <div className="h-full flex flex-col">
-            {/* Header */}
-            <div className="p-6 border-b border-border">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h1 className="text-xl font-display font-semibold text-[#2C2C2C] mb-1 tracking-[-0.02em]">
-                    {project?.name || 'Untitled'}
-                  </h1>
-                  <p className="text-xs text-[#7C7C7C] font-medium">
-                    {project?.createdAt ? `Created ${new Date(project.createdAt).toLocaleDateString()} ` : 'Loading...'}
+            {/* Compact Header */}
+            <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
+              <div className="flex items-center justify-between">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-sm font-semibold text-stone-900 truncate">
+                    {project?.name || 'Untitled Project'}
+                  </h2>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    {items.length} {items.length === 1 ? 'layer' : 'layers'}
                   </p>
                 </div>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                  className="p-2 hover:bg-[#F1EBE4] rounded-lg transition-colors"
-                  aria-label="Hide sidebar"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#7C7C7C]">
-                    <path d="M18 6L6 18" />
-                    <path d="M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1">
                 <button
                   onClick={() => setShowShareModal(true)}
-                  className="px-3 py-1.5 text-sm font-medium text-[#7C7C7C] hover:text-[#2C2C2C] hover:bg-[#F1EBE4] rounded-lg transition-colors flex items-center gap-2"
+                    className="p-1.5 rounded hover:bg-stone-200 text-stone-600 hover:text-stone-900 transition-colors"
+                    title="Share"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                     <polyline points="16 6 12 2 8 6" />
                     <line x1="12" y1="2" x2="12" y2="15" />
                   </svg>
-                  Share
                 </button>
                 <button
                   onClick={() => setSidebarOpen(false)}
-                  className="clay-button px-3 py-1.5 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-all shadow-sm"
+                    className="p-1.5 rounded hover:bg-stone-200 text-stone-600 hover:text-stone-900 transition-colors"
+                    title="Close sidebar"
                 >
-                  Start Creating
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
                 </button>
-                {onBack && (
-                  <button
-                    onClick={onBack}
-                    className="px-3 py-1.5 text-sm font-medium text-text-secondary hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors"
-                  >
-                    ← Back
-                  </button>
-                )}
+                </div>
+              </div>
               </div>
 
-              {/* Tabs */}
-              <div className="flex gap-1 mt-4 overflow-x-auto">
+            {/* Tab Navigation - Figma Style */}
+            <div className="flex border-b border-stone-200 bg-white">
                 <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'overview'
-                    ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                    } `}
-                >
-                  Overview
+                onClick={() => setActiveTab('layers')}
+                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
+                  activeTab === 'layers'
+                    ? 'text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                Layers
+                {activeTab === 'layers' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
+                )}
                 </button>
                 <button
                   onClick={() => setActiveTab('assets')}
-                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'assets'
-                    ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                    } `}
-                >
-                  Asset Library ({assets.length})
+                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
+                  activeTab === 'assets'
+                    ? 'text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                Assets
+                {activeTab === 'assets' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
+                )}
                 </button>
                 <button
-                  onClick={() => setActiveTab('creations')}
-                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'creations'
-                    ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                    } `}
-                >
-                  My Creations ({creations.length})
+                onClick={() => setActiveTab('properties')}
+                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
+                  activeTab === 'properties'
+                    ? 'text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                Properties
+                {activeTab === 'properties' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
+                )}
                 </button>
                 <button
-                  onClick={() => setActiveTab('variations')}
-                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'variations'
-                    ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                    } `}
-                >
-                  Variations
+                onClick={() => setActiveTab('collaboration')}
+                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
+                  activeTab === 'collaboration'
+                    ? 'text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                <span className="relative">
+                  Team
+                  {onlineUsers && onlineUsers.length > 0 && (
+                    <span className="absolute -top-1 -right-2 w-1.5 h-1.5 bg-green-500 rounded-full" />
+                  )}
+                </span>
+                {activeTab === 'collaboration' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
+                )}
                 </button>
                 <button
-                  onClick={() => setActiveTab('details')}
-                  className={`px - 3 py - 1.5 text - xs font - medium rounded - lg transition - colors whitespace - nowrap ${activeTab === 'details'
-                    ? 'bg-surface-elevated text-text-primary'
-                    : 'text-text-secondary hover:text-text-primary hover:bg-surface-elevated'
-                    } `}
-                >
-                  Details
+                onClick={() => setActiveTab('tools')}
+                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
+                  activeTab === 'tools'
+                    ? 'text-stone-900'
+                    : 'text-stone-500 hover:text-stone-700'
+                }`}
+              >
+                Tools
+                {activeTab === 'tools' && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
+                )}
                 </button>
-              </div>
             </div>
 
             {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto p-6">
-              {activeTab === 'overview' && (
-                <div className="space-y-6">
-                  {assets.length === 0 && creations.length === 0 ? (
-                    <div className="text-center py-12">
-                      <p className="text-text-secondary mb-4">No content yet</p>
+            <div className="flex-1 overflow-y-auto">
+              {activeTab === 'layers' && (
+                <LayersPanel
+                  embedded={true}
+                  isOpen={true}
+                  onClose={() => {}}
+                  items={items}
+                  selectedItemId={selectedItemId}
+                  onSelectItem={(id) => handleSelect(null, id, false)}
+                  onReorderItems={handleReorderItems}
+                  onToggleVisibility={handleToggleVisibility}
+                  onToggleLock={handleToggleLock}
+                  onOpacityChange={handleOpacityChange}
+                  onDeleteItem={handleItemDelete}
+                />
+              )}
+              {activeTab === 'assets' && (
+                <div className="p-4">
+                  <div className="mb-4">
                       <button
-                        onClick={() => setSidebarOpen(false)}
-                        className="px-4 py-2 text-sm font-medium bg-primary-400 text-background-base rounded-lg hover:bg-primary-300 transition-colors"
-                      >
-                        Start Creating
+                      onClick={() => {
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*'
+                        input.multiple = true
+                        input.onchange = async (e) => {
+                          const files = Array.from(e.target.files || [])
+                          for (const file of files) {
+                            await handleFileUpload(file, null)
+                          }
+                        }
+                        input.click()
+                      }}
+                      className="w-full px-4 py-2.5 bg-stone-900 text-white text-sm font-medium rounded-lg hover:bg-stone-800 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                      Upload Images
                       </button>
                     </div>
-                  ) : (
-                    <>
-                      <div>
-                        <h2 className="text-sm font-semibold text-text-primary mb-3">Folders</h2>
-                        <div className="grid grid-cols-2 gap-3">
-                          <Folder
-                            name="Designs"
-                            color="#9333ea"
-                            itemCount={creations.length}
-                            lastUpdated={creations.length > 0 ? creations[0]?.createdAt : null}
-                            onClick={() => setActiveTab('creations')}
-                          />
-                          <Folder
-                            name="Assets"
-                            color="#3b82f6"
-                            itemCount={assets.length}
-                            lastUpdated={assets.length > 0 ? assets[0]?.createdAt : null}
-                            onClick={() => setActiveTab('assets')}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <h2 className="text-sm font-semibold text-text-primary mb-3">Project Overview</h2>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-surface-elevated rounded-lg p-4 border border-border">
-                            <h3 className="text-xs font-semibold text-text-secondary mb-1">Asset Library</h3>
-                            <p className="text-xl font-semibold text-text-primary">{assets.length}</p>
-                            <p className="text-xs text-text-tertiary mt-1">Your private assets</p>
-                          </div>
-                          <div className="bg-surface-elevated rounded-lg p-4 border border-border">
-                            <h3 className="text-xs font-semibold text-text-secondary mb-1">Generated Creations</h3>
-                            <p className="text-xl font-semibold text-text-primary">{creations.length}</p>
-                            <p className="text-xs text-text-tertiary mt-1">AI-generated designs</p>
-                          </div>
-                        </div>
-                      </div>
-
-                      {assets.length > 0 && (
-                        <div>
-                          <h2 className="text-sm font-semibold text-text-primary mb-3">Recent Assets</h2>
+                  <div className="mb-3">
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">Recent Assets</h3>
+                    {assets.length === 0 ? (
+                      <p className="text-xs text-stone-500 py-4 text-center">No assets yet</p>
+                    ) : (
                           <div className="grid grid-cols-2 gap-2">
-                            {assets.slice(0, 4).map((asset) => (
+                        {assets.slice(0, 8).map((asset) => (
                               <div
                                 key={asset.id}
-                                className="aspect-square rounded-lg overflow-hidden border border-border bg-surface-elevated group cursor-pointer hover:border-primary-400 transition-colors"
-                                onClick={() => {
-                                  setActiveTab('assets')
+                            className="aspect-square rounded-lg overflow-hidden border border-stone-200 bg-stone-50 cursor-pointer hover:border-stone-400 transition-colors group"
+                            onClick={async () => {
+                              try {
+                                const response = await fetch(asset.url)
+                                const blob = await response.blob()
+                                const file = new File([blob], asset.name || 'asset.png', { type: blob.type || 'image/png' })
+                                await handleFileUpload(file, null)
+                              } catch (error) {
+                                console.error('Error loading asset:', error)
+                                setError('Failed to load asset. Please try again.')
+                              }
                                 }}
                               >
                                 <img
                                   src={asset.url}
                                   alt={asset.name}
-                                  className="w-full h-full object-cover"
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                 />
                               </div>
                             ))}
+                      </div>
+                    )}
                           </div>
                         </div>
                       )}
-
-                      {creations.length > 0 && (
+              {activeTab === 'properties' && (
+                <div className="p-4 space-y-4">
+                  {selectedItem ? (
+                    <>
                         <div>
-                          <h2 className="text-sm font-semibold text-text-primary mb-3">Recent Creations</h2>
+                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Transform</h3>
+                        <div className="space-y-2">
                           <div className="grid grid-cols-2 gap-2">
-                            {creations.slice(0, 4).map((creation) => (
-                              <div
-                                key={creation.id}
-                                className="aspect-square rounded-lg overflow-hidden border border-border bg-surface-elevated group cursor-pointer hover:border-primary-400 transition-colors"
-                                onClick={async () => {
-                                  try {
-                                    // Fetch the image and create a File object
-                                    const response = await fetch(creation.url)
-                                    const blob = await response.blob()
-                                    const file = new File([blob], creation.name || 'creation.png', { type: blob.type || 'image/png' })
-                                    await handleFileUpload(file, null)
-                                    setSidebarOpen(false)
-                                  } catch (error) {
-                                    console.error('Error loading creation:', error)
-                                    setError('Failed to load creation. Please try again.')
-                                  }
-                                }}
-                              >
-                                <img
-                                  src={creation.url}
-                                  alt={creation.name}
-                                  className="w-full h-full object-cover"
+                            <div>
+                              <label className="text-xs text-stone-600 mb-1 block">X</label>
+                              <input
+                                type="number"
+                                value={Math.round(selectedItem.x_position || 0)}
+                                onChange={(e) => handleItemUpdate(selectedItem.id, { x_position: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-stone-600 mb-1 block">Y</label>
+                              <input
+                                type="number"
+                                value={Math.round(selectedItem.y_position || 0)}
+                                onChange={(e) => handleItemUpdate(selectedItem.id, { y_position: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                              />
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div>
+                              <label className="text-xs text-stone-600 mb-1 block">Width</label>
+                              <input
+                                type="number"
+                                value={Math.round(selectedItem.width || 0)}
+                                onChange={(e) => handleItemUpdate(selectedItem.id, { width: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-stone-600 mb-1 block">Height</label>
+                              <input
+                                type="number"
+                                value={Math.round(selectedItem.height || 0)}
+                                onChange={(e) => handleItemUpdate(selectedItem.id, { height: parseFloat(e.target.value) || 0 })}
+                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-stone-600 mb-1 block">Rotation</label>
+                            <input
+                              type="number"
+                              value={Math.round(selectedItem.rotation || 0)}
+                              onChange={(e) => handleItemUpdate(selectedItem.id, { rotation: parseFloat(e.target.value) || 0 })}
+                              className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Appearance</h3>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="text-xs text-stone-600 mb-1 block">Opacity</label>
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="range"
+                                min="0"
+                                max="100"
+                                value={(selectedItem.opacity || 1) * 100}
+                                onChange={(e) => handleOpacityChange(selectedItem.id, parseInt(e.target.value) / 100)}
+                                className="flex-1"
+                              />
+                              <span className="text-xs text-stone-600 w-10 text-right font-mono">
+                                {Math.round((selectedItem.opacity || 1) * 100)}%
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => handleToggleVisibility(selectedItem.id)}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
+                                selectedItem.is_visible !== false
+                                  ? 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                                  : 'bg-stone-100 border-stone-300 text-stone-500'
+                              }`}
+                            >
+                              {selectedItem.is_visible !== false ? 'Visible' : 'Hidden'}
+                            </button>
+                            <button
+                              onClick={() => handleToggleLock(selectedItem.id)}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
+                                selectedItem.is_locked
+                                  ? 'bg-stone-100 border-stone-300 text-stone-700'
+                                  : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
+                              }`}
+                            >
+                              {selectedItem.is_locked ? 'Locked' : 'Unlocked'}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="py-8 text-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 text-stone-300">
+                        <rect x="3" y="3" width="18" height="18" rx="2" />
+                      </svg>
+                      <p className="text-sm text-stone-500 mb-1">No selection</p>
+                      <p className="text-xs text-stone-400">Select an item to edit properties</p>
+                      <div className="mt-6 space-y-2">
+                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Canvas Settings</h3>
+                        <div>
+                          <label className="text-xs text-stone-600 mb-1 block">Background Color</label>
+                          <input
+                            type="color"
+                            value={settings.backgroundColor}
+                            onChange={(e) => updateSettings({ backgroundColor: e.target.value })}
+                            className="w-full h-10 rounded border border-stone-200 cursor-pointer"
                                 />
                               </div>
-                            ))}
+                        <div className="flex items-center justify-between pt-2">
+                          <label className="text-xs text-stone-600">Show Grid</label>
+                          <button
+                            onClick={() => updateSettings({ gridEnabled: !settings.gridEnabled })}
+                            className={`relative w-10 h-5 rounded-full transition-colors ${
+                              settings.gridEnabled ? 'bg-stone-900' : 'bg-stone-300'
+                            }`}
+                          >
+                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                              settings.gridEnabled ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between pt-2">
+                          <label className="text-xs text-stone-600">Snap to Grid</label>
+                          <button
+                            onClick={() => updateSettings({ snapToGrid: !settings.snapToGrid })}
+                            className={`relative w-10 h-5 rounded-full transition-colors ${
+                              settings.snapToGrid ? 'bg-stone-900' : 'bg-stone-300'
+                            }`}
+                          >
+                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                              settings.snapToGrid ? 'translate-x-5' : 'translate-x-0'
+                            }`} />
+                          </button>
+                        </div>
                           </div>
                         </div>
                       )}
-                    </>
-                  )}
                 </div>
               )}
-              {activeTab === 'assets' && (
-                <AssetLibrary
-                  projectId={projectId}
-                  onSelectAsset={async (asset) => {
-                    try {
-                      // Fetch the image and create a File object
-                      const response = await fetch(asset.url)
-                      const blob = await response.blob()
-                      const file = new File([blob], asset.name || 'asset.png', { type: blob.type || 'image/png' })
-                      await handleFileUpload(file, null)
-                      setSidebarOpen(false)
-                    } catch (error) {
-                      console.error('Error loading asset:', error)
-                      setError('Failed to load asset. Please try again.')
-                    }
-                  }}
-                />
+              {activeTab === 'collaboration' && (
+                <div className="p-4 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Online Users</h3>
+                    {onlineUsers && onlineUsers.length > 0 ? (
+                      <div className="space-y-2">
+                        {onlineUsers.map((user) => (
+                          <div key={user.userId} className="flex items-center gap-2 p-2 rounded-lg hover:bg-stone-50">
+                            <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-xs font-medium text-stone-600">
+                              {(user.userName || user.userId || '?').charAt(0).toUpperCase()}
+                </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-stone-900 truncate">
+                                {user.userName || user.userId || 'Anonymous'}
+                              </p>
+                              <p className="text-xs text-stone-500">Online</p>
+                            </div>
+                            <div className="w-2 h-2 bg-green-500 rounded-full" />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-stone-500 py-4 text-center">You're working alone</p>
+                    )}
+                  </div>
+                  <div className="pt-4 border-t border-stone-200">
+                    <button
+                      onClick={() => setShowShareModal(true)}
+                      className="w-full px-4 py-2.5 bg-stone-900 text-white text-sm font-medium rounded-lg hover:bg-stone-800 transition-colors"
+                    >
+                      Share Project
+                    </button>
+                  </div>
+                </div>
               )}
-              {activeTab === 'creations' && (
-                <div className="space-y-4">
-                  {creations.length === 0 ? (
-                    <p className="text-text-tertiary text-center py-8">No creations yet</p>
-                  ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      {creations.map((creation) => (
-                        <div
-                          key={creation.id}
-                          className="aspect-square rounded-lg overflow-hidden border border-border cursor-pointer hover:border-primary-400 transition-colors"
-                          onClick={async () => {
-                            try {
-                              // Fetch the image and create a File object
-                              const response = await fetch(creation.url)
-                              const blob = await response.blob()
-                              const file = new File([blob], creation.name || 'creation.png', { type: blob.type || 'image/png' })
+              {activeTab === 'tools' && (
+                <div className="p-4 space-y-4">
+                  <div>
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Quick Actions</h3>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => {
+                          const input = document.createElement('input')
+                          input.type = 'file'
+                          input.accept = 'image/*'
+                          input.multiple = true
+                          input.onchange = async (e) => {
+                            const files = Array.from(e.target.files || [])
+                            for (const file of files) {
                               await handleFileUpload(file, null)
-                              setSidebarOpen(false)
-                            } catch (error) {
-                              console.error('Error loading creation:', error)
-                              setError('Failed to load creation. Please try again.')
                             }
-                          }}
-                        >
-                          <img src={creation.url} alt={creation.name} className="w-full h-full object-cover" />
+                          }
+                          input.click()
+                        }}
+                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                          <polyline points="17 8 12 3 7 8" />
+                          <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
+                        <span className="text-xs font-medium text-stone-700">Upload</span>
+                      </button>
+                      <button
+                        onClick={() => setShowGenerateModal(true)}
+                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                        </svg>
+                        <span className="text-xs font-medium text-stone-700">AI Generate</span>
+                      </button>
+                      <button
+                        onClick={handleUndo}
+                        disabled={historyIndex <= 0}
+                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                          <path d="M3 7v6h6" />
+                          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+                        </svg>
+                        <span className="text-xs font-medium text-stone-700">Undo</span>
+                      </button>
+                      <button
+                        onClick={handleRedo}
+                        disabled={historyIndex >= history.length - 1}
+                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
+                          <path d="M21 7v6h-6" />
+                          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+                        </svg>
+                        <span className="text-xs font-medium text-stone-700">Redo</span>
+                      </button>
                         </div>
-                      ))}
                     </div>
-                  )}
+                  <div>
+                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Keyboard Shortcuts</h3>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Select All</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+A</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Copy</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+C</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Paste</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+V</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Delete</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Delete</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Undo</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+Z</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Redo</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+Shift+Z</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Pan</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Space</kbd>
+                      </div>
+                      <div className="flex items-center justify-between py-1">
+                        <span className="text-stone-600">Zoom</span>
+                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Ctrl+Scroll</kbd>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
-              {activeTab === 'variations' && project && (
-                <VariationsView projectId={projectId} project={project} />
-              )}
-              {activeTab === 'details' && project && (
-                <ProjectMetadataForm project={project} projectId={projectId} />
               )}
             </div>
           </div>
@@ -3839,6 +4084,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           hasItems={items.length > 0}
         />
 
+        {/* Presence Indicator - Top Right */}
+        <PresenceIndicator />
+
         {/* Zoom Controls - Bottom Right */}
         <ZoomControls stageRef={stageRef} />
 
@@ -4106,7 +4354,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         />
       )}
 
-      {/* Layers Panel */}
+      {/* Layers Panel - Only show when sidebar is closed */}
+      {!sidebarOpen && (
       <LayersPanel
         isOpen={showLayersPanel}
         onClose={() => setShowLayersPanel(false)}
@@ -4119,6 +4368,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         onOpacityChange={handleOpacityChange}
         onDeleteItem={handleItemDelete}
       />
+      )}
 
       {/* Mini-map */}
       {showMinimap && dimensions.width > 0 && (

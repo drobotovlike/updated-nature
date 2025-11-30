@@ -120,6 +120,12 @@ export const useCanvasStore = create(
     isPanning: false,
 
     /**
+     * Collaboration state
+     */
+    onlineUsers: [], // Array of { userId, online_at, ... }
+    isConnected: false, // Real-time connection status
+
+    /**
      * AI Generation state
      */
     aiPrompt: '',
@@ -510,6 +516,8 @@ export const useCanvasStore = create(
     setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
     setSyncError: (syncError) => set({ syncError }),
     setIsPanning: (isPanning) => set({ isPanning }),
+    setOnlineUsers: (onlineUsers) => set({ onlineUsers }),
+    setIsConnected: (isConnected) => set({ isConnected }),
 
     // ============================================
     // AI GENERATION ACTIONS

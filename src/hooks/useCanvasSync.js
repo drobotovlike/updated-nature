@@ -23,6 +23,7 @@ export function useCanvasSync(projectId) {
   // Store selectors
   const items = useCanvasStore((state) => state.items)
   const setItems = useCanvasStore((state) => state.setItems)
+  const getState = useCanvasStore.getState
   const camera = useCanvasStore((state) => state.camera)
   const setCamera = useCanvasStore((state) => state.setCamera)
   const setIsLoading = useCanvasStore((state) => state.setIsLoading)
@@ -108,52 +109,106 @@ export function useCanvasSync(projectId) {
   }, [projectId, userId, clerk, isClerkReady, camera, setIsSyncing, setLastSyncedAt, setSyncError])
 
   /**
-   * Create a new item and sync to database
+   * Create a new item with optimistic update
+   * Updates UI immediately, syncs to database in background
    */
   const createItem = useCallback(async (itemData) => {
     if (!projectId || !userId || !isClerkReady) return null
 
+    // Generate temporary ID for optimistic update
+    const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    const optimisticItem = {
+      ...itemData,
+      id: tempId,
+      project_id: projectId,
+      created_by: userId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+
+    // Optimistic update - add to store immediately
+    setItems((items) => [...items, optimisticItem])
+
     try {
+      // Sync to database in background
       const newItem = await createCanvasItem(userId, projectId, itemData, clerk)
+      
+      // Replace temporary item with real item from database
+      setItems((items) =>
+        items.map((item) => (item.id === tempId ? newItem : item))
+      )
+      
       return newItem
     } catch (error) {
       console.error('Failed to create item:', error)
+      // Rollback optimistic update on error
+      setItems((items) => items.filter((item) => item.id !== tempId))
       setSyncError(error.message || 'Failed to create item')
       return null
     }
-  }, [projectId, userId, clerk, isClerkReady, setSyncError])
+  }, [projectId, userId, clerk, isClerkReady, setItems, setSyncError])
 
   /**
-   * Update an item and sync to database
+   * Update an item with optimistic update
+   * Updates UI immediately, syncs to database in background
    */
   const updateItemSync = useCallback(async (itemId, updates) => {
     if (!userId || !isClerkReady) return false
 
+    // Get current item for rollback
+    const currentItems = getState().items
+    const currentItem = currentItems.find((item) => item.id === itemId)
+    if (!currentItem) return false
+
+    // Optimistic update - update store immediately
+    setItems((items) =>
+      items.map((item) =>
+        item.id === itemId ? { ...item, ...updates, updated_at: new Date().toISOString() } : item
+      )
+    )
+
     try {
+      // Sync to database in background
       await updateCanvasItem(userId, itemId, updates, clerk)
       return true
     } catch (error) {
       console.error('Failed to update item:', error)
+      // Rollback optimistic update on error
+      setItems((items) =>
+        items.map((item) => (item.id === itemId ? currentItem : item))
+      )
       setSyncError(error.message || 'Failed to update item')
       return false
     }
-  }, [userId, clerk, setSyncError])
+  }, [userId, clerk, isClerkReady, setItems, setSyncError, getState])
 
   /**
-   * Delete an item and sync to database
+   * Delete an item with optimistic update
+   * Removes from UI immediately, syncs to database in background
    */
   const deleteItemSync = useCallback(async (itemId) => {
     if (!userId || !isClerkReady) return false
 
+    // Get current item for rollback
+    const currentItems = getState().items
+    const itemToDelete = currentItems.find((item) => item.id === itemId)
+    if (!itemToDelete) return false
+
+    // Optimistic update - remove from store immediately
+    setItems((items) => items.filter((item) => item.id !== itemId))
+
     try {
+      // Sync to database in background
       await deleteCanvasItem(userId, itemId, clerk)
       return true
     } catch (error) {
       console.error('Failed to delete item:', error)
+      // Rollback optimistic update on error
+      setItems((items) => [...items, itemToDelete])
       setSyncError(error.message || 'Failed to delete item')
       return false
     }
-  }, [userId, clerk, isClerkReady, setSyncError])
+  }, [userId, clerk, isClerkReady, setItems, setSyncError, getState])
 
   // Load canvas data on mount (when clerk is ready)
   useEffect(() => {

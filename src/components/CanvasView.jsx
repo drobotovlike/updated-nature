@@ -30,7 +30,7 @@ import { useSmartSnapping } from '../hooks/useSmartSnapping'
 import { InfiniteGrid } from './InfiniteGrid'
 import { isValidUUID, generateUUID } from '../utils/uuid'
 import { getAuthToken } from '../utils/authToken'
-import CanvasToolbar from './CanvasToolbar'
+import AIChatBar from './AIChatBar'
 import ZoomControls from './ZoomControls'
 import PresenceIndicator from './PresenceIndicator'
 
@@ -991,10 +991,10 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   useEffect(() => {
     const updateDimensions = () => {
       // Always use full viewport size, not container size
-      const toolbarHeight = 120 // Account for bottom toolbar
+      const chatBarHeight = 100 // Account for bottom AI chat bar
       setDimensions({
         width: window.innerWidth,
-        height: window.innerHeight - toolbarHeight,
+        height: window.innerHeight - chatBarHeight,
       })
     }
 
@@ -3642,31 +3642,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           })()}
         </div>
 
-        {/* Miro-Style Toolbar */}
-        <CanvasToolbar
-          onUndo={handleUndo}
-          onRedo={handleRedo}
-          canUndo={historyIndex > 0}
-          canRedo={historyIndex < history.length - 1}
-          onUpload={() => {
-                  const input = document.createElement('input')
-                  input.type = 'file'
-                  input.accept = 'image/*'
-            input.multiple = true
-                input.onchange = async (e) => {
-                  const files = Array.from(e.target.files || [])
-                  for (const file of files) {
-                await handleFileUpload(file, null)
-                  }
-                }
-                input.click()
-              }}
-          onExport={() => setShowExportModal(true)}
-          onToggleAssetLibrary={() => setShowAssetLibrary(!showAssetLibrary)}
-          onToggleLayersPanel={() => setShowLayersPanel(!showLayersPanel)}
-          showAssetLibrary={showAssetLibrary}
-          showLayersPanel={showLayersPanel}
-          hasItems={items.length > 0}
+        {/* AI Chat Bar - Bottom Center */}
+        <AIChatBar
+          onSubmit={async (prompt) => {
+            if (!prompt.trim() || !userId || !projectId) return
+            await generateToCanvas(prompt.trim())
+          }}
+          isLoading={isGenerating || generatingVariations}
+          placeholder="Ask AI to generate or modify your design..."
         />
 
         {/* Presence Indicator - Top Right */}

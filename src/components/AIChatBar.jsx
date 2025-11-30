@@ -277,11 +277,16 @@ export default function AIChatBar({
       if (file.type.startsWith("image/")) {
         const reader = new FileReader()
         reader.onload = () => {
+          const dataUrl = reader.result
           setAttachedFiles((prev) =>
             prev.map((f) =>
-              f.id === fileId ? { ...f, preview: reader.result } : f
+              f.id === fileId ? { ...f, preview: dataUrl } : f
             )
           )
+          // Set as reference image if onSelectReferenceImage is provided
+          if (onSelectReferenceImage) {
+            onSelectReferenceImage(dataUrl)
+          }
         }
         reader.readAsDataURL(file)
       }
@@ -352,7 +357,7 @@ export default function AIChatBar({
   }
 
   const handleAttachFile = () => {
-    if (selectedItem && onSelectReferenceImage) {
+    if (selectedItem && onSelectReferenceImage && selectedItem.image_url) {
       onSelectReferenceImage(selectedItem.image_url)
     } else {
       fileInputRef.current?.click()

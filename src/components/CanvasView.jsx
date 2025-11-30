@@ -2327,6 +2327,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [handleInteractionsKeyDown, handleInteractionsKeyUp])
 
+  // Handle selecting reference image from selected item
+  const handleSelectReferenceImage = useCallback((imageUrl) => {
+    if (imageUrl) {
+      setReferenceImage(imageUrl)
+    }
+  }, [])
+
   const generateToCanvas = async (prompt) => {
     if (!prompt.trim()) return
 
@@ -3706,7 +3713,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           }}
           isLoading={isGenerating || generatingVariations}
           placeholder="Ask anything"
-          onUploadReferenceImage={handleFileUpload}
           onSelectReferenceImage={handleSelectReferenceImage}
           onClearReferenceImage={() => setReferenceImage(null)}
           referenceImage={referenceImage}

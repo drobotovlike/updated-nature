@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Stage, Layer, Image as KonvaImage, Group, Rect, Text, Circle, Line, Arrow, Transformer } from 'react-konva'
 import { useAuth, useClerk } from '@clerk/clerk-react'
+import { useNavigate } from 'react-router-dom'
 import Konva from 'konva'
 import useImage from 'use-image'
 import AssetLibrary from './AssetLibrary'
@@ -315,65 +316,62 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       />
       {(isSelected || isMultiSelected) && (
         <>
-          {/* Selection border */}
+          {/* Miro-style Selection Border - Clean and minimal */}
           <Rect
-            x={-5}
-            y={-5}
-            width={(item.width || image.width) + 10}
-            height={(item.height || image.height) + 10}
-            stroke={isMultiSelected ? "#34D399" : "#D97757"}
+            x={-4}
+            y={-4}
+            width={(item.width || image.width) + 8}
+            height={(item.height || image.height) + 8}
+            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
             strokeWidth={2 / zoom}
-            dash={[5, 5]}
+            dash={[8, 4]}
             listening={false}
             perfectDrawEnabled={false}
+            shadowBlur={4 / zoom}
+            shadowColor="rgba(0, 0, 0, 0.1)"
           />
-          {/* Measurements */}
+          {/* Miro-style Dimensions Badge - Floating above item */}
           {showMeasurements && (
-            <Group listening={false}>
+            <Group 
+              x={0}
+              y={-32 / zoom}
+              listening={false}
+            >
+              {/* Badge background */}
+              <Rect
+                width={Math.max(80 / zoom, `${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`.length * 6 / zoom)}
+                height={24 / zoom}
+                fill="rgba(255, 255, 255, 0.95)"
+                cornerRadius={6 / zoom}
+                listening={false}
+                perfectDrawEnabled={false}
+                shadowBlur={8 / zoom}
+                shadowColor="rgba(0, 0, 0, 0.15)"
+                shadowOffsetY={2 / zoom}
+              />
+              {/* Badge border */}
+              <Rect
+                width={Math.max(80 / zoom, `${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`.length * 6 / zoom)}
+                height={24 / zoom}
+                stroke="#E4E4E7"
+                strokeWidth={1 / zoom}
+                cornerRadius={6 / zoom}
+                listening={false}
+                perfectDrawEnabled={false}
+              />
+              {/* Dimensions text */}
               <Text
                 text={`${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`}
-                fontSize={12 / zoom}
-                fill="#D97757"
-                x={5}
-                y={-20 / zoom}
-                padding={4 / zoom}
-                background="#F6F2EE"
-                cornerRadius={4 / zoom}
+                fontSize={11 / zoom}
+                fill="#09090B"
+                x={8 / zoom}
+                y={6 / zoom}
+                fontStyle="500"
+                listening={false}
                 perfectDrawEnabled={false}
               />
             </Group>
           )}
-          {/* Delete button */}
-          <Group
-            x={(item.width || image.width) - 20 / zoom}
-            y={-20 / zoom}
-            onClick={(e) => {
-              e.cancelBubble = true
-              onDelete(item.id)
-            }}
-            onTap={(e) => {
-              e.cancelBubble = true
-              onDelete(item.id)
-            }}
-          >
-            <Rect
-              width={24 / zoom}
-              height={24 / zoom}
-              fill="#ef4444"
-              cornerRadius={12 / zoom}
-              listening={false}
-              perfectDrawEnabled={false}
-            />
-            <Text
-              text="×"
-              fontSize={16 / zoom}
-              fill="white"
-              x={6 / zoom}
-              y={2 / zoom}
-              listening={false}
-              perfectDrawEnabled={false}
-            />
-          </Group>
         </>
       )}
     </Group>
@@ -386,6 +384,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 export default function CanvasView({ projectId, onBack, onSave }) {
   const { userId, isSignedIn, isLoaded: authLoaded } = useAuth()
   const clerk = useClerk()
+  const navigate = useNavigate()
 
   // Wait for Clerk to be fully loaded before using it
   // Note: clerk.getToken doesn't exist directly - it's on clerk.session
@@ -495,6 +494,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [generatePrompt, setGeneratePrompt] = useState('')
   const [showAssetLibrary, setShowAssetLibrary] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false)
+  const [assetHistory, setAssetHistory] = useState([]) // Last 10 assets (uploaded or generated)
   const [generatingVariations, setGeneratingVariations] = useState(false)
   const [variationCount, setVariationCount] = useState(3)
 
@@ -823,6 +824,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         // DEFENSIVE: Ensure prev is an array before spreading
         const safePrev = Array.isArray(prev) ? prev : []
         return [...safePrev, newItem]
+      })
+
+      // Add to history
+      setAssetHistory((prev) => {
+        const newHistory = [
+          { id: newItem.id, image_url: imageUrl, name: file.name || 'Uploaded asset', type: 'uploaded', timestamp: Date.now() },
+          ...prev.filter(item => item.id !== newItem.id)
+        ].slice(0, 10) // Keep only last 10
+        return newHistory
       })
 
       // Also save to assets library for future reuse
@@ -2405,6 +2415,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }, clerk)
 
         setItems((prev) => [...prev, newItem])
+        
+        // Add to history
+        setAssetHistory((prev) => {
+          const newHistory = [
+            { id: newItem.id, image_url: imageUrl, name: `Generated: ${prompt.substring(0, 30)}`, type: 'generated', timestamp: Date.now() },
+            ...prev.filter(item => item.id !== newItem.id)
+          ].slice(0, 10) // Keep only last 10
+          return newHistory
+        })
+        
         setShowGenerateModal(false)
         setGeneratePrompt('')
         setChatInput('')
@@ -2777,6 +2797,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
       {/* Vertical Toolbar - Left Side */}
       <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-2">
+        {/* Home Button - Back to Dashboard */}
+        <button
+          onClick={() => navigate('/dashboard')}
+          className="w-12 h-12 rounded-full bg-white border border-stone-200 shadow-lg hover:bg-stone-50 flex items-center justify-center transition-colors"
+          title="Back to Dashboard"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-700">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+            <polyline points="9 22 9 12 15 12 15 22" />
+          </svg>
+        </button>
+
+        <div className="w-8 h-px bg-stone-200 my-1" />
+
         {/* Plus Button - Create New */}
         <button
           onClick={() => {
@@ -2818,6 +2852,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <rect x="14" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="14" width="7" height="7" rx="1" />
             <rect x="3" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </button>
+
+        {/* History Button */}
+        <button
+          onClick={() => setShowHistoryPanel(!showHistoryPanel)}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+            showHistoryPanel 
+              ? 'bg-stone-900 text-white' 
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+          title="History (Last 10 assets)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <polyline points="12 6 12 12 16 14" />
           </svg>
         </button>
 
@@ -3821,6 +3871,87 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         onOpacityChange={handleOpacityChange}
         onDeleteItem={handleItemDelete}
       />
+
+      {/* History Panel */}
+      {showHistoryPanel && (
+        <div className="fixed left-20 top-1/2 -translate-y-1/2 z-50 bg-white rounded-lg border border-stone-200 shadow-xl w-80 max-h-[600px] flex flex-col">
+          <div className="px-4 py-3 border-b border-stone-200 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-stone-900">Recent Assets</h3>
+            <button
+              onClick={() => setShowHistoryPanel(false)}
+              className="text-stone-400 hover:text-stone-600 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3">
+            {assetHistory.length === 0 ? (
+              <div className="text-center py-12 text-stone-500">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 opacity-50">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <p className="text-sm">No recent assets</p>
+                <p className="text-xs mt-1">Uploaded or generated assets will appear here</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                {assetHistory.map((asset) => (
+                  <button
+                    key={asset.id}
+                    onClick={async () => {
+                      // Add asset to canvas
+                      const stage = stageRef.current
+                      if (!stage) return
+                      
+                      const width = dimensions?.width || window.innerWidth
+                      const height = dimensions?.height || window.innerHeight
+                      const canvasWidth = width * 4
+                      const canvasHeight = height * 4
+                      const centerX = (width / 2 - stage.x()) / stage.scaleX()
+                      const centerY = (height / 2 - stage.y()) / stage.scaleY()
+                      
+                      const safeItems = Array.isArray(items) ? items : []
+                      const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
+                      
+                      const newItem = await createCanvasItem(userId, projectId, {
+                        image_url: asset.image_url,
+                        x_position: centerX - 200,
+                        y_position: centerY - 200,
+                        width: 400,
+                        height: 400,
+                        name: asset.name,
+                        z_index: maxZIndex + 1,
+                        is_visible: true,
+                      }, clerk)
+                      
+                      setItems((prev) => [...prev, newItem])
+                    }}
+                    className="group relative aspect-square rounded-lg border border-stone-200 overflow-hidden hover:border-stone-400 transition-colors bg-stone-50"
+                    title={asset.name}
+                  >
+                    <img
+                      src={asset.image_url}
+                      alt={asset.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">
+                      <p className="text-xs text-white truncate">{asset.name}</p>
+                      <p className="text-[10px] text-white/70 mt-0.5">
+                        {asset.type === 'generated' ? 'Generated' : 'Uploaded'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Mini-map */}
       {showMinimap && dimensions.width > 0 && (

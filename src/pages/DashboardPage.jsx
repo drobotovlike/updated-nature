@@ -6,6 +6,7 @@ import { getCanvasData } from '../utils/canvasManager'
 import WorkspaceView from '../components/WorkspaceView'
 import CanvasView from '../components/CanvasView'
 import AccountView from '../components/AccountView'
+import CanvasPreview from '../components/CanvasPreview'
 
 export default function DashboardPage() {
   const { user, isLoaded: userLoaded } = useUser()
@@ -71,57 +72,55 @@ export default function DashboardPage() {
   // Compute userName safely
   const userName = user?.fullName || user?.firstName || 'User'
 
-  // Get canvas thumbnail for a project
-  const getCanvasThumbnail = useCallback(async (projectId) => {
+  // Get canvas data for a project (for preview)
+  const getCanvasDataForPreview = useCallback(async (projectId) => {
     if (!userId || !projectId) return null
     // Check if clerk session is ready before making API calls
     if (!clerk?.session) {
-      console.log('Clerk session not ready, skipping thumbnail load')
+      console.log('Clerk session not ready, skipping canvas data load')
       return null
     }
     try {
       const canvasData = await getCanvasData(userId, projectId, clerk)
-      // Get the first visible item's image as thumbnail
-      const firstItem = canvasData.items?.find(item => item.is_visible !== false && item.image_url)
-      return firstItem?.image_url || null
+      return canvasData
     } catch (error) {
       // Don't log error for auth issues - this is expected when session is not ready
       if (!error.message?.includes('Unauthorized')) {
-        console.error('Error getting canvas thumbnail:', error)
+        console.error('Error getting canvas data:', error)
       }
       return null
     }
   }, [userId, clerk])
 
-  // State to store canvas thumbnails
-  const [canvasThumbnails, setCanvasThumbnails] = useState({})
+  // State to store canvas data for previews
+  const [canvasDataMap, setCanvasDataMap] = useState({})
 
-  // Load thumbnails for projects
+  // Load canvas data for previews
   useEffect(() => {
     if (!userId || !isSignedIn || !clerk?.session) return
 
-    const loadThumbnails = async () => {
-      const thumbnails = {}
+    const loadCanvasData = async () => {
+      const newCanvasData = {}
       const allProjects = [...new Set([...recentProjects, ...savedProjects].map(p => p.id))]
 
       for (const projectId of allProjects) {
-        if (!canvasThumbnails[projectId]) {
-          const thumbnail = await getCanvasThumbnail(projectId)
-          if (thumbnail) {
-            thumbnails[projectId] = thumbnail
+        if (!canvasDataMap[projectId]) {
+          const canvasData = await getCanvasDataForPreview(projectId)
+          if (canvasData && canvasData.items && canvasData.items.length > 0) {
+            newCanvasData[projectId] = canvasData
           }
         }
       }
 
-      if (Object.keys(thumbnails).length > 0) {
-        setCanvasThumbnails(prev => ({ ...prev, ...thumbnails }))
+      if (Object.keys(newCanvasData).length > 0) {
+        setCanvasDataMap(prev => ({ ...prev, ...newCanvasData }))
       }
     }
 
     if (recentProjects.length > 0 || savedProjects.length > 0) {
-      loadThumbnails()
+      loadCanvasData()
     }
-  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasThumbnail, clerk?.session])
+  }, [userId, isSignedIn, recentProjects, savedProjects, getCanvasDataForPreview, clerk?.session])
 
   // Load spaces and projects on mount
   useEffect(() => {
@@ -1037,7 +1036,7 @@ export default function DashboardPage() {
                 {recentProjects.length > 0 ? (
                   <div className="grid grid-cols-4 gap-4">
                     {recentProjects.map((project) => {
-                      const thumbnail = canvasThumbnails[project.id] || project.workflow?.result?.url
+                      const canvasData = canvasDataMap[project.id]
                       const updatedAt = project.updatedAt || project.updated_at || project.createdAt || project.created_at
                       const timeAgo = updatedAt ? (() => {
                         const diff = Date.now() - new Date(updatedAt).getTime()
@@ -1062,13 +1061,11 @@ export default function DashboardPage() {
                         >
                           <div className="bg-surface-base rounded-lg overflow-hidden border border-border shadow-sm group-hover:shadow-md transition-all duration-micro ease-apple group-hover:-translate-y-[1px]">
                             <div className="aspect-[4/3] relative bg-background-elevated">
-                              {thumbnail ? (
-                                <img
-                                  src={thumbnail}
-                                  alt={project.name || 'Untitled'}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  decoding="async"
+                              {canvasData && canvasData.items && canvasData.items.length > 0 ? (
+                                <CanvasPreview
+                                  items={canvasData.items}
+                                  width={400}
+                                  height={300}
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-background-elevated">
@@ -1157,7 +1154,7 @@ export default function DashboardPage() {
                 {savedProjects.length > 0 ? (
                   <div className="grid grid-cols-4 gap-4">
                     {savedProjects.map((project) => {
-                      const thumbnail = canvasThumbnails[project.id] || project.workflow?.result?.url
+                      const canvasData = canvasDataMap[project.id]
                       const updatedAt = project.updatedAt || project.updated_at || project.createdAt || project.created_at
                       const timeAgo = updatedAt ? (() => {
                         const diff = Date.now() - new Date(updatedAt).getTime()
@@ -1182,13 +1179,11 @@ export default function DashboardPage() {
                         >
                           <div className="bg-surface-base rounded-lg overflow-hidden border border-border shadow-sm group-hover:shadow-md transition-all duration-micro ease-apple group-hover:-translate-y-[1px]">
                             <div className="aspect-[4/3] relative bg-background-elevated">
-                              {thumbnail ? (
-                                <img
-                                  src={thumbnail}
-                                  alt={project.name || 'Untitled'}
-                                  className="w-full h-full object-cover"
-                                  loading="lazy"
-                                  decoding="async"
+                              {canvasData && canvasData.items && canvasData.items.length > 0 ? (
+                                <CanvasPreview
+                                  items={canvasData.items}
+                                  width={400}
+                                  height={300}
                                 />
                               ) : (
                                 <div className="w-full h-full flex items-center justify-center bg-background-elevated">

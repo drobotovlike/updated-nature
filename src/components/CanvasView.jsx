@@ -2799,7 +2799,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-2">
         {/* Home Button - Back to Dashboard */}
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => {
+            if (onBack) {
+              onBack()
+            } else {
+              navigate('/dashboard')
+            }
+          }}
           className="w-12 h-12 rounded-full bg-white border border-stone-200 shadow-lg hover:bg-stone-50 flex items-center justify-center transition-colors"
           title="Back to Dashboard"
         >

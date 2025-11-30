@@ -553,12 +553,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [showPromptHistory, setShowPromptHistory] = useState(false)
   const [promptHistory, setPromptHistory] = useState([])
 
-  // Project sidebar state
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [activeTab, setActiveTab] = useState('layers') // 'layers', 'assets', 'properties', 'collaboration', 'tools'
+  // Project state (keep project and showShareModal as they're used elsewhere)
   const [project, setProject] = useState(null)
-  const [sharedAssets, setSharedAssets] = useState([])
-  const [loadingAssets, setLoadingAssets] = useState(true)
   const [showShareModal, setShowShareModal] = useState(false)
 
   // Initialize loading and error states early to prevent TDZ issues
@@ -2696,36 +2692,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     loadProjectData()
   }, [projectId, userId, clerk])
 
-  // Load assets for sidebar
-  useEffect(() => {
-    async function loadAssets() {
-      if (userId) {
-        setLoadingAssets(true)
-        try {
-          const assets = await getAssets(userId)
-          setSharedAssets(assets)
-        } catch (error) {
-          console.error('Error loading assets:', error)
-        } finally {
-          setLoadingAssets(false)
-        }
-      }
-    }
-    loadAssets()
-  }, [userId])
-
-  // Get project assets and creations - memoized to prevent unnecessary recalculations
-  const getProjectAssets = useCallback(() => {
-    if (!sharedAssets || !Array.isArray(sharedAssets)) return []
-    return sharedAssets.map(asset => ({
-      id: asset.id,
-      name: asset.name,
-      url: asset.url,
-      type: asset.type || 'image',
-      description: asset.description,
-      createdAt: asset.created_at || asset.createdAt,
-    }))
-  }, [sharedAssets])
 
   const getCreations = useCallback(() => {
     if (!project?.workflow) return []
@@ -2768,16 +2734,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     return creations
   }, [project])
 
-  // Compute assets and creations - must be defined before return
+  // Compute creations - must be defined before return
   // Ensure they always return arrays, never undefined
-  const assets = useMemo(() => {
-    try {
-      return getProjectAssets() || []
-    } catch (error) {
-      console.error('Error getting project assets:', error)
-      return []
-    }
-  }, [getProjectAssets])
 
   const creations = useMemo(() => {
     try {
@@ -2816,507 +2774,134 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
   return (
     <div className="h-screen w-screen flex overflow-hidden" style={{ backgroundColor: settings.backgroundColor }}>
-      {/* Left Sidebar - Figma/Miro Style */}
-      <div
-        className={`absolute left-0 top-0 bottom-0 z-50 bg-white border-r border-stone-200 transition-all duration-300 ease-out ${sidebarOpen ? 'w-80' : 'w-0'
-          } overflow-hidden shadow-sm`}
-      >
-        {sidebarOpen && (
-          <div className="h-full flex flex-col">
-            {/* Compact Header */}
-            <div className="px-4 py-3 border-b border-stone-200 bg-stone-50/50">
-              <div className="flex items-center justify-between">
-                <div className="flex-1 min-w-0">
-                  <h2 className="text-sm font-semibold text-stone-900 truncate">
-                    {project?.name || 'Untitled Project'}
-                  </h2>
-                  <p className="text-xs text-stone-500 mt-0.5">
-                    {items.length} {items.length === 1 ? 'layer' : 'layers'}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                <button
-                  onClick={() => setShowShareModal(true)}
-                    className="p-1.5 rounded hover:bg-stone-200 text-stone-600 hover:text-stone-900 transition-colors"
-                    title="Share"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                    <polyline points="16 6 12 2 8 6" />
-                    <line x1="12" y1="2" x2="12" y2="15" />
-                  </svg>
-                </button>
-                <button
-                  onClick={() => setSidebarOpen(false)}
-                    className="p-1.5 rounded hover:bg-stone-200 text-stone-600 hover:text-stone-900 transition-colors"
-                    title="Close sidebar"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                </button>
-                </div>
-              </div>
-              </div>
-
-            {/* Tab Navigation - Figma Style */}
-            <div className="flex border-b border-stone-200 bg-white">
-                <button
-                onClick={() => setActiveTab('layers')}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
-                  activeTab === 'layers'
-                    ? 'text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                Layers
-                {activeTab === 'layers' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
-                )}
-                </button>
-                <button
-                  onClick={() => setActiveTab('assets')}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
-                  activeTab === 'assets'
-                    ? 'text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                Assets
-                {activeTab === 'assets' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
-                )}
-                </button>
-                <button
-                onClick={() => setActiveTab('properties')}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
-                  activeTab === 'properties'
-                    ? 'text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                Properties
-                {activeTab === 'properties' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
-                )}
-                </button>
-                <button
-                onClick={() => setActiveTab('collaboration')}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
-                  activeTab === 'collaboration'
-                    ? 'text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                <span className="relative">
-                  Team
-                  {onlineUsers && onlineUsers.length > 0 && (
-                    <span className="absolute -top-1 -right-2 w-1.5 h-1.5 bg-green-500 rounded-full" />
-                  )}
-                </span>
-                {activeTab === 'collaboration' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
-                )}
-                </button>
-                <button
-                onClick={() => setActiveTab('tools')}
-                className={`flex-1 px-3 py-2.5 text-xs font-medium transition-colors relative ${
-                  activeTab === 'tools'
-                    ? 'text-stone-900'
-                    : 'text-stone-500 hover:text-stone-700'
-                }`}
-              >
-                Tools
-                {activeTab === 'tools' && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-stone-900" />
-                )}
-                </button>
-            </div>
-
-            {/* Tab Content */}
-            <div className="flex-1 overflow-y-auto">
-              {activeTab === 'layers' && (
-                <LayersPanel
-                  embedded={true}
-                  isOpen={true}
-                  onClose={() => {}}
-                  items={items}
-                  selectedItemId={selectedItemId}
-                  onSelectItem={(id) => handleSelect(null, id, false)}
-                  onReorderItems={handleReorderItems}
-                  onToggleVisibility={handleToggleVisibility}
-                  onToggleLock={handleToggleLock}
-                  onOpacityChange={handleOpacityChange}
-                  onDeleteItem={handleItemDelete}
-                />
-              )}
-              {activeTab === 'assets' && (
-                <div className="p-4">
-                  <div className="mb-4">
-                      <button
-                      onClick={() => {
-                        const input = document.createElement('input')
-                        input.type = 'file'
-                        input.accept = 'image/*'
-                        input.multiple = true
-                        input.onchange = async (e) => {
-                          const files = Array.from(e.target.files || [])
-                          for (const file of files) {
-                            await handleFileUpload(file, null)
-                          }
-                        }
-                        input.click()
-                      }}
-                      className="w-full px-4 py-2.5 bg-stone-900 text-white text-sm font-medium rounded-lg hover:bg-stone-800 transition-colors flex items-center justify-center gap-2"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="17 8 12 3 7 8" />
-                        <line x1="12" y1="3" x2="12" y2="15" />
-                      </svg>
-                      Upload Images
-                      </button>
-                    </div>
-                  <div className="mb-3">
-                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-2">Recent Assets</h3>
-                    {assets.length === 0 ? (
-                      <p className="text-xs text-stone-500 py-4 text-center">No assets yet</p>
-                    ) : (
-                          <div className="grid grid-cols-2 gap-2">
-                        {assets.slice(0, 8).map((asset) => (
-                              <div
-                                key={asset.id}
-                            className="aspect-square rounded-lg overflow-hidden border border-stone-200 bg-stone-50 cursor-pointer hover:border-stone-400 transition-colors group"
-                            onClick={async () => {
-                              try {
-                                const response = await fetch(asset.url)
-                                const blob = await response.blob()
-                                const file = new File([blob], asset.name || 'asset.png', { type: blob.type || 'image/png' })
-                                await handleFileUpload(file, null)
-                              } catch (error) {
-                                console.error('Error loading asset:', error)
-                                setError('Failed to load asset. Please try again.')
-                              }
-                                }}
-                              >
-                                <img
-                                  src={asset.url}
-                                  alt={asset.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                              </div>
-                            ))}
-                      </div>
-                    )}
-                          </div>
-                        </div>
-                      )}
-              {activeTab === 'properties' && (
-                <div className="p-4 space-y-4">
-                  {selectedItem ? (
-                    <>
-                        <div>
-                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Transform</h3>
-                        <div className="space-y-2">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs text-stone-600 mb-1 block">X</label>
-                              <input
-                                type="number"
-                                value={Math.round(selectedItem.x_position || 0)}
-                                onChange={(e) => handleItemUpdate(selectedItem.id, { x_position: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-stone-600 mb-1 block">Y</label>
-                              <input
-                                type="number"
-                                value={Math.round(selectedItem.y_position || 0)}
-                                onChange={(e) => handleItemUpdate(selectedItem.id, { y_position: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <label className="text-xs text-stone-600 mb-1 block">Width</label>
-                              <input
-                                type="number"
-                                value={Math.round(selectedItem.width || 0)}
-                                onChange={(e) => handleItemUpdate(selectedItem.id, { width: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-stone-600 mb-1 block">Height</label>
-                              <input
-                                type="number"
-                                value={Math.round(selectedItem.height || 0)}
-                                onChange={(e) => handleItemUpdate(selectedItem.id, { height: parseFloat(e.target.value) || 0 })}
-                                className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <label className="text-xs text-stone-600 mb-1 block">Rotation</label>
-                            <input
-                              type="number"
-                              value={Math.round(selectedItem.rotation || 0)}
-                              onChange={(e) => handleItemUpdate(selectedItem.id, { rotation: parseFloat(e.target.value) || 0 })}
-                              className="w-full px-2 py-1.5 text-sm border border-stone-200 rounded focus:outline-none focus:ring-2 focus:ring-stone-400"
-                            />
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Appearance</h3>
-                        <div className="space-y-2">
-                          <div>
-                            <label className="text-xs text-stone-600 mb-1 block">Opacity</label>
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="range"
-                                min="0"
-                                max="100"
-                                value={(selectedItem.opacity || 1) * 100}
-                                onChange={(e) => handleOpacityChange(selectedItem.id, parseInt(e.target.value) / 100)}
-                                className="flex-1"
-                              />
-                              <span className="text-xs text-stone-600 w-10 text-right font-mono">
-                                {Math.round((selectedItem.opacity || 1) * 100)}%
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleToggleVisibility(selectedItem.id)}
-                              className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
-                                selectedItem.is_visible !== false
-                                  ? 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
-                                  : 'bg-stone-100 border-stone-300 text-stone-500'
-                              }`}
-                            >
-                              {selectedItem.is_visible !== false ? 'Visible' : 'Hidden'}
-                            </button>
-                            <button
-                              onClick={() => handleToggleLock(selectedItem.id)}
-                              className={`flex-1 px-3 py-2 text-xs font-medium rounded border transition-colors ${
-                                selectedItem.is_locked
-                                  ? 'bg-stone-100 border-stone-300 text-stone-700'
-                                  : 'bg-white border-stone-200 text-stone-700 hover:bg-stone-50'
-                              }`}
-                            >
-                              {selectedItem.is_locked ? 'Locked' : 'Unlocked'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <div className="py-8 text-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 text-stone-300">
-                        <rect x="3" y="3" width="18" height="18" rx="2" />
-                      </svg>
-                      <p className="text-sm text-stone-500 mb-1">No selection</p>
-                      <p className="text-xs text-stone-400">Select an item to edit properties</p>
-                      <div className="mt-6 space-y-2">
-                        <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Canvas Settings</h3>
-                        <div>
-                          <label className="text-xs text-stone-600 mb-1 block">Background Color</label>
-                          <input
-                            type="color"
-                            value={settings.backgroundColor}
-                            onChange={(e) => updateSettings({ backgroundColor: e.target.value })}
-                            className="w-full h-10 rounded border border-stone-200 cursor-pointer"
-                                />
-                              </div>
-                        <div className="flex items-center justify-between pt-2">
-                          <label className="text-xs text-stone-600">Show Grid</label>
-                          <button
-                            onClick={() => updateSettings({ gridEnabled: !settings.gridEnabled })}
-                            className={`relative w-10 h-5 rounded-full transition-colors ${
-                              settings.gridEnabled ? 'bg-stone-900' : 'bg-stone-300'
-                            }`}
-                          >
-                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                              settings.gridEnabled ? 'translate-x-5' : 'translate-x-0'
-                            }`} />
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between pt-2">
-                          <label className="text-xs text-stone-600">Snap to Grid</label>
-                          <button
-                            onClick={() => updateSettings({ snapToGrid: !settings.snapToGrid })}
-                            className={`relative w-10 h-5 rounded-full transition-colors ${
-                              settings.snapToGrid ? 'bg-stone-900' : 'bg-stone-300'
-                            }`}
-                          >
-                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                              settings.snapToGrid ? 'translate-x-5' : 'translate-x-0'
-                            }`} />
-                          </button>
-                        </div>
-                          </div>
-                        </div>
-                      )}
-                </div>
-              )}
-              {activeTab === 'collaboration' && (
-                <div className="p-4 space-y-4">
-                  <div>
-                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Online Users</h3>
-                    {onlineUsers && onlineUsers.length > 0 ? (
-                      <div className="space-y-2">
-                        {onlineUsers.map((user) => (
-                          <div key={user.userId} className="flex items-center gap-2 p-2 rounded-lg hover:bg-stone-50">
-                            <div className="w-8 h-8 rounded-full bg-stone-200 flex items-center justify-center text-xs font-medium text-stone-600">
-                              {(user.userName || user.userId || '?').charAt(0).toUpperCase()}
-                </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-stone-900 truncate">
-                                {user.userName || user.userId || 'Anonymous'}
-                              </p>
-                              <p className="text-xs text-stone-500">Online</p>
-                            </div>
-                            <div className="w-2 h-2 bg-green-500 rounded-full" />
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="text-xs text-stone-500 py-4 text-center">You're working alone</p>
-                    )}
-                  </div>
-                  <div className="pt-4 border-t border-stone-200">
-                    <button
-                      onClick={() => setShowShareModal(true)}
-                      className="w-full px-4 py-2.5 bg-stone-900 text-white text-sm font-medium rounded-lg hover:bg-stone-800 transition-colors"
-                    >
-                      Share Project
-                    </button>
-                  </div>
-                </div>
-              )}
-              {activeTab === 'tools' && (
-                <div className="p-4 space-y-4">
-                  <div>
-                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Quick Actions</h3>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => {
-                          const input = document.createElement('input')
-                          input.type = 'file'
-                          input.accept = 'image/*'
-                          input.multiple = true
-                          input.onchange = async (e) => {
-                            const files = Array.from(e.target.files || [])
-                            for (const file of files) {
-                              await handleFileUpload(file, null)
-                            }
-                          }
-                          input.click()
-                        }}
-                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                          <polyline points="17 8 12 3 7 8" />
-                          <line x1="12" y1="3" x2="12" y2="15" />
-                        </svg>
-                        <span className="text-xs font-medium text-stone-700">Upload</span>
-                      </button>
-                      <button
-                        onClick={() => setShowGenerateModal(true)}
-                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                        </svg>
-                        <span className="text-xs font-medium text-stone-700">AI Generate</span>
-                      </button>
-                      <button
-                        onClick={handleUndo}
-                        disabled={historyIndex <= 0}
-                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                          <path d="M3 7v6h6" />
-                          <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-                        </svg>
-                        <span className="text-xs font-medium text-stone-700">Undo</span>
-                      </button>
-                      <button
-                        onClick={handleRedo}
-                        disabled={historyIndex >= history.length - 1}
-                        className="p-3 rounded-lg border border-stone-200 hover:border-stone-400 hover:bg-stone-50 transition-colors flex flex-col items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-600">
-                          <path d="M21 7v6h-6" />
-                          <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-                        </svg>
-                        <span className="text-xs font-medium text-stone-700">Redo</span>
-                      </button>
-                        </div>
-                    </div>
-                  <div>
-                    <h3 className="text-xs font-semibold text-stone-700 uppercase tracking-wider mb-3">Keyboard Shortcuts</h3>
-                    <div className="space-y-1.5 text-xs">
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Select All</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+A</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Copy</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+C</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Paste</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+V</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Delete</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Delete</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Undo</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+Z</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Redo</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Cmd+Shift+Z</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Pan</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Space</kbd>
-                      </div>
-                      <div className="flex items-center justify-between py-1">
-                        <span className="text-stone-600">Zoom</span>
-                        <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-200 rounded text-xs font-mono">Ctrl+Scroll</kbd>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Menu Button - Show when sidebar is closed */}
-      {!sidebarOpen && (
+      {/* Vertical Toolbar - Left Side */}
+      <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col items-center gap-2">
+        {/* Plus Button - Create New */}
         <button
-          onClick={() => setSidebarOpen(true)}
-          className="absolute left-4 top-4 z-50 p-2 bg-white hover:bg-[#F1EBE4] rounded-lg border border-[#F1EBE4] shadow-oak transition-colors"
-          aria-label="Show sidebar"
+          onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = 'image/*'
+            input.multiple = true
+            input.onchange = async (e) => {
+              const files = Array.from(e.target.files || [])
+              for (const file of files) {
+                await handleFileUpload(file, null)
+              }
+            }
+            input.click()
+          }}
+          className="w-12 h-12 rounded-full bg-white border border-stone-200 shadow-lg hover:bg-stone-50 flex items-center justify-center transition-colors"
+          title="Add new item"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-[#2C2C2C]">
-            <line x1="3" y1="12" x2="21" y2="12" />
-            <line x1="3" y1="6" x2="21" y2="6" />
-            <line x1="3" y1="18" x2="21" y2="18" />
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-stone-700">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
         </button>
-      )}
+
+        <div className="w-8 h-px bg-stone-200 my-1" />
+
+        {/* Layers/Assets Button */}
+        <button
+          onClick={() => setShowLayersPanel(!showLayersPanel)}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+            showLayersPanel 
+              ? 'bg-stone-900 text-white' 
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+          title="Layers"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="3" width="7" height="7" rx="1" />
+            <rect x="14" y="14" width="7" height="7" rx="1" />
+            <rect x="3" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </button>
+
+        {/* History/Undo Button */}
+        <button
+          onClick={handleUndo}
+          disabled={historyIndex <= 0}
+          className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-stone-700"
+          title="Undo"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 7v6h6" />
+            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+          </svg>
+        </button>
+
+        {/* Select Tool */}
+        <button
+          onClick={() => setInteractionMode('select')}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+            interactionMode === 'select'
+              ? 'bg-stone-900 text-white'
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+          title="Select (V)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
+          </svg>
+        </button>
+
+        {/* AI/Chat Button */}
+        <button
+          onClick={() => setShowGenerateModal(true)}
+          className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+          title="AI Generate"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </button>
+
+        {/* Help Button */}
+        <button
+          onClick={() => {/* Add help functionality */}}
+          className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+          title="Help"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+            <path d="M12 17h.01" />
+          </svg>
+        </button>
+
+        {/* Navigation/Pan Tool */}
+        <button
+          onClick={() => setInteractionMode(interactionMode === 'pan' ? 'select' : 'pan')}
+          className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+            interactionMode === 'pan'
+              ? 'bg-stone-900 text-white'
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+          title="Pan (H or Space+Drag)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
+            <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v2" />
+            <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v8" />
+            <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+          </svg>
+        </button>
+
+        {/* Settings Button */}
+        <button
+          onClick={() => {/* Add settings functionality */}}
+          className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+          title="Settings"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
+          </svg>
+        </button>
+      </div>
 
       {/* Context Menu - Right-click menu */}
       {contextMenuPosition.visible && (
@@ -3778,10 +3363,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </div>
       )}
 
-      {/* Main Canvas Area - Adjust for sidebar */}
+      {/* Main Canvas Area */}
       <div
         className="flex-1 flex flex-col w-full h-full transition-all duration-macro ease-apple"
-        style={{ marginLeft: sidebarOpen ? '320px' : '0' }}
       >
         {/* Error Message */}
         {error && (
@@ -4354,8 +3938,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         />
       )}
 
-      {/* Layers Panel - Only show when sidebar is closed */}
-      {!sidebarOpen && (
+      {/* Layers Panel */}
       <LayersPanel
         isOpen={showLayersPanel}
         onClose={() => setShowLayersPanel(false)}
@@ -4368,7 +3951,6 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         onOpacityChange={handleOpacityChange}
         onDeleteItem={handleItemDelete}
       />
-      )}
 
       {/* Mini-map */}
       {showMinimap && dimensions.width > 0 && (

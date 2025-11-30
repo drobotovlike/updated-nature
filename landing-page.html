@@ -1,1215 +1,648 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="scroll-smooth antialiased">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-  <meta name="theme-color" content="#F6F2EE">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <title>ATURE Studio - AI-Powered Furniture Visualization</title>
-  <meta name="description" content="Visualize furniture in any environment using AI. Perfect for interior designers, stagers, and furniture manufacturers.">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ATURE Studio - AI Furniture Visualization</title>
+  <meta name="description" content="Visualize furniture in any environment using AI. The copilot for professional interior designers and architects.">
   
   <!-- Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            'display': ['Space Grotesk', 'system-ui', 'sans-serif'],
+            'body': ['Inter', 'system-ui', 'sans-serif'],
+          },
+          colors: {
+            'clay': '#D97757',
+            'rattan': '#C5A26D',
+          }
+        }
+      }
+    }
+  </script>
   
   <style>
-    /* Reset & Base */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #e5e5e5; border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: #d4d4d4; }
     
-    :root {
-      --bg-base: #F6F2EE;
-      --bg-elevated: #FFFFFF;
-      --bg-surface: #F1EBE4;
-      --accent-clay: #D97757;
-      --accent-rattan: #C5A26D;
-      --text-primary: #2C2C2C;
-      --text-secondary: #7C7C7C;
-      --text-tertiary: #A8A8A8;
-      --border: rgba(44, 44, 44, 0.1);
+    /* Glass Panel */
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
     }
     
-    html { scroll-behavior: smooth; }
-    
-    body {
-      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background-color: var(--bg-base);
-      color: var(--text-primary);
-      line-height: 1.5;
-      font-weight: 500;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-      overflow-x: hidden;
-    }
-    
-    h1, h2, h3, h4, h5, h6 {
-      font-family: 'Space Grotesk', system-ui, sans-serif;
-      line-height: 1.2;
-      letter-spacing: -0.03em;
-      font-weight: 600;
-    }
-    
-    a { text-decoration: none; color: inherit; }
-    button { font-family: inherit; cursor: pointer; border: none; background: none; }
-    img { max-width: 100%; height: auto; }
-    
-    /* Utilities */
-    .container { max-width: 1800px; margin: 0 auto; padding: 0 1rem; }
-    @media (min-width: 768px) { .container { padding: 0 1.5rem; } }
-    
-    .font-display { font-family: 'Space Grotesk', system-ui, sans-serif; }
-    
-    /* Material Textures */
-    .oak-grain {
-      background-image: repeating-linear-gradient(90deg, transparent, transparent 2px, rgba(44, 44, 44, 0.02) 2px, rgba(44, 44, 44, 0.02) 4px);
-      position: relative;
-    }
-    .oak-grain::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(44, 44, 44, 0.015) 1px, rgba(44, 44, 44, 0.015) 2px);
-      pointer-events: none;
-    }
-    
-    .linen-texture {
-      background-image: radial-gradient(circle at 1px 1px, rgba(44, 44, 44, 0.03) 1px, transparent 0);
-      background-size: 8px 8px;
-    }
-    
-    .rattan-pattern {
-      background-image: repeating-linear-gradient(45deg, transparent, transparent 4px, rgba(197, 162, 109, 0.1) 4px, rgba(197, 162, 109, 0.1) 8px);
-    }
-    
-    /* Micro-interactions */
-    .hover-lift {
-      transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.25, 1), box-shadow 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-    }
-    .hover-lift:hover {
-      transform: translateY(-2px) scale(1.01);
-      box-shadow: 0 10px 15px -3px rgba(44, 44, 44, 0.1), 0 4px 6px -2px rgba(44, 44, 44, 0.05);
-    }
-    
-    .clay-button {
-      background-color: var(--accent-clay);
-      transition: opacity 0.15s ease, box-shadow 0.15s ease;
-    }
-    .clay-button:hover { opacity: 0.9; }
-    .clay-button:active { box-shadow: inset 0 1px 2px 0 rgba(217, 119, 87, 0.2); }
-    
-    .shadow-oak {
-      box-shadow: 0 2px 8px rgba(44, 44, 44, 0.08), 0 1px 3px rgba(44, 44, 44, 0.12);
-    }
-    
-    /* Reveal animations */
-    .reveal-element {
+    /* Reveal Animation */
+    .reveal-up {
       opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.6s cubic-bezier(0.25, 0.8, 0.25, 1), transform 0.6s cubic-bezier(0.25, 0.8, 0.25, 1);
+      transform: translateY(24px);
+      transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
     }
-    .reveal-element.is-visible {
+    .reveal-up.in-view {
       opacity: 1;
       transform: translateY(0);
     }
+    
+    /* Delay utilities */
     .delay-100 { transition-delay: 100ms; }
     .delay-200 { transition-delay: 200ms; }
     .delay-300 { transition-delay: 300ms; }
-    
-    /* Navigation */
-    .nav {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 50;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 1.5rem;
-      background: rgba(250, 247, 243, 0.8);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-    }
-    @media (min-width: 768px) { .nav { padding: 1.5rem 2.5rem; } }
-    
-    .nav-links { display: none; gap: 0.25rem; }
-    @media (min-width: 768px) { .nav-links { display: flex; } }
-    
-    .nav-link {
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      border-radius: 0.5rem;
-      transition: color 0.15s, background-color 0.15s;
-    }
-    .nav-link:hover { color: var(--text-primary); background-color: rgba(44, 44, 44, 0.05); }
-    .nav-link.active { color: var(--text-primary); background-color: rgba(44, 44, 44, 0.08); }
-    
-    .nav-brand {
-      position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 1.25rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      color: var(--text-primary);
-    }
-    
-    .nav-actions { display: flex; align-items: center; gap: 1rem; }
-    
-    .nav-icon {
-      padding: 0.5rem;
-      color: var(--text-secondary);
-      border-radius: 50%;
-      transition: background-color 0.15s, color 0.15s;
-    }
-    .nav-icon:hover { background-color: rgba(44, 44, 44, 0.08); color: var(--text-primary); }
-    
-    .btn-signin {
-      display: none;
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      color: var(--text-secondary);
-      border-radius: 0.5rem;
-      transition: color 0.15s, background-color 0.15s;
-    }
-    .btn-signin:hover { color: var(--text-primary); background-color: rgba(44, 44, 44, 0.05); }
-    @media (min-width: 768px) { .btn-signin { display: block; } }
-    
-    .btn-signup {
-      display: none;
-      padding: 0.5rem 1rem;
-      font-size: 0.875rem;
-      font-weight: 500;
-      background-color: var(--text-primary);
-      color: white;
-      border-radius: 0.5rem;
-      transition: background-color 0.15s;
-    }
-    .btn-signup:hover { background-color: #1a1a1a; }
-    @media (min-width: 768px) { .btn-signup { display: block; } }
-    
-    /* Mobile menu button */
-    .mobile-menu-btn { display: block; padding: 0.5rem; margin-left: -0.5rem; }
-    @media (min-width: 768px) { .mobile-menu-btn { display: none; } }
-    .mobile-menu-btn span {
-      display: block;
-      width: 1.5rem;
-      height: 2px;
-      background-color: var(--text-primary);
-      margin: 4px 0;
-      transition: transform 0.2s;
-    }
-    
-    /* Hero Section */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 5rem 1rem 8rem;
-      text-align: center;
-    }
-    @media (min-width: 768px) { .hero { padding: 5rem 2rem 8rem; } }
-    
-    .hero-content { max-width: 64rem; margin: 0 auto 4rem; }
-    
-    .hero-title {
-      font-size: clamp(3rem, 8vw, 8rem);
-      line-height: 0.9;
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      color: var(--text-primary);
-      margin-bottom: 2rem;
-    }
-    .hero-title span {
-      color: var(--text-secondary);
-      font-weight: 300;
-    }
-    
-    .hero-subtitle {
-      font-size: clamp(1.25rem, 3vw, 1.5rem);
-      color: var(--text-secondary);
-      max-width: 42rem;
-      margin: 0 auto 3rem;
-      line-height: 1.6;
-      font-weight: 500;
-    }
-    
-    .hero-buttons {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-    }
-    @media (min-width: 768px) { .hero-buttons { flex-direction: row; } }
-    
-    .btn-primary {
-      width: 100%;
-      padding: 1rem 2.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: white;
-      border-radius: 9999px;
-      box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);
-      letter-spacing: 0.02em;
-    }
-    @media (min-width: 768px) { .btn-primary { width: auto; } }
-    
-    .btn-secondary {
-      width: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 1rem 2.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: var(--accent-rattan);
-      background: transparent;
-      border: 2px solid var(--accent-rattan);
-      border-radius: 9999px;
-      transition: background-color 0.15s;
-    }
-    .btn-secondary:hover { background-color: rgba(197, 162, 109, 0.1); }
-    @media (min-width: 768px) { .btn-secondary { width: auto; } }
-    
-    /* Social Proof */
-    .social-proof {
-      padding: 4rem 0;
-      border-bottom: 1px solid var(--bg-surface);
-      margin-bottom: 8rem;
-      overflow: hidden;
-    }
-    .social-proof-label {
-      text-align: center;
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-secondary);
-      margin-bottom: 3rem;
-    }
-    .social-proof-logos {
-      display: flex;
-      gap: 4rem;
-      justify-content: center;
-      align-items: center;
-      opacity: 0.4;
-      filter: grayscale(1);
-      transition: filter 0.5s, opacity 0.5s;
-      flex-wrap: wrap;
-      padding: 0 1rem;
-    }
-    .social-proof-logos:hover { opacity: 1; filter: grayscale(0); }
-    @media (min-width: 768px) { .social-proof-logos { gap: 6rem; } }
-    .social-proof-logos span {
-      font-size: 1.25rem;
-      font-weight: 700;
-      color: var(--text-primary);
-    }
-    
-    /* Benefits Section */
-    .section { margin-bottom: 8rem; max-width: 80rem; margin-left: auto; margin-right: auto; padding: 0 1rem; }
-    @media (min-width: 768px) { .section { padding: 0 2rem; } }
-    
-    .section-header { text-align: center; max-width: 42rem; margin: 0 auto 5rem; }
-    .section-title {
-      font-size: clamp(2rem, 5vw, 3.5rem);
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      color: var(--text-primary);
-      margin-bottom: 1.5rem;
-    }
-    .section-subtitle {
-      font-size: clamp(1rem, 2vw, 1.25rem);
-      color: var(--text-secondary);
-      font-weight: 500;
-    }
-    
-    .benefits-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 2rem;
-    }
-    @media (min-width: 768px) { .benefits-grid { grid-template-columns: repeat(3, 1fr); } }
-    
-    .benefit-card {
-      padding: 2.5rem;
-      background: white;
-      border: 1px solid var(--bg-surface);
-      border-radius: 1.5rem;
-    }
-    
-    .benefit-icon {
-      width: 3.5rem;
-      height: 3.5rem;
-      background: var(--bg-surface);
-      border-radius: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: 2rem;
-    }
-    .benefit-icon svg { stroke: var(--accent-clay); }
-    
-    .benefit-title {
-      font-size: 1.5rem;
-      font-weight: 600;
-      margin-bottom: 1rem;
-      color: var(--text-primary);
-      letter-spacing: -0.02em;
-    }
-    .benefit-desc {
-      color: var(--text-secondary);
-      line-height: 1.6;
-      font-weight: 500;
-    }
-    
-    /* How it Works */
-    .workflow-header {
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: flex-start;
-      margin-bottom: 3rem;
-      gap: 1rem;
-    }
-    @media (min-width: 768px) {
-      .workflow-header { flex-direction: row; align-items: flex-end; }
-    }
-    .workflow-label {
-      font-size: 0.75rem;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-secondary);
-      margin-bottom: 0.5rem;
-    }
-    .workflow-title {
-      font-size: clamp(1.75rem, 4vw, 3rem);
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .workflow-link {
-      font-size: 0.875rem;
-      font-weight: 600;
-      border-bottom: 1px solid var(--text-primary);
-      padding-bottom: 2px;
-      transition: color 0.15s, border-color 0.15s;
-    }
-    .workflow-link:hover { color: var(--text-secondary); border-color: var(--text-secondary); }
-    
-    .workflow-grid {
-      display: grid;
-      grid-template-columns: 1fr;
-      gap: 1.5rem;
-    }
-    @media (min-width: 1024px) { .workflow-grid { grid-template-columns: 7fr 5fr; } }
-    
-    .workflow-card {
-      background: white;
-      border: 1px solid rgba(44, 44, 44, 0.1);
-      border-radius: 2.5rem;
-      padding: 2rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-    }
-    @media (min-width: 768px) { .workflow-card { padding: 2.5rem; } }
-    
-    .workflow-card-dark {
-      background: var(--text-primary);
-      color: white;
-      position: relative;
-      overflow: hidden;
-    }
-    
-    .workflow-step {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-    .workflow-step-num {
-      width: 2rem;
-      height: 2rem;
-      background: var(--text-primary);
-      color: white;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.875rem;
-      font-weight: 700;
-    }
-    .workflow-card-dark .workflow-step-num { background: white; color: var(--text-primary); }
-    .workflow-step-title { font-size: 1.25rem; font-weight: 600; }
-    
-    .workflow-mockup {
-      position: relative;
-      background: rgba(245, 245, 245, 0.5);
-      border-radius: 1rem;
-      border: 1px solid rgba(44, 44, 44, 0.05);
-      padding: 1.25rem;
-      height: 16rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      overflow: hidden;
-    }
-    .workflow-mockup::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 14rem;
-      height: 14rem;
-      background: rgba(200, 180, 255, 0.3);
-      border-radius: 50%;
-      margin-right: -2.5rem;
-      margin-top: -2.5rem;
-      filter: blur(3rem);
-    }
-    
-    .mockup-input {
-      position: relative;
-      z-index: 1;
-      background: white;
-      border: 1px solid rgba(44, 44, 44, 0.1);
-      border-radius: 0.75rem;
-      padding: 1rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-      display: flex;
-      align-items: flex-start;
-      gap: 0.75rem;
-    }
-    .mockup-input svg { color: #a855f7; flex-shrink: 0; margin-top: 2px; }
-    .mockup-input p { font-size: 0.875rem; color: var(--text-secondary); font-weight: 500; }
-    
-    .mockup-footer {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .mockup-file {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.5rem 0.75rem;
-      background: white;
-      border: 1px solid rgba(44, 44, 44, 0.1);
-      border-radius: 0.5rem;
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-    }
-    .mockup-divider { flex: 1; height: 1px; background: rgba(44, 44, 44, 0.1); }
-    .mockup-btn {
-      padding: 0.5rem 1rem;
-      background: var(--text-primary);
-      color: white;
-      border-radius: 9999px;
-      font-size: 0.75rem;
-      font-weight: 700;
-      letter-spacing: 0.02em;
-      transition: background-color 0.15s;
-    }
-    .mockup-btn:hover { background: #1a1a1a; }
-    
-    .workflow-card-dark p { color: rgba(168, 168, 168, 1); margin-bottom: 2rem; }
-    
-    .export-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
-    .export-option {
-      background: rgba(255, 255, 255, 0.1);
-      backdrop-filter: blur(10px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 0.75rem;
-      padding: 1rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      transition: background-color 0.15s;
-      cursor: pointer;
-    }
-    .export-option:hover { background: rgba(255, 255, 255, 0.2); }
-    .export-option span { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
-    
-    .workflow-glow {
-      position: absolute;
-      bottom: -6rem;
-      right: -6rem;
-      width: 16rem;
-      height: 16rem;
-      background: linear-gradient(to bottom right, #22c55e, #3b82f6);
-      border-radius: 50%;
-      opacity: 0.2;
-      filter: blur(3rem);
-    }
-    
-    /* Scroll Animation Section */
-    .scroll-animation-section { position: relative; margin-top: -8rem; margin-bottom: 8rem; }
-    .scroll-animation-container { position: relative; width: 100%; min-height: 200vh; display: flex; align-items: center; justify-content: center; }
-    .scroll-room {
-      position: sticky;
-      top: 0;
-      width: 100%;
-      max-width: 80rem;
-      margin: 0 auto;
-      aspect-ratio: 16/10;
-      border-radius: 1.5rem;
-      overflow: hidden;
-      background: linear-gradient(to bottom right, var(--bg-base), var(--bg-surface));
-      filter: drop-shadow(0 20px 40px rgba(44, 44, 44, 0.08));
-    }
-    .scroll-room img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      filter: brightness(1.05) contrast(0.95);
-    }
-    .furniture-piece {
-      position: absolute;
-      opacity: 0;
-      transition: opacity 0.7s ease-out, transform 0.7s ease-out;
-    }
-    .furniture-piece.visible { opacity: 1; }
-    
-    /* Testimonial */
-    .testimonial {
-      position: relative;
-      background: var(--bg-surface);
-      border-radius: 3rem;
-      padding: 2.5rem;
-      overflow: hidden;
-      max-width: 64rem;
-      margin: 0 auto 8rem;
-    }
-    @media (min-width: 768px) { .testimonial { padding: 5rem; } }
-    
-    .testimonial-quote {
-      position: absolute;
-      top: 2.5rem;
-      left: 2.5rem;
-      width: 3rem;
-      height: 3rem;
-      opacity: 0.3;
-      transform: rotate(180deg);
-    }
-    .testimonial-quote svg { stroke: var(--accent-rattan); }
-    
-    .testimonial-content { position: relative; z-index: 1; text-align: center; }
-    .testimonial-text {
-      font-size: clamp(1.25rem, 3vw, 2rem);
-      font-weight: 500;
-      font-style: italic;
-      color: var(--text-primary);
-      line-height: 1.4;
-      margin-bottom: 2.5rem;
-      letter-spacing: -0.02em;
-    }
-    
-    .testimonial-author {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 1rem;
-    }
-    .testimonial-avatar {
-      width: 3.5rem;
-      height: 3.5rem;
-      border-radius: 50%;
-      object-fit: cover;
-      border: 2px solid white;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-    }
-    .testimonial-name { font-size: 1rem; font-weight: 600; color: var(--text-primary); }
-    .testimonial-role { font-size: 0.875rem; font-weight: 500; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; }
-    
-    .testimonial-stats {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 2.5rem;
-      border-top: 1px solid rgba(217, 119, 87, 0.2);
-      padding-top: 2.5rem;
-      margin-top: 3rem;
-      max-width: 24rem;
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .testimonial-stat { text-align: center; }
-    .testimonial-stat-value {
-      font-size: 1.875rem;
-      font-weight: 600;
-      color: var(--text-primary);
-    }
-    .testimonial-stat-label {
-      font-size: 0.75rem;
-      font-weight: 600;
-      color: var(--text-secondary);
-      text-transform: uppercase;
-      margin-top: 0.25rem;
-    }
-    .testimonial-stat-divider { width: 1px; height: 2.5rem; background: rgba(197, 162, 109, 0.3); }
-    
-    /* FAQs */
-    .faqs { max-width: 48rem; margin: 0 auto 8rem; padding: 0 1rem; }
-    @media (min-width: 768px) { .faqs { padding: 0 2rem; } }
-    
-    .faqs-title {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 600;
-      text-align: center;
-      margin-bottom: 4rem;
-      letter-spacing: -0.03em;
-      color: var(--text-primary);
-    }
-    
-    .faq-item {
-      border: 1px solid var(--bg-surface);
-      border-radius: 1.5rem;
-      background: white;
-      margin-bottom: 1rem;
-      transition: box-shadow 0.3s;
-    }
-    .faq-item[open] { box-shadow: 0 4px 12px -2px rgba(44, 44, 44, 0.08), 0 2px 4px -1px rgba(44, 44, 44, 0.04); }
-    
-    .faq-question {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 2rem;
-      cursor: pointer;
-      list-style: none;
-      font-weight: 500;
-      color: var(--text-primary);
-    }
-    .faq-question::-webkit-details-marker { display: none; }
-    .faq-question svg {
-      transition: transform 0.3s;
-      color: var(--accent-rattan);
-    }
-    .faq-item[open] .faq-question svg { transform: rotate(180deg); }
-    
-    .faq-answer {
-      padding: 0 2rem 2rem;
-      color: var(--text-secondary);
-      line-height: 1.6;
-      font-weight: 500;
-    }
-    
-    /* CTA Section */
-    .cta {
-      background: var(--text-primary);
-      border-radius: 3rem;
-      padding: 6rem 1.5rem;
-      text-align: center;
-      color: white;
-      position: relative;
-      overflow: hidden;
-      margin: 0 1rem 5rem;
-    }
-    @media (min-width: 768px) { .cta { margin: 0 2rem 5rem; } }
-    
-    .cta-content { position: relative; z-index: 1; max-width: 48rem; margin: 0 auto; }
-    .cta-title {
-      font-size: clamp(2.5rem, 6vw, 4rem);
-      font-weight: 600;
-      letter-spacing: -0.03em;
-      margin-bottom: 2rem;
-    }
-    .cta-subtitle {
-      font-size: clamp(1rem, 2vw, 1.25rem);
-      color: var(--text-tertiary);
-      margin-bottom: 3rem;
-      font-weight: 500;
-    }
-    
-    .cta-buttons {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      gap: 1rem;
-    }
-    @media (min-width: 640px) { .cta-buttons { flex-direction: row; } }
-    
-    .cta-btn-primary {
-      width: 100%;
-      padding: 1rem 2.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: white;
-      border-radius: 9999px;
-      box-shadow: 0 4px 14px rgba(217, 119, 87, 0.3);
-    }
-    @media (min-width: 640px) { .cta-btn-primary { width: auto; } }
-    
-    .cta-btn-secondary {
-      width: 100%;
-      padding: 1rem 2.5rem;
-      font-size: 1rem;
-      font-weight: 600;
-      color: white;
-      background: transparent;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      border-radius: 9999px;
-      transition: border-color 0.15s, background-color 0.15s;
-    }
-    .cta-btn-secondary:hover { border-color: rgba(255, 255, 255, 0.5); background: rgba(255, 255, 255, 0.05); }
-    @media (min-width: 640px) { .cta-btn-secondary { width: auto; } }
-    
-    .cta-note { margin-top: 2rem; font-size: 0.875rem; color: var(--text-secondary); }
-    
-    .cta-glow-1 {
-      position: absolute;
-      top: -20%;
-      right: -20%;
-      width: 24rem;
-      height: 24rem;
-      background: rgba(217, 119, 87, 0.15);
-      border-radius: 50%;
-      filter: blur(3rem);
-    }
-    .cta-glow-2 {
-      position: absolute;
-      bottom: -20%;
-      left: -20%;
-      width: 24rem;
-      height: 24rem;
-      background: rgba(197, 162, 109, 0.1);
-      border-radius: 50%;
-      filter: blur(3rem);
-    }
-    
-    /* Footer */
-    .footer {
-      margin-top: 5rem;
-      border-top: 1px solid var(--border);
-      padding: 2rem 1rem;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      align-items: center;
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--text-tertiary);
-      max-width: 1800px;
-      margin-left: auto;
-      margin-right: auto;
-      gap: 1rem;
-    }
-    @media (min-width: 768px) {
-      .footer { flex-direction: row; padding: 2rem 1.5rem; }
-    }
-    .footer-links { display: flex; flex-wrap: wrap; gap: 1.5rem; justify-content: center; }
-    .footer-links a { transition: color 0.15s; }
-    .footer-links a:hover { color: var(--text-primary); }
+    .delay-400 { transition-delay: 400ms; }
   </style>
 </head>
-<body>
+
+<body class="bg-[#F9F8F6] text-stone-900 font-body selection:bg-orange-200 selection:text-orange-900 overflow-x-hidden">
+  
   <!-- Navigation -->
-  <nav class="nav">
-    <button class="mobile-menu-btn" aria-label="Toggle menu">
-      <span></span>
-      <span></span>
-      <span></span>
-    </button>
-    
-    <div class="nav-links">
-      <a href="#" class="nav-link active">Home</a>
-      <a href="#" class="nav-link">Studio</a>
-      <a href="#" class="nav-link">Pricing</a>
-      <a href="#" class="nav-link">Blog</a>
-      <a href="#" class="nav-link">About</a>
-      <a href="#" class="nav-link">Help</a>
-    </div>
-    
-    <a href="#" class="nav-brand">ature studio.</a>
-    
-    <div class="nav-actions">
-      <button class="nav-icon" aria-label="Search">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/>
-          <path d="m21 21-4.3-4.3"/>
-        </svg>
-      </button>
-      <button class="nav-icon" aria-label="Cart" style="position: relative;">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-          <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
-          <line x1="12" y1="22.08" x2="12" y2="12"/>
-        </svg>
-        <span style="position: absolute; top: 6px; right: 6px; width: 6px; height: 6px; background: #f97316; border-radius: 50%; border: 1px solid var(--bg-base);"></span>
-      </button>
-      <a href="#" class="btn-signin">Sign In</a>
-      <a href="#" class="btn-signup">Sign Up</a>
+  <nav class="fixed top-0 inset-x-0 z-50 h-16 border-b border-stone-200/50 glass-panel">
+    <div class="max-w-7xl mx-auto px-6 h-full flex items-center justify-between">
+      <div class="flex items-center gap-8">
+        <a href="#" class="font-display font-semibold tracking-tight text-lg">
+          ature.
+        </a>
+        <div class="hidden md:flex items-center gap-6">
+          <a href="#features" class="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">Features</a>
+          <a href="#how-it-works" class="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">How it Works</a>
+          <a href="#pricing" class="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">Pricing</a>
+        </div>
+      </div>
+      <div class="flex items-center gap-4">
+        <button class="hidden md:flex text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">Log in</button>
+        <button class="bg-stone-900 text-white text-xs font-medium px-4 py-2 rounded-full hover:bg-stone-800 transition-all shadow-sm">
+          Start sketching
+        </button>
+      </div>
     </div>
   </nav>
 
   <main>
     <!-- Hero Section -->
-    <section class="hero">
-      <div class="hero-content reveal-element">
-        <h1 class="hero-title font-display">
-          Let the room<br>
-          <span>grow around you.</span>
+    <section class="relative pt-32 pb-12 md:pb-20 px-6 max-w-7xl mx-auto">
+      <div class="reveal-up text-center max-w-4xl mx-auto mb-10">
+        <h1 class="font-display text-5xl md:text-7xl lg:text-8xl leading-[0.9] font-semibold tracking-tighter text-stone-900 mb-6">
+          Visualize interiors
+          <br>
+          <span class="text-stone-400 font-light italic font-serif">with</span>
+          native intelligence.
         </h1>
-        <p class="hero-subtitle">
-          Sketch, speak, see. We'll weave the rest.
+        <p class="text-lg text-stone-500 max-w-xl mx-auto leading-relaxed mb-8">
+          Transform empty spaces into fully furnished sanctuaries in seconds.
+          The AI copilot for professional interior designers and architects.
         </p>
-        <div class="hero-buttons">
-          <a href="#" class="btn-primary clay-button hover-lift">Start sketching</a>
-          <a href="#" class="btn-secondary">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"/>
-              <polygon points="10 8 16 12 10 16"/>
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4">
+          <button class="w-full md:w-auto px-8 py-4 bg-stone-900 text-white rounded-full font-semibold text-sm tracking-wide hover:bg-stone-800 transition-all shadow-xl shadow-stone-200 hover:-translate-y-[2px]">
+            Start Designing Free
+          </button>
+          <button class="w-full md:w-auto px-8 py-4 bg-white text-stone-900 border border-stone-200 rounded-full font-semibold text-sm tracking-wide hover:border-stone-400 transition-all flex items-center justify-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polygon points="10 8 16 12 10 16"></polygon>
             </svg>
-            Watch 30s tour
-          </a>
+            Watch Demo
+          </button>
+        </div>
+      </div>
+
+      <!-- Hero Visual -->
+      <div class="reveal-up relative w-full aspect-[4/3] md:aspect-[21/9] bg-stone-200 rounded-[2rem] md:rounded-[3rem] overflow-hidden group shadow-2xl shadow-stone-200" style="transition-delay: 200ms;">
+        <img src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?q=80&w=2600&auto=format&fit=crop" alt="AI Designed Interior" loading="lazy" class="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105">
+        
+        <!-- Hotspot -->
+        <div class="absolute top-[55%] left-[20%] md:left-[25%] group/spot pointer-events-auto">
+          <div class="absolute bottom-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/spot:opacity-100 transition-all duration-500 transform translate-y-2 group-hover/spot:translate-y-0 min-w-max">
+            <div class="bg-white/90 backdrop-blur-md text-stone-900 px-4 py-2 rounded-xl shadow-xl border border-white/50 flex items-center gap-3">
+              <div class="w-8 h-8 bg-stone-100 rounded-lg overflow-hidden">
+                <img src="https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?w=100&q=80" loading="lazy" class="w-full h-full object-cover" alt="Chair">
+              </div>
+              <div class="text-left">
+                <p class="text-[10px] uppercase tracking-wider text-stone-500 font-bold">Generated</p>
+                <p class="text-xs font-semibold">Kasaya Chair Blend</p>
+              </div>
+            </div>
+          </div>
+          <div class="relative w-4 h-4 md:w-6 md:h-6 bg-white rounded-full shadow-lg cursor-pointer flex items-center justify-center">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-stone-900 opacity-20"></span>
+            <div class="w-1.5 h-1.5 bg-stone-900 rounded-full relative z-10"></div>
+          </div>
         </div>
       </div>
     </section>
 
-    <!-- Scroll Animation Section -->
-    <section class="scroll-animation-section">
-      <div class="scroll-animation-container" id="scroll-container">
-        <div class="scroll-room" id="scroll-room">
-          <img src="https://images.unsplash.com/photo-1631679706909-1844bbd07221?q=80&w=2600&auto=format&fit=crop" alt="Empty room">
-          
-          <!-- Furniture pieces -->
-          <div class="furniture-piece" id="rug" style="bottom: 0; left: 50%; transform: translateX(-50%) translateY(20px) scale(0.95);">
-            <div class="linen-texture" style="width: 60%; aspect-ratio: 3/2; background: #E8E0D8; border-radius: 1rem; filter: drop-shadow(0 4px 12px rgba(44, 44, 44, 0.15));"></div>
-          </div>
-          <div class="furniture-piece" id="sofa" style="bottom: 15%; left: 10%; transform: translateX(-30px) translateY(20px) scale(0.9);">
-            <div class="oak-grain" style="width: 16rem; height: 10rem; background: #D4C4B0; border-radius: 1rem; filter: drop-shadow(0 8px 16px rgba(44, 44, 44, 0.2));"></div>
-          </div>
-          <div class="furniture-piece" id="table" style="bottom: 18%; left: 45%; transform: translateX(20px) translateY(30px) scale(0.85);">
-            <div class="oak-grain" style="width: 12rem; height: 8rem; background: #C5A26D; border-radius: 0.75rem; filter: drop-shadow(0 6px 12px rgba(44, 44, 44, 0.18));"></div>
-          </div>
-          <div class="furniture-piece" id="chair" style="bottom: 15%; right: 15%; transform: translateX(30px) translateY(20px) scale(0.9) rotate(5deg);">
-            <div class="rattan-pattern" style="width: 10rem; height: 12rem; background: #E8DCC8; border-radius: 1rem; filter: drop-shadow(0 6px 12px rgba(44, 44, 44, 0.18));"></div>
-          </div>
-          <div class="furniture-piece" id="lamp" style="top: 25%; right: 20%; transform: translateY(-40px) scale(0.8);">
-            <div style="width: 4rem; height: 8rem; background: #2C2C2C; border-radius: 9999px; filter: drop-shadow(0 4px 8px rgba(44, 44, 44, 0.2));"></div>
-          </div>
-          <div class="furniture-piece" id="plant" style="bottom: 20%; left: 5%; transform: translateY(30px) scale(0.85);">
-            <div style="width: 6rem; height: 10rem; background: #7C9A6B; border-radius: 1rem; filter: drop-shadow(0 6px 12px rgba(44, 44, 44, 0.18));"></div>
-          </div>
-          
-          <!-- Warm evening sun effect -->
-          <div id="sun-effect" style="position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 1s; background: radial-gradient(circle at 70% 30%, rgba(217, 119, 87, 0.3), transparent 60%);"></div>
+    <!-- Social Proof Bar -->
+    <section class="py-8 border-y border-stone-200/50 bg-white/50">
+      <div class="max-w-7xl mx-auto px-6">
+        <div class="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-8 text-center mb-6">
+          <span class="text-sm text-stone-500">Trusted by <strong class="text-stone-900">500+</strong> design professionals</span>
+          <span class="hidden md:block text-stone-300">•</span>
+          <span class="text-sm text-stone-500">Works with <strong class="text-stone-900">any</strong> room photo</span>
+          <span class="hidden md:block text-stone-300">•</span>
+          <span class="text-sm text-stone-500">Renders in under <strong class="text-stone-900">30 seconds</strong></span>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-40 grayscale hover:opacity-70 hover:grayscale-0 transition-all">
+          <span class="font-display font-bold text-sm tracking-[0.15em]">ARCHITECTURAL DIGEST</span>
+          <span class="font-display font-bold text-sm tracking-tight">dwell</span>
+          <span class="font-display font-bold text-sm tracking-[0.1em]">DEZEEN</span>
+          <span class="font-mono font-bold text-sm">HOUZZ</span>
+          <span class="font-display font-bold text-sm italic">Vogue Living</span>
         </div>
       </div>
     </section>
 
-    <!-- Social Proof -->
-    <section class="social-proof">
-      <p class="social-proof-label">Trusted by leading design firms</p>
-      <div class="social-proof-logos">
-        <span class="font-display" style="letter-spacing: -0.05em;">ARCHITECTURAL</span>
-        <span class="font-display" style="letter-spacing: -0.02em;">dwell</span>
-        <span class="font-display" style="font-style: italic;">Vogue Living</span>
-        <span class="font-display" style="letter-spacing: -0.05em;">DEZEEN</span>
-        <span style="font-family: monospace; font-weight: 700;">HOUZZ</span>
+    <!-- Problem Section -->
+    <section class="py-24 px-6 bg-gradient-to-b from-[#F9F8F6] via-stone-100 to-[#F9F8F6]">
+      <div class="max-w-3xl mx-auto text-center reveal-up">
+        <p class="text-xs font-bold uppercase tracking-[0.2em] text-clay mb-4">The bottleneck</p>
+        <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight text-stone-900 mb-6 leading-tight">
+          The visualization bottleneck<br>
+          <span class="text-clay">is killing your deals.</span>
+        </h2>
+        <p class="text-lg text-stone-500 leading-relaxed mb-6">
+          You spend hours in Photoshop manually compositing furniture into room photos. Or you wait 2-3 days for 3D renders that still don't look right. Meanwhile, clients lose interest and competitors close deals faster.
+        </p>
+        <div class="bg-white rounded-2xl p-6 border-l-4 border-rattan shadow-sm">
+          <p class="text-lg text-stone-700 font-medium">
+            What if you could show a client exactly how their space will look—<em class="text-clay not-italic font-semibold">in the meeting, in real-time</em>, without leaving the conversation?
+          </p>
+        </div>
       </div>
     </section>
 
-    <!-- Benefits Section -->
-    <section class="section" id="features">
-      <div class="section-header reveal-element">
-        <h2 class="section-title font-display">Design smarter, not harder.</h2>
-        <p class="section-subtitle">Eliminate the guesswork from interior staging. Ature gives you the tools to visualize outcomes before lifting a finger.</p>
+    <!-- Features Section -->
+    <section id="features" class="py-24 px-6 max-w-7xl mx-auto">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal-up">
+        <p class="text-xs font-bold uppercase tracking-[0.2em] text-clay mb-4">Features</p>
+        <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight text-stone-900 mb-4">
+          Everything you need to visualize.
+        </h2>
+        <p class="text-lg text-stone-500">Powerful tools designed for professionals who think visually.</p>
       </div>
-      
-      <div class="benefits-grid">
-        <div class="benefit-card hover-lift oak-grain linen-texture reveal-element delay-100">
-          <div class="benefit-icon rattan-pattern">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+
+      <!-- Feature Grid -->
+      <div class="grid md:grid-cols-3 gap-6 mb-12">
+        <div class="reveal-up bg-white rounded-3xl p-8 border border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
               <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
             </svg>
           </div>
-          <h3 class="benefit-title font-display">Instant Rendering</h3>
-          <p class="benefit-desc">Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds with our GPU clusters.</p>
+          <h3 class="font-display text-xl font-semibold mb-3">Instant Rendering</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Skip the 48-hour rendering queue. Generate photorealistic interior previews in under 30 seconds.</p>
         </div>
-        
-        <div class="benefit-card hover-lift oak-grain linen-texture reveal-element delay-200">
-          <div class="benefit-icon rattan-pattern">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M21.16 6.26a1 1 0 0 0-1.41-1.41l-2.4 2.4a2 2 0 0 1-2.24 2.24l-2.4 2.4a1 1 0 0 0 0 1.41l.7.7a1 1 0 0 0 1.41 0l2.4-2.4a2 2 0 0 1 2.24-2.24l2.4-2.4.7.7Z"/>
-              <path d="M11 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h6"/>
-              <path d="m11 5 8 8"/>
+
+        <div class="reveal-up delay-100 bg-white rounded-3xl p-8 border border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M3 9h18"/>
+              <path d="M9 21V9"/>
             </svg>
           </div>
-          <h3 class="benefit-title font-display">Intelligent Scale</h3>
-          <p class="benefit-desc">Furniture that actually fits. Our AI analyzes room dimensions to suggest pieces that work within physical constraints.</p>
+          <h3 class="font-display text-xl font-semibold mb-3">Infinite Canvas</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Pan, zoom, and organize unlimited designs on a single workspace. Think Figma meets AI generation.</p>
         </div>
-        
-        <div class="benefit-card hover-lift oak-grain linen-texture reveal-element delay-300">
-          <div class="benefit-icon rattan-pattern">
-            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/>
-              <path d="M22 17.65v-4.26l-9 4.1"/>
-              <path d="M2 17.65v-4.26l9 4.1"/>
+
+        <div class="reveal-up delay-200 bg-white rounded-3xl p-8 border border-stone-200 hover:shadow-xl hover:-translate-y-1 transition-all">
+          <div class="w-12 h-12 rounded-2xl bg-stone-100 flex items-center justify-center mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
             </svg>
           </div>
-          <h3 class="benefit-title font-display">Style Consistency</h3>
-          <p class="benefit-desc">Upload a moodboard and let Ature apply the texture, lighting, and vibe to your empty space automatically.</p>
+          <h3 class="font-display text-xl font-semibold mb-3">AI-Powered Blending</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Powered by Gemini 2.5. Natural lighting, perspective-aware placement, and material understanding.</p>
+        </div>
+      </div>
+
+      <!-- Large Feature Block -->
+      <div class="reveal-up grid lg:grid-cols-2 gap-8 bg-stone-900 rounded-[2rem] p-8 md:p-12 text-white overflow-hidden">
+        <div>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-rattan mb-4">Private Asset Library</p>
+          <h3 class="font-display text-2xl md:text-3xl font-semibold mb-4">Your furniture catalog. Always ready.</h3>
+          <p class="text-stone-400 leading-relaxed mb-6">
+            Build a library of furniture pieces, textures, and design elements that syncs across all your devices. Upload once, use everywhere. Every asset stays private to your account.
+          </p>
+          <ul class="grid grid-cols-2 gap-3 text-sm">
+            <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Cloud-synced</li>
+            <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Auto-organized</li>
+            <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Private per user</li>
+            <li class="flex items-center gap-2"><span class="text-green-400">✓</span> Reuse anywhere</li>
+          </ul>
+        </div>
+        <div class="relative flex items-center justify-center">
+          <div class="grid grid-cols-3 gap-3">
+            <div class="w-20 h-20 bg-white/10 rounded-xl"></div>
+            <div class="w-20 h-20 bg-white/10 rounded-xl"></div>
+            <div class="w-20 h-20 bg-white/10 rounded-xl"></div>
+            <div class="w-20 h-20 bg-white/10 rounded-xl"></div>
+            <div class="w-20 h-20 bg-white/20 rounded-xl border-2 border-dashed border-white/30 flex items-center justify-center text-2xl text-white/50">+</div>
+            <div class="w-20 h-20 bg-white/10 rounded-xl"></div>
+          </div>
+          <div class="absolute -bottom-20 -right-20 w-48 h-48 bg-gradient-to-br from-clay/30 to-rattan/30 rounded-full blur-3xl"></div>
         </div>
       </div>
     </section>
 
     <!-- How it Works -->
-    <section class="section" id="how-it-works">
-      <div class="workflow-header reveal-element">
-        <div>
-          <p class="workflow-label">Workflow</p>
-          <h2 class="workflow-title font-display">From scan to sanctuary.</h2>
+    <section id="how-it-works" class="py-24 px-6 bg-white">
+      <div class="max-w-7xl mx-auto">
+        <div class="text-center max-w-2xl mx-auto mb-16 reveal-up">
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-clay mb-4">How it works</p>
+          <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight text-stone-900 mb-4">
+            Three steps to photorealistic.
+          </h2>
+          <p class="text-lg text-stone-500">No learning curve. No technical skills required. Just results.</p>
         </div>
-        <a href="#" class="workflow-link" style="display: none;">View full tutorial</a>
-      </div>
-      
-      <div class="workflow-grid">
-        <div class="workflow-card reveal-element">
-          <div class="workflow-step">
-            <span class="workflow-step-num">1</span>
-            <h3 class="workflow-step-title font-display">Describe your vision</h3>
-          </div>
-          
-          <div class="workflow-mockup">
-            <div class="mockup-input">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
-              </svg>
-              <p>"Minimalist Japanese living room, low teak furniture, paper lamps, warm ambient lighting..."</p>
-            </div>
-            
-            <div class="mockup-footer">
-              <div class="mockup-file">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2"/>
-                  <circle cx="9" cy="9" r="2"/>
-                  <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>
-                </svg>
-                room_scan.jpg
+
+        <div class="grid md:grid-cols-3 gap-8">
+          <!-- Step 1 -->
+          <div class="reveal-up relative bg-[#F9F8F6] rounded-3xl p-8">
+            <span class="absolute top-6 right-6 font-display text-6xl font-bold text-stone-200">01</span>
+            <div class="relative z-10">
+              <div class="h-40 mb-6 flex items-center justify-center">
+                <div class="w-full max-w-[200px] border-2 border-dashed border-rattan rounded-xl p-6 text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="mx-auto mb-2 text-rattan">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <p class="text-sm text-stone-500">Drag & drop your room</p>
+                </div>
               </div>
-              <div class="mockup-divider"></div>
-              <button class="mockup-btn">Generate</button>
+              <h3 class="font-display text-xl font-semibold mb-2">Upload Your Space</h3>
+              <p class="text-stone-500 text-sm leading-relaxed">Drag in any room photo. Empty floorplan, existing interior, or real estate listing. Our AI analyzes lighting, perspective, and spatial dimensions automatically.</p>
+            </div>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="reveal-up delay-100 relative bg-[#F9F8F6] rounded-3xl p-8">
+            <span class="absolute top-6 right-6 font-display text-6xl font-bold text-stone-200">02</span>
+            <div class="relative z-10">
+              <div class="h-40 mb-6 flex items-center justify-center">
+                <div class="grid grid-cols-4 gap-2">
+                  <div class="w-12 h-12 bg-white rounded-lg shadow-sm overflow-hidden"><img src="https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=100&q=80" class="w-full h-full object-cover" alt="Sofa"></div>
+                  <div class="w-12 h-12 bg-white rounded-lg shadow-sm overflow-hidden"><img src="https://images.unsplash.com/photo-1506439773649-6e0eb8cfb237?w=100&q=80" class="w-full h-full object-cover" alt="Chair"></div>
+                  <div class="w-12 h-12 bg-white rounded-lg shadow-sm overflow-hidden"><img src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&q=80" class="w-full h-full object-cover" alt="Table"></div>
+                  <div class="w-12 h-12 bg-white rounded-lg shadow-sm border-2 border-dashed border-rattan flex items-center justify-center text-rattan text-xl">+</div>
+                </div>
+              </div>
+              <h3 class="font-display text-xl font-semibold mb-2">Add Your Furniture</h3>
+              <p class="text-stone-500 text-sm leading-relaxed">Drop in pieces you want to visualize. Individual furniture photos, catalog images, or pull from your private asset library. Works with anything.</p>
+            </div>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="reveal-up delay-200 relative bg-[#F9F8F6] rounded-3xl p-8">
+            <span class="absolute top-6 right-6 font-display text-6xl font-bold text-stone-200">03</span>
+            <div class="relative z-10">
+              <div class="h-40 mb-6 flex flex-col items-center justify-center gap-3">
+                <div class="w-full max-w-[220px] bg-white rounded-xl p-3 shadow-sm flex items-center gap-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-purple-500 shrink-0">
+                    <path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275Z"/>
+                  </svg>
+                  <span class="text-xs text-stone-500 italic">"Put the chair by the window..."</span>
+                </div>
+                <div class="px-4 py-2 bg-clay/10 rounded-full text-xs font-semibold text-clay">⏱ 15-30 sec</div>
+              </div>
+              <h3 class="font-display text-xl font-semibold mb-2">Describe & Generate</h3>
+              <p class="text-stone-500 text-sm leading-relaxed">Tell the AI where to place it. Type natural language prompts or let AI Designer choose optimal placement. See photorealistic results in seconds.</p>
             </div>
           </div>
         </div>
-        
-        <div class="workflow-card workflow-card-dark reveal-element delay-100">
-          <div class="workflow-step">
-            <span class="workflow-step-num">2</span>
-            <h3 class="workflow-step-title font-display">Experience in AR</h3>
+      </div>
+    </section>
+
+    <!-- Who It's For -->
+    <section class="py-24 px-6 max-w-7xl mx-auto">
+      <div class="text-center max-w-2xl mx-auto mb-16 reveal-up">
+        <p class="text-xs font-bold uppercase tracking-[0.2em] text-clay mb-4">Who it's for</p>
+        <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight text-stone-900">
+          Built for professionals who visualize.
+        </h2>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div class="reveal-up bg-white rounded-3xl p-8 border border-stone-200 text-center hover:shadow-xl hover:border-rattan transition-all">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-100 to-rattan/20 flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/>
+              <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+              <path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/>
+              <path d="M2 7h20"/>
+            </svg>
           </div>
-          <p>Export your generated designs directly to .USDZ or .GLB formats for instant AR walkthroughs on iOS and Android.</p>
-          
-          <div class="export-grid">
-            <div class="export-option">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-              </svg>
-              <span>.GLB</span>
-            </div>
-            <div class="export-option">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="5" y="2" width="14" height="20" rx="2"/>
-                <path d="M12 18h.01"/>
-              </svg>
-              <span>.USDZ</span>
-            </div>
+          <h3 class="font-display text-lg font-semibold mb-2">Interior Designers</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Show clients 5 furniture options in the first meeting. Close deals faster with instant visualization.</p>
+        </div>
+
+        <div class="reveal-up delay-100 bg-white rounded-3xl p-8 border border-stone-200 text-center hover:shadow-xl hover:border-rattan transition-all">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-100 to-rattan/20 flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <line x1="2" x2="5" y1="12" y2="12"/>
+              <line x1="19" x2="22" y1="12" y2="12"/>
+              <line x1="12" x2="12" y1="2" y2="5"/>
+              <line x1="12" x2="12" y1="19" y2="22"/>
+              <circle cx="12" cy="12" r="7"/>
+            </svg>
           </div>
-          
-          <div class="workflow-glow"></div>
+          <h3 class="font-display text-lg font-semibold mb-2">Architects</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Test furniture layouts against floor plans. Generate presentation materials in minutes.</p>
+        </div>
+
+        <div class="reveal-up delay-200 bg-white rounded-3xl p-8 border border-stone-200 text-center hover:shadow-xl hover:border-rattan transition-all">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-100 to-rattan/20 flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <path d="M5 5.5A3.5 3.5 0 0 1 8.5 2H12v7H8.5A3.5 3.5 0 0 1 5 5.5z"/>
+              <path d="M12 2h3.5a3.5 3.5 0 1 1 0 7H12V2z"/>
+              <path d="M12 12.5a3.5 3.5 0 1 1 7 0 3.5 3.5 0 1 1-7 0z"/>
+              <path d="M5 19.5A3.5 3.5 0 0 1 8.5 16H12v3.5a3.5 3.5 0 1 1-7 0z"/>
+            </svg>
+          </div>
+          <h3 class="font-display text-lg font-semibold mb-2">Furniture Brands</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Show products in any environment. Create marketing materials without photo shoots.</p>
+        </div>
+
+        <div class="reveal-up delay-300 bg-white rounded-3xl p-8 border border-stone-200 text-center hover:shadow-xl hover:border-rattan transition-all">
+          <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-stone-100 to-rattan/20 flex items-center justify-center mx-auto mb-6">
+            <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-clay">
+              <path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/>
+              <path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            </svg>
+          </div>
+          <h3 class="font-display text-lg font-semibold mb-2">Real Estate Stagers</h3>
+          <p class="text-stone-500 text-sm leading-relaxed">Virtual staging in minutes. Generate multiple style options for different buyer personas.</p>
         </div>
       </div>
     </section>
 
     <!-- Testimonial -->
-    <section class="section">
-      <div class="testimonial linen-texture reveal-element">
-        <div class="testimonial-quote">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <section class="py-24 px-6">
+      <div class="max-w-4xl mx-auto">
+        <div class="reveal-up bg-stone-100 rounded-[2rem] p-8 md:p-12 relative overflow-hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" class="absolute top-8 left-8 text-rattan/30 rotate-180">
             <path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/>
             <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/>
           </svg>
-        </div>
-        
-        <div class="testimonial-content">
-          <h3 class="testimonial-text font-display">
-            "Ature has completely revolutionized our client presentations. We've cut our staging time by 70% while increasing client approval rates on the first pitch."
-          </h3>
           
-          <div class="testimonial-author">
-            <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" alt="Elena Rodriguez" class="testimonial-avatar">
-            <div>
-              <p class="testimonial-name">Elena Rodriguez</p>
-              <p class="testimonial-role">Lead Architect at Studio Kōan</p>
+          <div class="relative z-10 text-center">
+            <p class="font-display text-xl md:text-2xl text-stone-800 font-medium italic leading-relaxed mb-8">
+              "Ature has completely revolutionized our client presentations. We've cut our staging time by 70% while increasing client approval rates on the first pitch. Our designers used to spend hours in Photoshop—now they generate 10 options in the time it took to make one."
+            </p>
+            <div class="flex flex-col items-center gap-3">
+              <img src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&q=80" alt="Elena Rodriguez" class="w-14 h-14 rounded-full object-cover border-2 border-white shadow-md">
+              <div>
+                <p class="font-semibold text-stone-900">Elena Rodriguez</p>
+                <p class="text-sm text-stone-500">Lead Architect at Studio Kōan</p>
+              </div>
             </div>
           </div>
-          
-          <div class="testimonial-stats">
-            <div class="testimonial-stat">
-              <p class="testimonial-stat-value font-display">70%</p>
-              <p class="testimonial-stat-label">Faster Staging</p>
-            </div>
-            <div class="testimonial-stat-divider"></div>
-            <div class="testimonial-stat">
-              <p class="testimonial-stat-value font-display">2x</p>
-              <p class="testimonial-stat-label">Win Rate</p>
-            </div>
+        </div>
+
+        <!-- Stats -->
+        <div class="reveal-up grid grid-cols-3 gap-6 mt-8 bg-white rounded-2xl p-8 border border-stone-200">
+          <div class="text-center">
+            <p class="font-display text-4xl md:text-5xl font-bold text-clay">70%</p>
+            <p class="text-sm text-stone-500 font-medium uppercase tracking-wider mt-1">Faster staging</p>
+          </div>
+          <div class="text-center border-x border-stone-200">
+            <p class="font-display text-4xl md:text-5xl font-bold text-clay">2x</p>
+            <p class="text-sm text-stone-500 font-medium uppercase tracking-wider mt-1">Win rate</p>
+          </div>
+          <div class="text-center">
+            <p class="font-display text-4xl md:text-5xl font-bold text-clay">30s</p>
+            <p class="text-sm text-stone-500 font-medium uppercase tracking-wider mt-1">Render time</p>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- FAQs -->
-    <section class="faqs reveal-element">
-      <h2 class="faqs-title font-display">Frequently Asked Questions</h2>
-      
-      <details class="faq-item hover-lift oak-grain">
-        <summary class="faq-question">
-          <span>Can I export models to Revit or SketchUp?</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </summary>
-        <div class="faq-answer">
-          Yes! We support exports to .OBJ and .FBX formats which are compatible with most professional CAD software including Revit, SketchUp, and Rhino.
+    <!-- Pricing -->
+    <section id="pricing" class="py-24 px-6 bg-white">
+      <div class="max-w-5xl mx-auto">
+        <div class="text-center max-w-2xl mx-auto mb-16 reveal-up">
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-clay mb-4">Pricing</p>
+          <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight text-stone-900 mb-4">
+            Start free. Upgrade when you're ready.
+          </h2>
+          <p class="text-lg text-stone-500">No hidden fees. No surprises. Cancel anytime.</p>
         </div>
-      </details>
-      
-      <details class="faq-item hover-lift oak-grain">
-        <summary class="faq-question">
-          <span>Is the generated furniture commercially available?</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </summary>
-        <div class="faq-answer">
-          Our "Market Mode" matches generated items with real inventory from over 400 partner brands. You can generate a shopping list with one click.
+
+        <div class="grid md:grid-cols-3 gap-6">
+          <!-- Free -->
+          <div class="reveal-up bg-[#F9F8F6] rounded-3xl p-8 border border-stone-200 flex flex-col">
+            <div class="text-center pb-6 border-b border-stone-200 mb-6">
+              <h3 class="font-display text-lg font-semibold text-stone-500 uppercase tracking-wider mb-2">Free</h3>
+              <p class="font-display text-4xl font-bold text-stone-900">$0<span class="text-base font-normal text-stone-400">/mo</span></p>
+            </div>
+            <ul class="space-y-3 flex-1 mb-6">
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> 5 AI blends/month</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Basic AR viewer</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Standard resolution</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Community support</li>
+            </ul>
+            <button class="w-full py-3 rounded-full bg-stone-200 text-stone-900 font-semibold text-sm hover:bg-stone-300 transition-colors">Get Started</button>
+          </div>
+
+          <!-- Pro -->
+          <div class="reveal-up delay-100 bg-stone-900 rounded-3xl p-8 border-2 border-clay flex flex-col relative shadow-xl">
+            <div class="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-clay text-white text-xs font-bold uppercase tracking-wider rounded-full">Most Popular</div>
+            <div class="text-center pb-6 border-b border-stone-700 mb-6">
+              <h3 class="font-display text-lg font-semibold text-stone-400 uppercase tracking-wider mb-2">Pro</h3>
+              <p class="font-display text-4xl font-bold text-white">$29<span class="text-base font-normal text-stone-500">/mo</span></p>
+            </div>
+            <ul class="space-y-3 flex-1 mb-6">
+              <li class="flex items-center gap-3 text-sm text-stone-300"><span class="text-green-400 font-bold">✓</span> Unlimited blends</li>
+              <li class="flex items-center gap-3 text-sm text-stone-300"><span class="text-green-400 font-bold">✓</span> High-res exports</li>
+              <li class="flex items-center gap-3 text-sm text-stone-300"><span class="text-green-400 font-bold">✓</span> Project history</li>
+              <li class="flex items-center gap-3 text-sm text-stone-300"><span class="text-green-400 font-bold">✓</span> Priority support</li>
+            </ul>
+            <button class="w-full py-3 rounded-full bg-clay text-white font-semibold text-sm hover:bg-clay/90 transition-colors shadow-lg shadow-clay/30">Start Pro Trial</button>
+          </div>
+
+          <!-- Enterprise -->
+          <div class="reveal-up delay-200 bg-[#F9F8F6] rounded-3xl p-8 border border-stone-200 flex flex-col">
+            <div class="text-center pb-6 border-b border-stone-200 mb-6">
+              <h3 class="font-display text-lg font-semibold text-stone-500 uppercase tracking-wider mb-2">Enterprise</h3>
+              <p class="font-display text-4xl font-bold text-stone-900">Custom</p>
+            </div>
+            <ul class="space-y-3 flex-1 mb-6">
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Everything in Pro</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Team collaboration</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> API access</li>
+              <li class="flex items-center gap-3 text-sm text-stone-600"><span class="text-clay font-bold">✓</span> Dedicated support</li>
+            </ul>
+            <button class="w-full py-3 rounded-full bg-stone-200 text-stone-900 font-semibold text-sm hover:bg-stone-300 transition-colors">Contact Sales</button>
+          </div>
         </div>
-      </details>
-      
-      <details class="faq-item hover-lift oak-grain">
-        <summary class="faq-question">
-          <span>How does the pricing work?</span>
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 12 15 18 9"/>
-          </svg>
-        </summary>
-        <div class="faq-answer">
-          We offer a free tier for hobbyists. Professional plans start at $29/month allowing for high-resolution exports and commercial licensing.
-        </div>
-      </details>
+      </div>
     </section>
 
-    <!-- CTA Section -->
-    <section class="cta reveal-element">
-      <div class="cta-content">
-        <h2 class="cta-title font-display">Ready to transform your workflow?</h2>
-        <p class="cta-subtitle">Join 10,000+ designers using Ature to visualize the future of living spaces.</p>
-        
-        <div class="cta-buttons">
-          <a href="#" class="cta-btn-primary clay-button hover-lift">Get Started Free</a>
-          <a href="#" class="cta-btn-secondary">Book a Demo</a>
-        </div>
-        
-        <p class="cta-note">No credit card required for free tier.</p>
+    <!-- FAQ -->
+    <section class="py-24 px-6 max-w-3xl mx-auto">
+      <div class="text-center mb-12 reveal-up">
+        <h2 class="font-display text-3xl md:text-4xl font-semibold tracking-tight text-stone-900">
+          Frequently Asked Questions
+        </h2>
       </div>
-      
-      <div class="cta-glow-1"></div>
-      <div class="cta-glow-2"></div>
+
+      <div class="space-y-4 reveal-up">
+        <details class="group bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <summary class="flex items-center justify-between p-6 cursor-pointer font-medium">
+            <span>How is this different from Photoshop?</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-rattan transition-transform group-open:rotate-180">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </summary>
+          <div class="px-6 pb-6 text-stone-500 text-sm leading-relaxed">
+            Photoshop requires manual compositing—matching lighting, adding shadows, adjusting perspective by hand. Ature's AI handles all of that automatically. What takes 30 minutes in Photoshop takes 30 seconds here.
+          </div>
+        </details>
+
+        <details class="group bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <summary class="flex items-center justify-between p-6 cursor-pointer font-medium">
+            <span>Can I upload my own furniture photos?</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-rattan transition-transform group-open:rotate-180">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </summary>
+          <div class="px-6 pb-6 text-stone-500 text-sm leading-relaxed">
+            Yes! Upload any furniture image—product photos, catalog cuts, or photos you've taken. The AI will isolate the furniture and blend it naturally into your room scenes.
+          </div>
+        </details>
+
+        <details class="group bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <summary class="flex items-center justify-between p-6 cursor-pointer font-medium">
+            <span>Is my data private?</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-rattan transition-transform group-open:rotate-180">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </summary>
+          <div class="px-6 pb-6 text-stone-500 text-sm leading-relaxed">
+            Absolutely. Your projects, assets, and generated images are completely private to your account. We don't train AI on your data, share it with third parties, or expose it to other users.
+          </div>
+        </details>
+
+        <details class="group bg-white rounded-2xl border border-stone-200 overflow-hidden">
+          <summary class="flex items-center justify-between p-6 cursor-pointer font-medium">
+            <span>Do I need technical skills?</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class="text-rattan transition-transform group-open:rotate-180">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </summary>
+          <div class="px-6 pb-6 text-stone-500 text-sm leading-relaxed">
+            Not at all. If you can drag-and-drop files and type a sentence, you can use Ature. The AI handles all the technical complexity of compositing and rendering.
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <!-- Final CTA -->
+    <section class="py-24 px-6">
+      <div class="reveal-up max-w-5xl mx-auto bg-stone-900 rounded-[2rem] md:rounded-[3rem] p-12 md:p-16 text-center text-white relative overflow-hidden">
+        <div class="relative z-10">
+          <h2 class="font-display text-3xl md:text-5xl font-semibold tracking-tight mb-4">
+            Your next client is waiting to see the vision.
+          </h2>
+          <p class="text-lg text-stone-400 mb-8 max-w-xl mx-auto">
+            Stop describing what a space could look like. Show them.<br>Start free—no credit card required.
+          </p>
+          <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
+            <button class="w-full sm:w-auto px-8 py-4 bg-clay text-white rounded-full font-semibold text-sm hover:bg-clay/90 transition-all shadow-lg shadow-clay/30">
+              Start designing free
+            </button>
+            <button class="w-full sm:w-auto px-8 py-4 bg-transparent text-white border border-white/30 rounded-full font-semibold text-sm hover:bg-white/10 transition-all">
+              Book a demo
+            </button>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-6 text-sm text-stone-500">
+            <span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-400"><polyline points="20 6 9 17 4 12"/></svg> No credit card required</span>
+            <span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-400"><polyline points="20 6 9 17 4 12"/></svg> Free tier forever</span>
+            <span class="flex items-center gap-2"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="text-green-400"><polyline points="20 6 9 17 4 12"/></svg> SOC 2 compliant</span>
+          </div>
+        </div>
+        <!-- Glows -->
+        <div class="absolute -top-24 -right-24 w-64 h-64 bg-clay/20 rounded-full blur-3xl"></div>
+        <div class="absolute -bottom-24 -left-24 w-64 h-64 bg-rattan/20 rounded-full blur-3xl"></div>
+      </div>
     </section>
   </main>
 
   <!-- Footer -->
-  <footer class="footer">
-    <div class="footer-links">
-      <a href="#">Privacy</a>
-      <a href="#">Terms</a>
-      <a href="#">Studio API</a>
-      <a href="https://github.com" target="_blank" rel="noopener noreferrer">GitHub</a>
+  <footer class="border-t border-stone-200 bg-white pt-16 pb-8">
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 mb-16">
+        <div class="col-span-2 md:col-span-1">
+          <a href="#" class="font-display font-semibold tracking-tight text-lg block mb-4">ature.</a>
+          <p class="text-xs text-stone-500 max-w-[160px]">AI-powered furniture visualization for the modern age.</p>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-widest text-stone-400 mb-4">Product</h4>
+          <ul class="space-y-3 text-sm text-stone-600">
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Studio</a></li>
+            <li><a href="#" class="hover:text-stone-900 transition-colors">API</a></li>
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Pricing</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-widest text-stone-400 mb-4">Company</h4>
+          <ul class="space-y-3 text-sm text-stone-600">
+            <li><a href="#" class="hover:text-stone-900 transition-colors">About</a></li>
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Blog</a></li>
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Careers</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-xs font-bold uppercase tracking-widest text-stone-400 mb-4">Legal</h4>
+          <ul class="space-y-3 text-sm text-stone-600">
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Privacy</a></li>
+            <li><a href="#" class="hover:text-stone-900 transition-colors">Terms</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="flex flex-col md:flex-row items-center justify-between pt-8 border-t border-stone-100 gap-4">
+        <span class="text-xs text-stone-400">© 2025 Ature Inc. — Professional interior visualization, powered by AI.</span>
+        <div class="flex gap-4">
+          <a href="#" class="text-stone-400 hover:text-stone-900 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/>
+              <path d="M9 18c-4.51 2-5-2-7-2"/>
+            </svg>
+          </a>
+          <a href="#" class="text-stone-400 hover:text-stone-900 transition-colors">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <rect width="20" height="20" x="2" y="2" rx="5" ry="5"/>
+              <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/>
+              <line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/>
+            </svg>
+          </a>
+        </div>
+      </div>
     </div>
-    <p>© 2025 Ature Inc. Powered by Gemini.</p>
   </footer>
 
   <script>
-    // Reveal on scroll animation
-    document.addEventListener('DOMContentLoaded', () => {
-      const elements = document.querySelectorAll('.reveal-element');
-      
-      const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add('is-visible');
-            observer.unobserve(entry.target);
-          }
-        });
-      }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
-      
-      elements.forEach(el => observer.observe(el));
-    });
-    
-    // Scroll-based furniture reveal animation
-    const scrollContainer = document.getElementById('scroll-container');
-    const furnitureThresholds = {
-      sofa: 0.1,
-      chair: 0.25,
-      table: 0.4,
-      lamp: 0.55,
-      plant: 0.7,
-      rug: 0.85
-    };
-    
-    window.addEventListener('scroll', () => {
-      if (!scrollContainer) return;
-      
-      const rect = scrollContainer.getBoundingClientRect();
-      const windowHeight = window.innerHeight;
-      const start = windowHeight * 0.5;
-      const end = -rect.height + windowHeight * 0.5;
-      const progress = Math.max(0, Math.min(1, (start - rect.top) / (start - end)));
-      
-      // Reveal furniture based on scroll progress
-      Object.entries(furnitureThresholds).forEach(([id, threshold]) => {
-        const el = document.getElementById(id);
-        if (el) {
-          if (progress > threshold) {
-            el.classList.add('visible');
-            el.style.transform = id === 'rug' 
-              ? 'translateX(-50%) translateY(0) scale(1)'
-              : id === 'sofa'
-              ? 'translateX(0) translateY(0) scale(1)'
-              : id === 'table'
-              ? 'translateX(0) translateY(0) scale(1)'
-              : id === 'chair'
-              ? 'translateX(0) translateY(0) scale(1) rotate(0deg)'
-              : id === 'lamp'
-              ? 'translateY(0) scale(1)'
-              : 'translateY(0) scale(1)';
-          }
+    // Reveal Elements on Scroll
+    const observerOptions = { threshold: 0.1, rootMargin: '0px 0px -50px 0px' };
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('in-view');
+          observer.unobserve(entry.target);
         }
       });
-      
-      // Sun effect
-      const sunEffect = document.getElementById('sun-effect');
-      if (sunEffect) {
-        sunEffect.style.opacity = progress > 0.9 ? '0.15' : '0';
-      }
-    }, { passive: true });
+    }, observerOptions);
+
+    document.querySelectorAll('.reveal-up').forEach(el => observer.observe(el));
   </script>
 </body>
 </html>
-

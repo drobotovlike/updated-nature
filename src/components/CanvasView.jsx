@@ -3705,7 +3705,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             await generateToCanvas(prompt.trim())
           }}
           isLoading={isGenerating || generatingVariations}
-          placeholder="Ask AI to generate or modify your design..."
+          placeholder="Ask anything"
+          onUploadReferenceImage={handleFileUpload}
+          onSelectReferenceImage={handleSelectReferenceImage}
+          onClearReferenceImage={() => setReferenceImage(null)}
+          referenceImage={referenceImage}
+          selectedItem={selectedItem}
         />
 
         {/* Presence Indicator - Top Right */}

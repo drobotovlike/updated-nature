@@ -8,37 +8,41 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Warm natural palette
+        // Blocks-style modern palette
         background: {
-          base: '#F6F2EE', // warm paper
+          base: '#FAFAFA', // clean light gray
           elevated: '#FFFFFF', // cards
-          surface: '#F1EBE4', // secondary surfaces
+          surface: '#F5F5F5', // secondary surfaces
         },
         surface: {
           base: '#FFFFFF', // cards, buttons
-          elevated: '#F1EBE4', // secondary surfaces
+          elevated: '#FAFAFA', // secondary surfaces
           raised: '#FFFFFF',
         },
         accent: {
-          clay: '#D97757', // CTA buttons
-          rattan: '#C5A26D', // subtle highlights
+          clay: '#18181B', // dark for CTAs (blocks style)
+          rattan: '#71717A', // subtle highlights
         },
         text: {
-          primary: '#2C2C2C', // almost-black
-          secondary: '#7C7C7C', // secondary text
-          tertiary: '#A8A8A8',
+          primary: '#09090B', // near-black
+          secondary: '#71717A', // medium gray
+          tertiary: '#A1A1AA', // light gray
         },
         border: {
-          DEFAULT: 'rgba(44, 44, 44, 0.1)',
+          DEFAULT: '#E4E4E7', // subtle gray border
+        },
+        primary: {
+          400: '#18181B', // dark primary
+          300: '#27272A', // hover state
         },
         error: {
-          400: '#FB7185',
+          400: '#EF4444',
         },
         warning: {
-          400: '#FBBF24',
+          400: '#F59E0B',
         },
         success: {
-          400: '#34D399',
+          400: '#10B981',
         },
       },
       fontFamily: {
@@ -63,17 +67,18 @@ export default {
         xs: '4px',
         sm: '6px',
         DEFAULT: '8px',
-        md: '12px',
-        lg: '16px',
-        xl: '24px',
+        md: '8px',
+        lg: '12px',
+        xl: '16px',
         '20': '20px', // For squircle
       },
       boxShadow: {
-        sm: '0 1px 2px 0 rgb(0 0 0 / 0.08)',
-        DEFAULT: '0 2px 4px -1px rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.06)',
-        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -2px rgb(0 0 0 / 0.05)',
-        'oak': '0 4px 12px -2px rgba(44, 44, 44, 0.08), 0 2px 4px -1px rgba(44, 44, 44, 0.04)',
-        'clay-pressed': 'inset 0 1px 2px 0 rgba(217, 119, 87, 0.2)',
+        sm: '0 1px 2px 0 rgb(0 0 0 / 0.05)',
+        DEFAULT: '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
+        md: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+        lg: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
+        'oak': '0 1px 3px 0 rgb(0 0 0 / 0.1)',
+        'clay-pressed': 'inset 0 1px 2px 0 rgba(0, 0, 0, 0.1)',
       },
       transitionTimingFunction: {
         'apple': 'cubic-bezier(0.25, 0.8, 0.25, 1)',

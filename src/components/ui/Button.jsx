@@ -21,9 +21,9 @@ export function Button({
   }
   
   const variantClasses = {
-    primary: 'bg-primary-400 text-background-base hover:bg-primary-300 hover:-translate-y-[1px] active:scale-[0.95] active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0',
-    secondary: 'bg-surface-elevated text-text-primary hover:bg-surface-raised hover:-translate-y-[1px] active:scale-[0.95] active:translate-y-0 disabled:opacity-50 disabled:translate-y-0',
-    ghost: 'bg-transparent text-text-secondary hover:bg-surface-base hover:-translate-y-[1px] active:scale-[0.95] active:translate-y-0 disabled:opacity-50 disabled:translate-y-0',
+    primary: 'bg-primary-400 text-white hover:bg-primary-300 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed transition-all',
+    secondary: 'bg-white text-text-primary border border-border hover:bg-surface-elevated shadow-sm hover:shadow disabled:opacity-50 transition-all',
+    ghost: 'bg-transparent text-text-secondary hover:bg-surface-base hover:text-text-primary disabled:opacity-50 transition-all',
   }
   
   return (

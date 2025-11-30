@@ -120,7 +120,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
         // Apple uses exponential zoom: newScale = oldScale * exp(-deltaY * sensitivity)
         // This creates a smooth, logarithmic zoom curve that feels natural
         // Sensitivity tuned to match Apple's trackpad zoom feel
-        const zoomSensitivity = 0.0015 // Apple-like sensitivity (slightly slower than before)
+        const zoomSensitivity = 0.0018 // Apple-like sensitivity +20% (0.0015 * 1.2)
         const zoomFactor = Math.exp(-deltaY * zoomSensitivity)
         
         const proposedScale = oldScale * zoomFactor

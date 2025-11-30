@@ -980,11 +980,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   }, [projectId, userId, dimensions.width, dimensions.height, setError, setLoading, updateSettings, setCamera, stageRef])
 
   // Load canvas data
+  // Only reload when projectId or userId changes, not when Clerk state changes
   useEffect(() => {
     if (projectId && userId) {
       loadCanvas()
     }
-  }, [projectId, userId, loadCanvas, isClerkReady, clerk])
+  }, [projectId, userId, loadCanvas])
 
   // Update dimensions on resize - fixed size, always full screen
   useEffect(() => {

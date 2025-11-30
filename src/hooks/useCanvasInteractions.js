@@ -55,6 +55,8 @@ export function useCanvasInteractions(stageRef, dimensions) {
   
   // Animation ref for smooth zoom transitions
   const zoomAnimationRef = useRef(null)
+  const zoomTimeoutRef = useRef(null)
+  const isZoomingRef = useRef(false)
 
   /**
    * Sync panning state to store (for grid optimization)
@@ -123,8 +125,8 @@ export function useCanvasInteractions(stageRef, dimensions) {
         
         // Apple uses exponential zoom: newScale = oldScale * exp(-deltaY * sensitivity)
         // This creates a smooth, logarithmic zoom curve that feels natural
-        // Sensitivity tuned to match Apple's trackpad zoom feel
-        const zoomSensitivity = 0.0018 // Apple-like sensitivity +20% (0.0015 * 1.2)
+        // Sensitivity tuned to match Apple's trackpad zoom feel (native sensitivity)
+        const zoomSensitivity = 0.0035 // Apple native trackpad zoom sensitivity
         const zoomFactor = Math.exp(-deltaY * zoomSensitivity)
         
         const proposedScale = currentScale * zoomFactor
@@ -142,28 +144,57 @@ export function useCanvasInteractions(stageRef, dimensions) {
 
         const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
 
-        // Cancel any ongoing zoom animation for smooth transitions
+        // Clear any pending zoom timeout and cancel ongoing animation
+        if (zoomTimeoutRef.current) {
+          clearTimeout(zoomTimeoutRef.current)
+        }
         if (zoomAnimationRef.current) {
           zoomAnimationRef.current.stop()
           zoomAnimationRef.current = null
         }
 
-        // Animate zoom with smooth transition (short duration for responsive feel)
-        zoomAnimationRef.current = stage.to({
-          scaleX: clampedScale,
-          scaleY: clampedScale,
-          x: newCamera.x,
-          y: newCamera.y,
-          duration: 0.15, // Short duration for responsive wheel zoom
-          easing: Konva.Easings.EaseOut,
-          onFinish: () => {
-            zoomAnimationRef.current = null
-            setCamera({
-              ...newCamera,
-              zoom: clampedScale,
-            })
-          }
+        // During active scrolling, update immediately for Apple-like responsive feel
+        isZoomingRef.current = true
+        stage.scale({ x: clampedScale, y: clampedScale })
+        stage.position({ x: newCamera.x, y: newCamera.y })
+        updateCameraThrottled({
+          ...newCamera,
+          zoom: clampedScale,
         })
+
+        // Set timeout to detect when scrolling stops, then smooth finish
+        zoomTimeoutRef.current = setTimeout(() => {
+          isZoomingRef.current = false
+          zoomTimeoutRef.current = null
+          
+          // Get current state
+          const currentFinalScale = stage.scaleX()
+          const currentFinalPos = stage.position()
+          
+          // Recalculate final camera position for smooth finish
+          const finalCamera = zoomToCursor(pointer, {
+            x: currentFinalPos.x,
+            y: currentFinalPos.y,
+            zoom: currentFinalScale,
+          }, clampedScale)
+          
+          // Smooth finish animation (very short for immediate feel)
+          zoomAnimationRef.current = stage.to({
+            scaleX: clampedScale,
+            scaleY: clampedScale,
+            x: finalCamera.x,
+            y: finalCamera.y,
+            duration: 0.08,
+            easing: Konva.Easings.EaseOut,
+            onFinish: () => {
+              zoomAnimationRef.current = null
+              setCamera({
+                ...finalCamera,
+                zoom: clampedScale,
+              })
+            }
+          })
+        }, 50) // Wait 50ms after last wheel event to detect scroll end
       } else {
         // PAN mode - two-finger scroll (Apple natural scrolling)
         // Apple's natural scrolling: content follows finger direction 1:1

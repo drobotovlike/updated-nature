@@ -1,4 +1,5 @@
 import { useCanvasStore } from '../stores/useCanvasStore'
+import Konva from 'konva'
 
 /**
  * Miro-Style Zoom Controls
@@ -34,9 +35,18 @@ export default function ZoomControls({ stageRef }) {
         y: centerY - mousePointTo.y * newScale,
       }
       
-      setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
-      stage.scale({ x: newZoom, y: newZoom })
-      stage.position(newPos)
+      // Animate zoom with smooth transition
+      stage.to({
+        scaleX: newZoom,
+        scaleY: newZoom,
+        x: newPos.x,
+        y: newPos.y,
+        duration: 0.2,
+        easing: Konva.Easings.EaseOut,
+        onFinish: () => {
+          setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
+        }
+      })
     } else {
       setCamera({ ...camera, zoom: newZoom })
     }
@@ -62,9 +72,18 @@ export default function ZoomControls({ stageRef }) {
         y: centerY - mousePointTo.y * newScale,
       }
       
-      setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
-      stage.scale({ x: newZoom, y: newZoom })
-      stage.position(newPos)
+      // Animate zoom with smooth transition
+      stage.to({
+        scaleX: newZoom,
+        scaleY: newZoom,
+        x: newPos.x,
+        y: newPos.y,
+        duration: 0.2,
+        easing: Konva.Easings.EaseOut,
+        onFinish: () => {
+          setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
+        }
+      })
     } else {
       setCamera({ ...camera, zoom: newZoom })
     }
@@ -80,9 +99,18 @@ export default function ZoomControls({ stageRef }) {
         y: dimensions.height / 2 - (dimensions.height / 2),
       }
       
-      setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
-      stage.scale({ x: newZoom, y: newZoom })
-      stage.position(newPos)
+      // Animate zoom with smooth transition
+      stage.to({
+        scaleX: newZoom,
+        scaleY: newZoom,
+        x: newPos.x,
+        y: newPos.y,
+        duration: 0.3,
+        easing: Konva.Easings.EaseOut,
+        onFinish: () => {
+          setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
+        }
+      })
     }
   }
 
@@ -107,9 +135,18 @@ export default function ZoomControls({ stageRef }) {
         y: centerY - mousePointTo.y * newScale,
       }
       
-      setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
-      stage.scale({ x: newZoom, y: newZoom })
-      stage.position(newPos)
+      // Animate zoom with smooth transition
+      stage.to({
+        scaleX: newZoom,
+        scaleY: newZoom,
+        x: newPos.x,
+        y: newPos.y,
+        duration: 0.2,
+        easing: Konva.Easings.EaseOut,
+        onFinish: () => {
+          setCamera({ x: newPos.x, y: newPos.y, zoom: newZoom })
+        }
+      })
     }
   }
 

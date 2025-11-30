@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { useCanvasStore } from '../stores/useCanvasStore'
 import { toWorld, getWorldPointerPosition, zoomToCursor } from '../utils/coordinateSystem'
+import Konva from 'konva'
 
 const MIN_ZOOM = 0.1
 const MAX_ZOOM = 5
@@ -51,6 +52,9 @@ export function useCanvasInteractions(stageRef, dimensions) {
   // RAF throttling refs for smooth 60fps updates
   const rafRef = useRef(null)
   const pendingCameraRef = useRef(null)
+  
+  // Animation ref for smooth zoom transitions
+  const zoomAnimationRef = useRef(null)
 
   /**
    * Sync panning state to store (for grid optimization)
@@ -114,7 +118,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
         // Apple-style logarithmic zoom for natural feel
         e.evt.preventDefault()
         
-        const oldScale = stage.scaleX()
+        const currentScale = stage.scaleX()
         const deltaY = e.evt.deltaY
         
         // Apple uses exponential zoom: newScale = oldScale * exp(-deltaY * sensitivity)
@@ -123,25 +127,42 @@ export function useCanvasInteractions(stageRef, dimensions) {
         const zoomSensitivity = 0.0018 // Apple-like sensitivity +20% (0.0015 * 1.2)
         const zoomFactor = Math.exp(-deltaY * zoomSensitivity)
         
-        const proposedScale = oldScale * zoomFactor
+        const proposedScale = currentScale * zoomFactor
         const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
         // Only update if zoom actually changed (prevent jitter)
-        if (Math.abs(clampedScale - oldScale) < 0.0001) return
+        if (Math.abs(clampedScale - currentScale) < 0.0001) return
 
         // Zoom to cursor position (Apple-style: zoom towards where you're pointing)
         const oldCamera = {
           x: stage.x(),
           y: stage.y(),
-          zoom: oldScale,
+          zoom: currentScale,
         }
 
         const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
 
-        // Use throttled update
-        updateCameraThrottled({
-          ...newCamera,
-          zoom: clampedScale,
+        // Cancel any ongoing zoom animation for smooth transitions
+        if (zoomAnimationRef.current) {
+          zoomAnimationRef.current.stop()
+          zoomAnimationRef.current = null
+        }
+
+        // Animate zoom with smooth transition (short duration for responsive feel)
+        zoomAnimationRef.current = stage.to({
+          scaleX: clampedScale,
+          scaleY: clampedScale,
+          x: newCamera.x,
+          y: newCamera.y,
+          duration: 0.15, // Short duration for responsive wheel zoom
+          easing: Konva.Easings.EaseOut,
+          onFinish: () => {
+            zoomAnimationRef.current = null
+            setCamera({
+              ...newCamera,
+              zoom: clampedScale,
+            })
+          }
         })
       } else {
         // PAN mode - two-finger scroll (Apple natural scrolling)

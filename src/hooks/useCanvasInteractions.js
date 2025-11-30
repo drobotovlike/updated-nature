@@ -111,23 +111,25 @@ export function useCanvasInteractions(stageRef, dimensions) {
       
       if (isPinchZoom) {
         // ZOOM mode - pinch or Ctrl+scroll
-        e.evt.preventDefault() // Only prevent default for zoom
+        // Apple-style logarithmic zoom for natural feel
+        e.evt.preventDefault()
         
         const oldScale = stage.scaleX()
         const deltaY = e.evt.deltaY
         
-        // Improved zoom factor calculation
-        // Use deltaY sign: negative = zoom in, positive = zoom out
-        const zoomSpeed = 0.001 // More sensitive zoom
-        const zoomFactor = 1 - (deltaY * zoomSpeed)
+        // Apple uses exponential zoom: newScale = oldScale * exp(-deltaY * sensitivity)
+        // This creates a smooth, logarithmic zoom curve that feels natural
+        // Sensitivity tuned to match Apple's trackpad zoom feel
+        const zoomSensitivity = 0.0015 // Apple-like sensitivity (slightly slower than before)
+        const zoomFactor = Math.exp(-deltaY * zoomSensitivity)
         
         const proposedScale = oldScale * zoomFactor
         const clampedScale = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, proposedScale))
 
-        // Only update if zoom actually changed
-        if (Math.abs(clampedScale - oldScale) < 0.001) return
+        // Only update if zoom actually changed (prevent jitter)
+        if (Math.abs(clampedScale - oldScale) < 0.0001) return
 
-        // Zoom to cursor position
+        // Zoom to cursor position (Apple-style: zoom towards where you're pointing)
         const oldCamera = {
           x: stage.x(),
           y: stage.y(),
@@ -142,28 +144,27 @@ export function useCanvasInteractions(stageRef, dimensions) {
           zoom: clampedScale,
         })
       } else {
-        // PAN mode - two-finger scroll (natural scrolling)
-        // Only prevent default if we're actually panning (not just hovering)
-        if (Math.abs(e.evt.deltaX) > 0 || Math.abs(e.evt.deltaY) > 0) {
-          e.evt.preventDefault()
-        }
+        // PAN mode - two-finger scroll (Apple natural scrolling)
+        // Apple's natural scrolling: content follows finger direction 1:1
+        e.evt.preventDefault()
         
         const deltaX = e.evt.deltaX
         const deltaY = e.evt.deltaY
         
-        // Handle shift+scroll for horizontal pan
+        // Handle shift+scroll for horizontal pan (Apple behavior)
         const panX = e.evt.shiftKey ? deltaY : deltaX
         const panY = e.evt.shiftKey ? 0 : deltaY
         
-        // Smooth panning sensitivity
-        const panSensitivity = 1.0
-        
+        // Apple uses 1:1 mapping - no sensitivity adjustment needed
+        // The browser already handles momentum and smooth scrolling
         const currentX = stage.x()
         const currentY = stage.y()
         const currentZoom = stage.scaleX()
         
-        const newX = currentX - panX * panSensitivity
-        const newY = currentY - panY * panSensitivity
+        // Direct 1:1 mapping (Apple natural scrolling)
+        // Negative because we want content to follow finger direction
+        const newX = currentX - panX
+        const newY = currentY - panY
 
         // Use throttled update
         updateCameraThrottled({

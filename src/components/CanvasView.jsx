@@ -189,11 +189,54 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
   )
 }
 
-// Canvas Item Component
+// Canvas Item Component - PERFORMANCE OPTIMIZED
 function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, showMeasurements, zoom, blendMode, transformerRef }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
+  const imageRef = useRef(null)
+  const lastCacheKeyRef = useRef(null)
+
+  // Memoize filter calculations to avoid recalculating every render
+  const { filters, brightness, contrast, saturation, hue, cacheKey } = useMemo(() => {
+    const adjustments = item.adjustments || {}
+    const b = (adjustments.brightness || 1) - 1
+    const c = (adjustments.contrast || 1) - 1
+    const s = (adjustments.saturation || 1) - 1
+    const h = (adjustments.hue || 0) / 180
+
+    const f = []
+    if (b !== 0) f.push(Konva.Filters.Brighten)
+    if (c !== 0) f.push(Konva.Filters.Contrast)
+    if (s !== 0 || h !== 0) f.push(Konva.Filters.HSL)
+
+    // Create a cache key to detect when we need to re-cache
+    const key = `${b}-${c}-${s}-${h}`
+
+    return { filters: f, brightness: b, contrast: c, saturation: s, hue: h, cacheKey: key }
+  }, [item.adjustments])
+
+  // PERFORMANCE: Cache image with filters only when filters change
+  useEffect(() => {
+    const imageNode = imageRef.current
+    if (!imageNode || !image) return
+
+    // Only re-cache if filters changed
+    if (filters.length > 0 && lastCacheKeyRef.current !== cacheKey) {
+      // Apply cache after a short delay to batch multiple updates
+      const timeoutId = setTimeout(() => {
+        imageNode.cache()
+        imageNode.getLayer()?.batchDraw()
+        lastCacheKeyRef.current = cacheKey
+      }, 16) // ~1 frame
+
+      return () => clearTimeout(timeoutId)
+    } else if (filters.length === 0 && lastCacheKeyRef.current !== null) {
+      // Clear cache if no filters
+      imageNode.clearCache()
+      lastCacheKeyRef.current = null
+    }
+  }, [image, filters.length, cacheKey])
 
   const handleDragEnd = useCallback((e) => {
     const node = e.target
@@ -229,19 +272,6 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
 
   if (!image) return null
 
-  // Apply color adjustments using Konva filters
-  const adjustments = item.adjustments || {}
-  const brightness = (adjustments.brightness || 1) - 1 // Konva expects -1 to 1
-  const contrast = (adjustments.contrast || 1) - 1 // Konva expects -1 to 1
-  const saturation = (adjustments.saturation || 1) - 1 // Konva expects -1 to 1
-  const hue = (adjustments.hue || 0) / 180 // Konva HSL expects -1 to 1 (0-360 degrees -> -1 to 1)
-
-  // Create filter array
-  const filters = []
-  if (brightness !== 0) filters.push(Konva.Filters.Brighten)
-  if (contrast !== 0) filters.push(Konva.Filters.Contrast)
-  if (saturation !== 0 || hue !== 0) filters.push(Konva.Filters.HSL)
-
   return (
     <Group
       ref={shapeRef}
@@ -266,9 +296,10 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       onTransformEnd={handleTransformEnd}
       visible={item.is_visible !== false}
       opacity={item.opacity || 1}
-      style={{ cursor: blendMode ? 'crosshair' : 'default' }}
+      perfectDrawEnabled={false}
     >
       <KonvaImage
+        ref={imageRef}
         image={image}
         width={item.width || image.width}
         height={item.height || image.height}
@@ -278,7 +309,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
         contrast={contrast}
         saturation={saturation}
         hue={hue}
-        cache
+        perfectDrawEnabled={false}
       />
       {(isSelected || isMultiSelected) && (
         <>
@@ -292,6 +323,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
             strokeWidth={2 / zoom}
             dash={[5, 5]}
             listening={false}
+            perfectDrawEnabled={false}
           />
           {/* Measurements */}
           {showMeasurements && (
@@ -305,6 +337,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
                 padding={4 / zoom}
                 background="#F6F2EE"
                 cornerRadius={4 / zoom}
+                perfectDrawEnabled={false}
               />
             </Group>
           )}
@@ -327,6 +360,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
               fill="#ef4444"
               cornerRadius={12 / zoom}
               listening={false}
+              perfectDrawEnabled={false}
             />
             <Text
               text="×"
@@ -335,6 +369,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
               x={6 / zoom}
               y={2 / zoom}
               listening={false}
+              perfectDrawEnabled={false}
             />
           </Group>
         </>
@@ -2232,6 +2267,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     handleKeyUp: handleInteractionsKeyUp,
     isSelecting,
     selectionBox,
+    isPanning, // PERFORMANCE: Used to disable listening during pan
   } = useCanvasInteractions(stageRef, dimensions)
 
   // Use viewport culling for performance
@@ -3577,25 +3613,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 style={{ position: 'relative', zIndex: 1 }}
               >
 
-                {/* Infinite Grid Background */}
-                <Layer name="grid-layer">
+                {/* Infinite Grid Background - PERFORMANCE: Uses pattern fill */}
+                <Layer name="grid-layer" listening={false}>
                   <InfiniteGrid />
                 </Layer>
 
-                {/* Canvas Items Layer - Virtual Rendering using hook */}
-                <Layer name="items-layer">
+                {/* Canvas Items Layer - PERFORMANCE OPTIMIZED:
+                    - Items are pre-sorted in store (no sort on render)
+                    - Listening disabled during panning for faster hit detection
+                    - Viewport culling reduces rendered items
+                */}
+                <Layer name="items-layer" listening={!isPanning}>
                   {(() => {
                     // Use viewport-culled items from hook
-                    // Ensure both values are arrays to prevent spread syntax errors
+                    // Items are already sorted by z_index in the store
                     const visibleItems = Array.isArray(visibleItemsFromHook) ? visibleItemsFromHook : []
                     const fallbackItems = Array.isArray(items) ? items : []
                     const itemsToRender = visibleItems.length > 0 ? visibleItems : fallbackItems
 
-                    // Sort items by z_index (ascending) for correct stacking context
-                    // Lower z_index = drawn first = behind
-                    const sortedItems = [...itemsToRender].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
-
-                    return sortedItems.map((item) => (
+                    // No sorting needed - items are pre-sorted in store
+                    return itemsToRender.map((item) => (
                       <CanvasItem
                         key={item.id}
                         item={item}
@@ -3645,8 +3682,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 </Layer>
 
                 {/* Transformer Layer - Resize handles for selected items */}
-                {selectedItemId && !blendMode && (
-                  <Layer>
+                {selectedItemId && !blendMode && !isPanning && (
+                  <Layer listening={!isPanning}>
                     <Transformer
                       ref={transformerRef}
                       boundBoxFunc={(oldBox, newBox) => {

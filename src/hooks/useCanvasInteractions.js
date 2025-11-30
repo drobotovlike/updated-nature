@@ -8,6 +8,9 @@ const MAX_ZOOM = 5
 /**
  * Canvas Interactions Hook
  * 
+ * PERFORMANCE OPTIMIZED: Uses requestAnimationFrame to batch camera updates
+ * and prevent React re-renders on every wheel/mouse event.
+ * 
  * Handles all canvas-level interactions:
  * - Zoom to cursor (wheel)
  * - Pan with spacebar + drag or middle mouse
@@ -26,9 +29,10 @@ export function useCanvasInteractions(stageRef, dimensions) {
   const interactionMode = useCanvasStore((state) => state.interactionMode)
   const items = useCanvasStore((state) => state.items)
   const openAIPrompt = useCanvasStore((state) => state.openAIPrompt)
+  const setIsPanning = useCanvasStore((state) => state.setIsPanning)
 
   // Pan state
-  const [isPanning, setIsPanning] = useState(false)
+  const [isPanning, setIsPanningLocal] = useState(false)
   const panStartRef = useRef({ x: 0, y: 0 })
 
   // Rubber band selection state
@@ -44,8 +48,49 @@ export function useCanvasInteractions(stageRef, dimensions) {
   // Spacebar state
   const [isSpacePressed, setIsSpacePressed] = useState(false)
 
+  // RAF throttling refs for smooth 60fps updates
+  const rafRef = useRef(null)
+  const pendingCameraRef = useRef(null)
+
+  /**
+   * Sync panning state to store (for grid optimization)
+   */
+  const updatePanningState = useCallback((panning) => {
+    setIsPanningLocal(panning)
+    if (setIsPanning) {
+      setIsPanning(panning)
+    }
+  }, [setIsPanning])
+
+  /**
+   * RAF-throttled camera update
+   * Updates Konva stage immediately, batches React state to next frame
+   */
+  const updateCameraThrottled = useCallback((newCamera) => {
+    const stage = stageRef.current
+    if (!stage) return
+
+    // Update Konva stage immediately (no React involved)
+    stage.scale({ x: newCamera.zoom, y: newCamera.zoom })
+    stage.position({ x: newCamera.x, y: newCamera.y })
+
+    // Batch React state update to next animation frame
+    pendingCameraRef.current = newCamera
+    
+    if (!rafRef.current) {
+      rafRef.current = requestAnimationFrame(() => {
+        if (pendingCameraRef.current) {
+          setCamera(pendingCameraRef.current)
+        }
+        rafRef.current = null
+      })
+    }
+  }, [stageRef, setCamera])
+
   /**
    * Handle wheel event - Apple-style natural scrolling
+   * 
+   * PERFORMANCE: Uses RAF throttling to prevent excessive React updates
    * 
    * - Two-finger scroll (no modifier) → Pan the canvas (natural direction)
    * - Pinch gesture (ctrlKey on trackpad) → Zoom to cursor
@@ -87,21 +132,11 @@ export function useCanvasInteractions(stageRef, dimensions) {
 
         const newCamera = zoomToCursor(pointer, oldCamera, clampedScale)
 
-        // Update stage
-        stage.scale({ x: clampedScale, y: clampedScale })
-        stage.position({ x: newCamera.x, y: newCamera.y })
-
-        // Update store
-        setCamera({
-          x: newCamera.x,
-          y: newCamera.y,
-          zoom: clampedScale,
-        })
+        // Use throttled update instead of immediate state update
+        updateCameraThrottled(newCamera)
       } else {
         // PAN mode - two-finger scroll (natural scrolling like Apple)
         // Natural scrolling: content follows finger direction
-        // deltaX > 0 means finger moved left, so pan right (content moves left)
-        // deltaY > 0 means finger moved up, so pan down (content moves up)
         const deltaX = e.evt.deltaX
         const deltaY = e.evt.deltaY
         
@@ -111,18 +146,15 @@ export function useCanvasInteractions(stageRef, dimensions) {
         const newX = stage.x() - deltaX * panSensitivity
         const newY = stage.y() - deltaY * panSensitivity
 
-        // Update stage position
-        stage.position({ x: newX, y: newY })
-
-        // Update store
-        setCamera({
+        // Use throttled update
+        updateCameraThrottled({
           x: newX,
           y: newY,
           zoom: stage.scaleX(),
         })
       }
     },
-    [stageRef, dimensions, setCamera]
+    [stageRef, dimensions, updateCameraThrottled]
   )
 
   /**
@@ -138,7 +170,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
 
       // Middle mouse button or pan mode or spacebar pressed - start panning
       if (interactionMode === 'pan' || e.evt.button === 1 || isSpacePressed) {
-        setIsPanning(true)
+        updatePanningState(true)
         panStartRef.current = {
           x: pointer.x - stage.x(),
           y: pointer.y - stage.y(),
@@ -180,7 +212,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
         setSelection(null)
       }
     },
-    [interactionMode, isSpacePressed, setSelection, stageRef]
+    [interactionMode, isSpacePressed, setSelection, stageRef, updatePanningState]
   )
 
   /**
@@ -257,7 +289,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
     const stage = stageRef.current
 
     if (isPanning) {
-      setIsPanning(false)
+      updatePanningState(false)
       if (stage && !isSpacePressed) {
         stage.draggable(false)
       }
@@ -278,7 +310,7 @@ export function useCanvasInteractions(stageRef, dimensions) {
       setAIAreaBox(null)
       aiAreaStartRef.current = null
     }
-  }, [isPanning, isSelecting, isDrawingAIArea, aiAreaBox, isSpacePressed, openAIPrompt, stageRef])
+  }, [isPanning, isSelecting, isDrawingAIArea, aiAreaBox, isSpacePressed, openAIPrompt, stageRef, updatePanningState])
 
   /**
    * Handle drag end for panning
@@ -287,12 +319,15 @@ export function useCanvasInteractions(stageRef, dimensions) {
     const stage = stageRef.current
     if (!stage) return
 
-    // Update store with new camera position
+    // Sync final camera position to store
     setCamera({
       x: stage.x(),
       y: stage.y(),
+      zoom: stage.scaleX(),
     })
-  }, [setCamera, stageRef])
+    
+    updatePanningState(false)
+  }, [setCamera, stageRef, updatePanningState])
 
   /**
    * Handle keyboard events for spacebar panning

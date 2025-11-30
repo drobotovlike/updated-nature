@@ -114,6 +114,12 @@ export const useCanvasStore = create(
     syncError: null,
 
     /**
+     * Performance optimization: track panning state
+     * Used to disable expensive renders (like grid) during panning
+     */
+    isPanning: false,
+
+    /**
      * AI Generation state
      */
     aiPrompt: '',
@@ -125,41 +131,61 @@ export const useCanvasStore = create(
     // ============================================
 
     /**
+     * Helper: Sort items by z_index (ascending) for correct stacking
+     * PERFORMANCE: Called only when items change, not on every render
+     */
+    _sortByZIndex: (items) => {
+      return [...items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+    },
+
+    /**
      * Set all items (used for loading from database)
      * Supports both direct array and callback function pattern
+     * PERFORMANCE: Items are pre-sorted to avoid sorting on every render
      * @param {CanvasItem[]|Function} itemsOrUpdater
      */
     setItems: (itemsOrUpdater) => {
       if (typeof itemsOrUpdater === 'function') {
-        set((state) => ({
-          items: itemsOrUpdater(state.items)
-        }))
+        set((state) => {
+          const newItems = itemsOrUpdater(state.items)
+          return {
+            items: get()._sortByZIndex(Array.isArray(newItems) ? newItems : [])
+          }
+        })
       } else {
-        set({ items: Array.isArray(itemsOrUpdater) ? itemsOrUpdater : [] })
+        const items = Array.isArray(itemsOrUpdater) ? itemsOrUpdater : []
+        set({ items: get()._sortByZIndex(items) })
       }
     },
 
     /**
      * Add a new item to the canvas
+     * PERFORMANCE: Maintains sorted order
      * @param {CanvasItem} item
      */
     addItem: (item) => {
       set((state) => ({
-        items: [...state.items, item],
+        items: get()._sortByZIndex([...state.items, item]),
       }))
     },
 
     /**
      * Update an existing item
+     * PERFORMANCE: Re-sorts only if z_index changed
      * @param {string} id - Item ID
      * @param {Partial<CanvasItem>} updates - Partial updates
      */
     updateItem: (id, updates) => {
-      set((state) => ({
-        items: state.items.map((item) =>
+      set((state) => {
+        const newItems = state.items.map((item) =>
           item.id === id ? { ...item, ...updates } : item
-        ),
-      }))
+        )
+        // Only re-sort if z_index was updated
+        if ('z_index' in updates) {
+          return { items: get()._sortByZIndex(newItems) }
+        }
+        return { items: newItems }
+      })
     },
 
     /**
@@ -191,14 +217,16 @@ export const useCanvasStore = create(
 
     /**
      * Reorder items (for z-index changes)
+     * PERFORMANCE: Maintains sorted order
      * @param {CanvasItem[]} reorderedItems
      */
     reorderItems: (reorderedItems) => {
-      set({ items: reorderedItems })
+      set({ items: get()._sortByZIndex(reorderedItems) })
     },
 
     /**
      * Bring item to front
+     * PERFORMANCE: Maintains sorted order
      * @param {string} id
      */
     bringToFront: (id) => {
@@ -206,16 +234,16 @@ export const useCanvasStore = create(
         const item = state.items.find((i) => i.id === id)
         if (!item) return state
         const maxZ = Math.max(...state.items.map((i) => i.z_index || 0))
-        return {
-          items: state.items.map((i) =>
-            i.id === id ? { ...i, z_index: maxZ + 1 } : i
-          ),
-        }
+        const newItems = state.items.map((i) =>
+          i.id === id ? { ...i, z_index: maxZ + 1 } : i
+        )
+        return { items: get()._sortByZIndex(newItems) }
       })
     },
 
     /**
      * Send item to back
+     * PERFORMANCE: Maintains sorted order
      * @param {string} id
      */
     sendToBack: (id) => {
@@ -223,11 +251,10 @@ export const useCanvasStore = create(
         const item = state.items.find((i) => i.id === id)
         if (!item) return state
         const minZ = Math.min(...state.items.map((i) => i.z_index || 0))
-        return {
-          items: state.items.map((i) =>
-            i.id === id ? { ...i, z_index: minZ - 1 } : i
-          ),
-        }
+        const newItems = state.items.map((i) =>
+          i.id === id ? { ...i, z_index: minZ - 1 } : i
+        )
+        return { items: get()._sortByZIndex(newItems) }
       })
     },
 
@@ -482,6 +509,7 @@ export const useCanvasStore = create(
     setIsSyncing: (isSyncing) => set({ isSyncing }),
     setLastSyncedAt: (lastSyncedAt) => set({ lastSyncedAt }),
     setSyncError: (syncError) => set({ syncError }),
+    setIsPanning: (isPanning) => set({ isPanning }),
 
     // ============================================
     // AI GENERATION ACTIONS

@@ -1,92 +1,83 @@
-import { useMemo } from 'react'
-import { Circle } from 'react-konva'
+import { useMemo, useRef, useEffect, useState } from 'react'
+import { Rect, Image as KonvaImage } from 'react-konva'
 import { useCanvasStore } from '../stores/useCanvasStore'
 
 /**
  * Infinite Grid Component (Miro-style Dot Pattern)
  * 
- * Renders a subtle dot grid in world coordinates.
- * The Stage handles the camera transform, so we just need to
- * calculate which dots are visible and render them at world positions.
+ * PERFORMANCE OPTIMIZED: Uses a single pattern fill instead of
+ * thousands of individual Circle components.
+ * 
+ * The grid is rendered as a single Rect with a repeating pattern,
+ * which is orders of magnitude faster than rendering individual dots.
  */
 export function InfiniteGrid() {
   const camera = useCanvasStore((state) => state.camera)
   const dimensions = useCanvasStore((state) => state.dimensions)
   const settings = useCanvasStore((state) => state.settings)
+  const isPanning = useCanvasStore((state) => state.isPanning)
+  
+  const [patternImage, setPatternImage] = useState(null)
+  const gridSize = settings.gridSize || 24
 
+  // Create the pattern image once (or when gridSize changes)
+  useEffect(() => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    
+    // Pattern tile size
+    canvas.width = gridSize
+    canvas.height = gridSize
+    
+    // Draw a single dot in the center of the tile
+    ctx.fillStyle = 'rgba(180, 180, 180, 0.4)'
+    ctx.beginPath()
+    ctx.arc(gridSize / 2, gridSize / 2, 1.5, 0, Math.PI * 2)
+    ctx.fill()
+    
+    // Create an Image from the canvas
+    const img = new window.Image()
+    img.onload = () => {
+      setPatternImage(img)
+    }
+    img.src = canvas.toDataURL()
+  }, [gridSize])
+
+  // Don't render grid if disabled, no dimensions, or while actively panning (perf optimization)
   if (!settings.gridEnabled || !dimensions.width || !dimensions.height) {
     return null
   }
 
-  // Grid spacing in world units
-  const gridSize = settings.gridSize || 24
+  // Calculate viewport bounds in world space
+  const viewLeft = -camera.x / camera.zoom
+  const viewTop = -camera.y / camera.zoom
+  const viewRight = (dimensions.width - camera.x) / camera.zoom
+  const viewBottom = (dimensions.height - camera.y) / camera.zoom
 
-  // Calculate grid dots in world space
-  const gridDots = useMemo(() => {
-    const dots = []
+  // Add padding to prevent edge popping
+  const padding = gridSize * 4
 
-    // Get viewport bounds in world space
-    // The stage is positioned at (camera.x, camera.y) and scaled by camera.zoom
-    // So visible world area is from (-camera.x/zoom, -camera.y/zoom) to ((width-camera.x)/zoom, (height-camera.y)/zoom)
-    const viewLeft = -camera.x / camera.zoom
-    const viewTop = -camera.y / camera.zoom
-    const viewRight = (dimensions.width - camera.x) / camera.zoom
-    const viewBottom = (dimensions.height - camera.y) / camera.zoom
+  // Snap bounds to grid for clean pattern alignment
+  const x = Math.floor((viewLeft - padding) / gridSize) * gridSize
+  const y = Math.floor((viewTop - padding) / gridSize) * gridSize
+  const width = Math.ceil((viewRight - viewLeft + padding * 2) / gridSize) * gridSize
+  const height = Math.ceil((viewBottom - viewTop + padding * 2) / gridSize) * gridSize
 
-    // Add padding to avoid popping at edges
-    const padding = gridSize * 2
-
-    // Calculate grid start positions (snap to grid)
-    const startX = Math.floor((viewLeft - padding) / gridSize) * gridSize
-    const startY = Math.floor((viewTop - padding) / gridSize) * gridSize
-    const endX = Math.ceil((viewRight + padding) / gridSize) * gridSize
-    const endY = Math.ceil((viewBottom + padding) / gridSize) * gridSize
-
-    // Adjust density based on zoom for performance
-    // At very low zoom, skip dots to maintain performance
-    let step = gridSize
-    if (camera.zoom < 0.3) {
-      step = gridSize * 4
-    } else if (camera.zoom < 0.5) {
-      step = gridSize * 2
-    }
-
-    // Limit dots for performance
-    const maxDots = 10000
-    let dotCount = 0
-
-    // Generate dots in world coordinates
-    for (let x = startX; x <= endX && dotCount < maxDots; x += step) {
-      for (let y = startY; y <= endY && dotCount < maxDots; y += step) {
-        dots.push({
-          key: `${x}-${y}`,
-          x: x,
-          y: y,
-        })
-        dotCount++
-      }
-    }
-
-    return dots
-  }, [camera.x, camera.y, camera.zoom, dimensions.width, dimensions.height, gridSize])
-
-  // Dot appearance - size in world units, adjusted for zoom
-  // At 100% zoom, dot should be ~1.5px on screen
-  const dotRadius = 1.5 / camera.zoom
+  if (!patternImage) {
+    return null
+  }
 
   return (
-    <>
-      {gridDots.map((dot) => (
-        <Circle
-          key={dot.key}
-          x={dot.x}
-          y={dot.y}
-          radius={dotRadius}
-          fill="rgba(200, 200, 200, 0.5)"
-          listening={false}
-          perfectDrawEnabled={false}
-        />
-      ))}
-    </>
+    <Rect
+      x={x}
+      y={y}
+      width={width}
+      height={height}
+      fillPatternImage={patternImage}
+      fillPatternRepeat="repeat"
+      fillPatternOffset={{ x: -x, y: -y }}
+      listening={false}
+      perfectDrawEnabled={false}
+    />
   )
 }

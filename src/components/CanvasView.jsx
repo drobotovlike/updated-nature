@@ -253,26 +253,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
     setIsDragging(false)
   }, [item.id, onUpdate])
 
-  const handleTransformEnd = useCallback(() => {
-    const node = shapeRef.current
-    if (!node) return
-
-    const scaleX = node.scaleX()
-    const scaleY = node.scaleY()
-
-    // Reset scale and update width/height
-    node.scaleX(1)
-    node.scaleY(1)
-
-    onUpdate(item.id, {
-      x_position: node.x(),
-      y_position: node.y(),
-      width: Math.max(50, node.width() * scaleX),
-      height: Math.max(50, node.height() * scaleY),
-      rotation: node.rotation(),
-    })
-  }, [item.id, onUpdate])
-
+  // Transform is handled by the Transformer component in the parent
   if (!image) return null
 
   return (
@@ -304,12 +285,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
           onContextMenu(e, item.id)
         }
       }}
-      onTransform={(e) => {
-        // Immediate visual feedback during transform
-        const node = e.target
-        node.getLayer()?.batchDraw()
-      }}
-      onTransformEnd={handleTransformEnd}
+      // Transform is handled by the Transformer component, not here
       visible={item.is_visible !== false}
       opacity={item.opacity || 1}
       perfectDrawEnabled={false}
@@ -327,51 +303,7 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
         hue={hue}
         perfectDrawEnabled={false}
       />
-      {(isSelected || isMultiSelected) && (
-        <>
-          {/* Corner dots at the four corners */}
-          <Circle
-            x={0}
-            y={0}
-            radius={6 / zoom}
-            fill="#FFFFFF"
-            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
-            strokeWidth={2 / zoom}
-            listening={false}
-            perfectDrawEnabled={false}
-          />
-          <Circle
-            x={item.width || image.width}
-            y={0}
-            radius={6 / zoom}
-            fill="#FFFFFF"
-            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
-            strokeWidth={2 / zoom}
-                listening={false}
-                perfectDrawEnabled={false}
-          />
-          <Circle
-            x={0}
-            y={item.height || image.height}
-            radius={6 / zoom}
-            fill="#FFFFFF"
-            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
-            strokeWidth={2 / zoom}
-                listening={false}
-                perfectDrawEnabled={false}
-              />
-          <Circle
-            x={item.width || image.width}
-            y={item.height || image.height}
-            radius={6 / zoom}
-            fill="#FFFFFF"
-            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
-            strokeWidth={2 / zoom}
-                listening={false}
-                perfectDrawEnabled={false}
-              />
-        </>
-      )}
+      {/* Visual selection indicator - Transformer handles will show the resize controls */}
     </Group>
   )
 }
@@ -3922,76 +3854,117 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   })()}
                 </Layer>
 
-                {/* Transformer Layer - Corner dots for selected items */}
+                {/* Transformer Layer - Resize handles for selected items (Miro-style) */}
+                {/* Put transformer on separate layer that's always on top */}
                 {selectedItemId && !blendMode && !isPanning && (
-                  <Layer listening={!isPanning}>
+                  <Layer name="transformer-layer" listening={true}>
                     <Transformer
                       ref={transformerRef}
                       boundBoxFunc={(oldBox, newBox) => {
-                        // Limit minimum size
-                        if (Math.abs(newBox.width) < 50 || Math.abs(newBox.height) < 50) {
+                        // Limit minimum size - prevent items from becoming too small
+                        const minSize = 50
+                        if (Math.abs(newBox.width) < minSize || Math.abs(newBox.height) < minSize) {
                           return oldBox
                         }
                         return newBox
                       }}
-                      borderEnabled={false}
-                      anchorFill="transparent"
-                      anchorStroke="transparent"
-                      anchorStrokeWidth={0}
-                      anchorSize={12}
+                      borderEnabled={true}
+                      borderStroke="#18181B"
+                      borderStrokeWidth={2}
+                      borderDash={[5, 5]}
+                      // Miro-style handles: white fill, dark border, easy to grab
+                      // Larger handles for better visibility and easier grabbing
+                      anchorFill="#FFFFFF"
+                      anchorStroke="#18181B"
+                      anchorStrokeWidth={2.5}
+                      anchorSize={14}
+                      anchorCornerRadius={3}
                       rotateEnabled={false}
                       resizeEnabled={true}
-                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+                      keepRatio={false}
+                      // Enable all 8 handles like Miro (4 corners + 4 edges)
+                      enabledAnchors={[
+                        'top-left', 'top-center', 'top-right',
+                        'middle-left', 'middle-right',
+                        'bottom-left', 'bottom-center', 'bottom-right'
+                      ]}
+                      flipEnabled={false}
+                      centeredScaling={false}
+                      centeredRotation={false}
                       onTransform={(e) => {
-                        // Visual update during transform - immediate feedback
-                        // No database update here, just visual
+                        // Real-time visual feedback during transform
                         const node = e.target
                         node.getLayer()?.batchDraw()
                       }}
                       onTransformEnd={(e) => {
-                        // Final update - save to database
+                        // Final update after resize completes - Miro-style smooth resize
                         const node = e.target
                         const selectedItem = items.find(item => item.id === selectedItemId)
-                        if (selectedItem && node) {
-                          const scaleX = node.scaleX()
-                          const scaleY = node.scaleY()
-                          node.scaleX(1)
-                          node.scaleY(1)
-                          
-                          // Throttle database updates - use requestIdleCallback or setTimeout
-                          // Update store immediately for visual feedback (non-blocking)
-                          updateItem(selectedItemId, {
-                            x_position: node.x(),
-                            y_position: node.y(),
-                            width: Math.max(50, (selectedItem.width || 200) * scaleX),
-                            height: Math.max(50, (selectedItem.height || 200) * scaleY),
-                            rotation: node.rotation(),
-                          })
-                          
-                          // Sync to database in background (non-blocking, debounced)
-                          if (userId && clerk) {
-                            // Clear any pending update
-                            if (transformUpdateTimeoutRef.current) {
-                              clearTimeout(transformUpdateTimeoutRef.current)
-                            }
-                            
-                            // Debounce database updates to avoid lag
-                            transformUpdateTimeoutRef.current = setTimeout(async () => {
-                              try {
-                                await apiUpdateCanvasItem(userId, selectedItemId, {
-                                  x_position: node.x(),
-                                  y_position: node.y(),
-                                  width: Math.max(50, (selectedItem.width || 200) * scaleX),
-                                  height: Math.max(50, (selectedItem.height || 200) * scaleY),
-                                  rotation: node.rotation(),
-                                }, clerk)
-                              } catch (error) {
-                                console.error('Failed to sync item update to database:', error)
-                              }
-                              transformUpdateTimeoutRef.current = null
-                            }, 300) // 300ms debounce for database updates
+                        
+                        if (!selectedItem || !node) return
+                        
+                        // Get the current scale values from the transform
+                        const scaleX = node.scaleX()
+                        const scaleY = node.scaleY()
+                        
+                        // Get the node's current width and height (before scale)
+                        const currentWidth = node.width()
+                        const currentHeight = node.height()
+                        
+                        // Calculate the actual new dimensions after scaling
+                        // The transformer applies scale to the node's width/height
+                        const newWidth = Math.max(50, Math.abs(currentWidth * scaleX))
+                        const newHeight = Math.max(50, Math.abs(currentHeight * scaleY))
+                        
+                        // Get the new position (may have shifted during corner/edge resize)
+                        const newX = node.x()
+                        const newY = node.y()
+                        
+                        // Reset scale to 1:1 and update the actual width/height
+                        // This is the standard Konva pattern for applying transforms
+                        node.scaleX(1)
+                        node.scaleY(1)
+                        node.width(newWidth)
+                        node.height(newHeight)
+                        
+                        // Update store immediately for instant feedback
+                        updateItem(selectedItemId, {
+                          x_position: newX,
+                          y_position: newY,
+                          width: newWidth,
+                          height: newHeight,
+                          rotation: node.rotation() || 0,
+                        })
+                        
+                        // Sync to database in background (debounced for performance)
+                        if (userId && clerk) {
+                          if (transformUpdateTimeoutRef.current) {
+                            clearTimeout(transformUpdateTimeoutRef.current)
                           }
+                          
+                          transformUpdateTimeoutRef.current = setTimeout(async () => {
+                            try {
+                              await apiUpdateCanvasItem(userId, selectedItemId, {
+                                x_position: newX,
+                                y_position: newY,
+                                width: newWidth,
+                                height: newHeight,
+                                rotation: node.rotation() || 0,
+                              }, clerk)
+                            } catch (error) {
+                              console.error('Failed to sync resize to database:', error)
+                            }
+                            transformUpdateTimeoutRef.current = null
+                          }, 300)
                         }
+                        
+                        // Force transformer to update its bounds after dimension change
+                        requestAnimationFrame(() => {
+                          if (transformerRef.current) {
+                            transformerRef.current.forceUpdate()
+                            transformerRef.current.getLayer()?.batchDraw()
+                          }
+                        })
                       }}
                     />
                   </Layer>

@@ -316,62 +316,47 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       />
       {(isSelected || isMultiSelected) && (
         <>
-          {/* Miro-style Selection Border - Clean and minimal */}
-          <Rect
-            x={-4}
-            y={-4}
-            width={(item.width || image.width) + 8}
-            height={(item.height || image.height) + 8}
+          {/* Corner dots at the four corners */}
+          <Circle
+            x={0}
+            y={0}
+            radius={6 / zoom}
+            fill="#FFFFFF"
             stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
             strokeWidth={2 / zoom}
-            dash={[8, 4]}
             listening={false}
             perfectDrawEnabled={false}
-            shadowBlur={4 / zoom}
-            shadowColor="rgba(0, 0, 0, 0.1)"
           />
-          {/* Miro-style Dimensions Badge - Floating above item */}
-          {showMeasurements && (
-            <Group 
-              x={0}
-              y={-32 / zoom}
-              listening={false}
-            >
-              {/* Badge background */}
-              <Rect
-                width={Math.max(80 / zoom, `${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`.length * 6 / zoom)}
-                height={24 / zoom}
-                fill="rgba(255, 255, 255, 0.95)"
-                cornerRadius={6 / zoom}
-                listening={false}
-                perfectDrawEnabled={false}
-                shadowBlur={8 / zoom}
-                shadowColor="rgba(0, 0, 0, 0.15)"
-                shadowOffsetY={2 / zoom}
-              />
-              {/* Badge border */}
-              <Rect
-                width={Math.max(80 / zoom, `${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`.length * 6 / zoom)}
-                height={24 / zoom}
-                stroke="#E4E4E7"
-                strokeWidth={1 / zoom}
-                cornerRadius={6 / zoom}
-                listening={false}
-                perfectDrawEnabled={false}
-              />
-              {/* Dimensions text */}
-              <Text
-                text={`${Math.round(item.width || image.width)}px × ${Math.round(item.height || image.height)}px`}
-                fontSize={11 / zoom}
-                fill="#09090B"
-                x={8 / zoom}
-                y={6 / zoom}
-                fontStyle="500"
-                listening={false}
-                perfectDrawEnabled={false}
-              />
-            </Group>
-          )}
+          <Circle
+            x={item.width || image.width}
+            y={0}
+            radius={6 / zoom}
+            fill="#FFFFFF"
+            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
+            strokeWidth={2 / zoom}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+          <Circle
+            x={0}
+            y={item.height || image.height}
+            radius={6 / zoom}
+            fill="#FFFFFF"
+            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
+            strokeWidth={2 / zoom}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
+          <Circle
+            x={item.width || image.width}
+            y={item.height || image.height}
+            radius={6 / zoom}
+            fill="#FFFFFF"
+            stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
+            strokeWidth={2 / zoom}
+            listening={false}
+            perfectDrawEnabled={false}
+          />
         </>
       )}
     </Group>
@@ -3574,7 +3559,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   })()}
                 </Layer>
 
-                {/* Transformer Layer - Resize handles for selected items */}
+                {/* Transformer Layer - Corner dots for selected items */}
                 {selectedItemId && !blendMode && !isPanning && (
                   <Layer listening={!isPanning}>
                     <Transformer
@@ -3586,16 +3571,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         }
                         return newBox
                       }}
-                      borderEnabled={true}
-                      anchorFill="#D97757"
-                      anchorStroke="#FFFFFF"
+                      borderEnabled={false}
+                      anchorFill="#FFFFFF"
+                      anchorStroke={selectedItemIds && selectedItemIds.size > 1 ? "#3b82f6" : "#18181B"}
                       anchorStrokeWidth={2}
-                      anchorSize={10}
-                      borderStroke="#D97757"
-                      borderStrokeWidth={2}
-                      borderDash={[5, 5]}
-                      rotateEnabled={true}
-                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right', 'top-center', 'bottom-center', 'middle-left', 'middle-right']}
+                      anchorSize={12}
+                      rotateEnabled={false}
+                      enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
                       onTransformEnd={(e) => {
                         const node = e.target
                         const selectedItem = items.find(item => item.id === selectedItemId)

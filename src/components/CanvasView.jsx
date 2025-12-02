@@ -193,7 +193,7 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
 }
 
 // Canvas Item Component - PERFORMANCE OPTIMIZED
-function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, showMeasurements, zoom, blendMode, transformerRef }) {
+function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, onItemClick, showMeasurements, zoom, blendMode, transformerRef }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
@@ -286,9 +286,17 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       onDragEnd={handleDragEnd}
       onClick={(e) => {
         onSelect(e, e.evt.shiftKey)
+        // Show context menu on click
+        if (onItemClick) {
+          onItemClick(e, item.id)
+        }
       }}
       onTap={(e) => {
         onSelect(e, e.evt.shiftKey)
+        // Show context menu on tap
+        if (onItemClick) {
+          onItemClick(e, item.id)
+        }
       }}
       onContextMenu={(e) => {
         e.evt.preventDefault()
@@ -1437,8 +1445,56 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       } else {
         setError('Please select two images to compare. Use Shift+Click to select multiple.')
       }
+    } else if (action === 'moveToTop') {
+      const item = items.find(item => item.id === itemId)
+      if (item) {
+        const safeItems = Array.isArray(items) ? items : []
+        const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
+        handleItemUpdate(itemId, { z_index: maxZIndex + 1 })
+      }
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'moveToBottom') {
+      const item = items.find(item => item.id === itemId)
+      if (item) {
+        const safeItems = Array.isArray(items) ? items : []
+        const minZIndex = safeItems.length > 0 ? Math.min(...safeItems.map(item => item.z_index || 0), 0) : 0
+        handleItemUpdate(itemId, { z_index: minZIndex - 1 })
+      }
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'delete') {
+      handleItemDelete(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'download') {
+      const item = items.find(item => item.id === itemId)
+      if (item && item.image_url) {
+        // Fetch the image and create a blob for download
+        fetch(item.image_url)
+          .then(response => response.blob())
+          .then(blob => {
+            const url = window.URL.createObjectURL(blob)
+            const link = document.createElement('a')
+            link.href = url
+            link.download = `image-${itemId}.png`
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+            window.URL.revokeObjectURL(url)
+          })
+          .catch(error => {
+            console.error('Error downloading image:', error)
+            // Fallback: try direct download
+            const link = document.createElement('a')
+            link.href = item.image_url
+            link.download = `image-${itemId}.png`
+            link.target = '_blank'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+          })
+      }
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
     }
-  }, [selectedItemIds, items])
+  }, [selectedItemIds, items, handleItemUpdate, handleItemDelete])
 
   // Style transfer handler
   const handleStyleTransfer = useCallback(async (itemId, styleName) => {
@@ -2964,6 +3020,57 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         >
           <button
             onClick={() => {
+              handleContextMenuAction('moveToTop', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2v20" />
+              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+            </svg>
+            Move on Top
+          </button>
+          <button
+            onClick={() => {
+              handleContextMenuAction('moveToBottom', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22v-20" />
+              <path d="M17 19H9.5a3.5 3.5 0 0 1 0-7h5a3.5 3.5 0 0 0 0-7H6" />
+            </svg>
+            Move Down
+          </button>
+          <button
+            onClick={() => {
+              handleContextMenuAction('delete', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 6h18" />
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+            </svg>
+            Delete
+          </button>
+          <button
+            onClick={() => {
+              handleContextMenuAction('download', contextMenuPosition.itemId)
+            }}
+            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Download
+          </button>
+          <div className="border-t border-[#F1EBE4] my-1" />
+          <button
+            onClick={() => {
               handleContextMenuAction('blend', contextMenuPosition.itemId)
             }}
             className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
@@ -3551,6 +3658,20 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                             })
                           }
                         }}
+                        onItemClick={(e, itemId) => {
+                          // Show context menu on click
+                          const stage = stageRef.current
+                          if (!stage) return
+                          const pointer = stage.getPointerPosition()
+                          if (pointer) {
+                            setContextMenuPosition({
+                              x: pointer.x,
+                              y: pointer.y,
+                              visible: true,
+                              itemId: itemId,
+                            })
+                          }
+                        }}
                         showMeasurements={settings.showMeasurements}
                         zoom={camera.zoom}
                         blendMode={blendMode}
@@ -3572,9 +3693,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         return newBox
                       }}
                       borderEnabled={false}
-                      anchorFill="#FFFFFF"
-                      anchorStroke={selectedItemIds && selectedItemIds.size > 1 ? "#3b82f6" : "#18181B"}
-                      anchorStrokeWidth={2}
+                      anchorFill="transparent"
+                      anchorStroke="transparent"
+                      anchorStrokeWidth={0}
                       anchorSize={12}
                       rotateEnabled={false}
                       enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}

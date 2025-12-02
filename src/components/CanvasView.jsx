@@ -3008,13 +3008,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </button>
       </div>
 
-      {/* Context Menu - Right-click menu */}
+      {/* Context Menu - Horizontal toolbar bar */}
       {contextMenuPosition.visible && (
         <div
-          className="context-menu fixed z-50 bg-white rounded-lg shadow-oak border border-[#F1EBE4] py-1 min-w-[160px] linen-texture"
+          className="context-menu fixed z-50 bg-white rounded-lg shadow-lg border border-stone-200 px-2 py-2 flex items-center gap-1"
           style={{
-            left: `${contextMenuPosition.x} px`,
-            top: `${contextMenuPosition.y} px`,
+            left: `${contextMenuPosition.x}px`,
+            top: `${contextMenuPosition.y - 70}px`,
+            transform: 'translateX(-50%)',
           }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -3022,144 +3023,53 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             onClick={() => {
               handleContextMenuAction('moveToTop', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Move on Top"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2v20" />
               <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
             </svg>
-            Move on Top
           </button>
           <button
             onClick={() => {
               handleContextMenuAction('moveToBottom', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Move Down"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22v-20" />
               <path d="M17 19H9.5a3.5 3.5 0 0 1 0-7h5a3.5 3.5 0 0 0 0-7H6" />
             </svg>
-            Move Down
           </button>
+          <div className="w-px h-6 bg-stone-200 mx-1" />
           <button
             onClick={() => {
               handleContextMenuAction('delete', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Delete"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M3 6h18" />
               <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
               <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
             </svg>
-            Delete
           </button>
           <button
             onClick={() => {
               handleContextMenuAction('download', contextMenuPosition.itemId)
             }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Download"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Download
           </button>
-          <div className="border-t border-[#F1EBE4] my-1" />
-          <button
-            onClick={() => {
-              handleContextMenuAction('blend', contextMenuPosition.itemId)
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v20" />
-              <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-            </svg>
-            Blend with...
-          </button>
-          <div className="border-t border-[#F1EBE4] my-1" />
-          <button
-            onClick={() => {
-              handleContextMenuAction('erase', contextMenuPosition.itemId)
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21" />
-              <path d="M22 21H7" />
-              <path d="m5 11 6 6" />
-            </svg>
-            Erase / Fill
-          </button>
-          <div className="border-t border-[#F1EBE4] my-1" />
-          <button
-            onClick={() => {
-              handleContextMenuAction('removeBg', contextMenuPosition.itemId)
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="2" width="20" height="20" rx="2" />
-              <path d="M12 8v8" />
-              <path d="M8 12h8" />
-            </svg>
-            Remove Background
-          </button>
-          <div className="border-t border-[#F1EBE4] my-1" />
-          <button
-            onClick={() => {
-              handleContextMenuAction('extractPalette', contextMenuPosition.itemId)
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-              <circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-              <circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-              <circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-              <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.074 2.26-.21" />
-            </svg>
-            Extract Color Palette
-          </button>
-          <button
-            onClick={() => {
-              handleContextMenuAction('loop', contextMenuPosition.itemId)
-            }}
-            className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2v4" />
-              <path d="M12 18v4" />
-              <path d="M4.93 4.93l2.83 2.83" />
-              <path d="M16.24 16.24l2.83 2.83" />
-              <path d="M2 12h4" />
-              <path d="M18 12h4" />
-              <path d="M4.93 19.07l2.83-2.83" />
-              <path d="M16.24 7.76l2.83-2.83" />
-            </svg>
-            Create Loop (GIF)
-          </button>
-          {selectedItemIds.size >= 1 && (
-            <>
-              <div className="border-t border-[#F1EBE4] my-1" />
-              <button
-                onClick={() => {
-                  handleContextMenuAction('compare', contextMenuPosition.itemId)
-                }}
-                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" />
-                  <line x1="12" y1="3" x2="12" y2="21" />
-                </svg>
-                Compare Mode
-              </button>
-            </>
-          )}
         </div>
       )}
 
@@ -3648,11 +3558,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           e.evt.preventDefault()
                           const stage = stageRef.current
                           if (!stage) return
-                          const pointer = stage.getPointerPosition()
-                          if (pointer) {
+                          const item = items.find(i => i.id === itemId)
+                          if (item) {
+                            // Calculate center of item in screen coordinates
+                            const itemCenterX = (item.x_position + (item.width || 200) / 2) * camera.zoom + camera.x
+                            const itemTopY = item.y_position * camera.zoom + camera.y
                             setContextMenuPosition({
-                              x: pointer.x,
-                              y: pointer.y,
+                              x: itemCenterX,
+                              y: itemTopY,
                               visible: true,
                               itemId: itemId,
                             })
@@ -3662,11 +3575,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           // Show context menu on click
                           const stage = stageRef.current
                           if (!stage) return
-                          const pointer = stage.getPointerPosition()
-                          if (pointer) {
+                          const item = items.find(i => i.id === itemId)
+                          if (item) {
+                            // Calculate center of item in screen coordinates
+                            const itemCenterX = (item.x_position + (item.width || 200) / 2) * camera.zoom + camera.x
+                            const itemTopY = item.y_position * camera.zoom + camera.y
                             setContextMenuPosition({
-                              x: pointer.x,
-                              y: pointer.y,
+                              x: itemCenterX,
+                              y: itemTopY,
                               visible: true,
                               itemId: itemId,
                             })

@@ -446,19 +446,24 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   
   // Adapter functions that update both local state and sync to database
   const createCanvasItem = useCallback(async (userId, projectId, data, clerk) => {
-    const newItem = {
-      id: generateUUID(),
-      ...data
-    }
-    addItem(newItem)
-    // Sync to database in background
+    // Create item in database first to get proper ID and ensure it's persisted
+    // The real-time sync will add it to the store automatically, but we also add it
+    // optimistically for immediate UI feedback. The real-time sync will handle deduplication.
     try {
-      await apiCreateCanvasItem(userId, projectId, data, clerk)
+      const newItem = await apiCreateCanvasItem(userId, projectId, data, clerk)
+      // Add to store immediately for UI feedback (real-time sync will handle duplicates)
+      setItems((prev) => {
+        // Check if item already exists (from real-time sync)
+        const exists = prev.some((item) => item.id === newItem.id)
+        if (exists) return prev
+        return [...prev, newItem]
+      })
+      return newItem
     } catch (error) {
-      console.error('Failed to sync item to database:', error)
+      console.error('Failed to create item in database:', error)
+      throw error // Re-throw so caller can handle the error
     }
-    return newItem
-  }, [addItem])
+  }, [setItems])
 
   const updateCanvasItem = useCallback(async (userId, itemId, updates, clerk) => {
     updateItem(itemId, updates)
@@ -497,6 +502,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [assetHistory, setAssetHistory] = useState([]) // Last 10 assets (uploaded or generated)
   const [generatingVariations, setGeneratingVariations] = useState(false)
   const [variationCount, setVariationCount] = useState(3)
+  const uploadingFilesRef = useRef(new Set()) // Track files being uploaded to prevent duplicates
 
   // Enhanced Generation State
   const [selectedModel, setSelectedModel] = useState('gemini')
@@ -677,6 +683,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       return
     }
 
+    // Prevent duplicate uploads - create a unique key for this file upload
+    const uploadKey = `${file.name}-${file.size}-${file.lastModified}`
+    if (uploadingFilesRef.current.has(uploadKey)) {
+      console.log('Upload already in progress for this file, skipping duplicate')
+      return
+    }
+
+    // Mark file as uploading
+    uploadingFilesRef.current.add(uploadKey)
+
     // CRITICAL: Verify project exists in database before uploading
     try {
       // First, try to verify project exists in database
@@ -811,6 +827,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       const safeItems = Array.isArray(items) ? items : []
       const maxZIndex = safeItems.length > 0 ? Math.max(...safeItems.map(item => item.z_index || 0), 0) : 0
 
+      // Create the item - this will add it to the store and sync to database
       const newItem = await createCanvasItem(userId, projectId, {
         image_url: imageUrl,
         x_position: x - img.width / 2,
@@ -821,11 +838,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         is_visible: true,
       }, clerk)
 
-      setItems((prev) => {
-        // DEFENSIVE: Ensure prev is an array before spreading
-        const safePrev = Array.isArray(prev) ? prev : []
-        return [...safePrev, newItem]
-      })
+      // Note: createCanvasItem already adds the item to the store via addItem,
+      // so we don't need to call setItems here - this was causing duplicates
+      // Real-time sync might also add it, but that's handled by duplicate checks
 
       // Add to history
       setAssetHistory((prev) => {
@@ -851,6 +866,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         // Don't fail the upload if asset library save fails
         console.warn('Failed to save asset to library:', assetError)
       }
+
+      // Clear upload tracking after successful upload
+      uploadingFilesRef.current.delete(uploadKey)
     } catch (error) {
       console.error('Error uploading file:', error)
 
@@ -882,6 +900,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       } else {
         setError('Failed to upload image. Please try again.')
       }
+      
+      // Clear upload tracking on error as well
+      uploadingFilesRef.current.delete(uploadKey)
     } finally {
       setIsGenerating(false)
     }
@@ -1207,14 +1228,35 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [updateItem, userId, clerk])
 
-  const handleItemDelete = useCallback((itemId) => {
-    // Yjs handles history automatically if we set it up, but for now we just delete
+  const handleItemDelete = useCallback(async (itemId) => {
+    // Store the item to delete for potential rollback
+    const itemToDelete = items.find(item => item.id === itemId)
+    if (!itemToDelete) return
+    
+    // Delete from store immediately for visual feedback
     deleteItem(itemId)
-      if (selectedItemId === itemId) {
-        setSelectedItemId(null)
+    
+    if (selectedItemId === itemId) {
+      setSelectedItemId(null)
+    }
+    setPopupMenuPosition({ x: 0, y: 0, visible: false })
+    
+    // Sync to database - ensure deletion completes
+    if (userId && clerk) {
+      try {
+        await apiDeleteCanvasItem(userId, itemId, clerk)
+        console.log('Item deleted successfully:', itemId)
+        // Don't restore on success - deletion is permanent
+      } catch (error) {
+        console.error('Failed to sync item deletion to database:', error)
+        // Only revert if it's a real error (not a not found error)
+        if (error.message && !error.message.includes('not found') && !error.message.includes('404')) {
+          // Revert deletion on error - restore item
+          addItem(itemToDelete)
+        }
       }
-      setPopupMenuPosition({ x: 0, y: 0, visible: false })
-  }, [selectedItemId])
+    }
+  }, [selectedItemId, deleteItem, userId, clerk, items, addItem])
 
   // Layer panel handlers
   const handleReorderLayers = useCallback((reorderedItems) => {
@@ -1643,12 +1685,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         is_visible: true,
       }, clerk)
 
-      // Delete both original items
+      // Delete both original items (deleteCanvasItem already updates the store)
       await deleteCanvasItem(userId, sourceId, clerk)
       await deleteCanvasItem(userId, targetId, clerk)
 
-      // Update items list
-      setItems((prev) => prev.filter(item => item.id !== sourceId && item.id !== targetId).concat(newItem))
+      // Note: createCanvasItem already adds the new item to the store via addItem,
+      // and deleteCanvasItem already removes items from the store,
+      // so we don't need to manually update setItems here
 
       // Clear selection and blend mode
       setSelectedItemId(null)
@@ -2714,7 +2757,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           is_visible: true,
         }, clerk)
 
-        setItems((prev) => [...prev, newItem])
+        // Note: createCanvasItem already adds the item to the store via addItem,
+        // so we don't need to call setItems here - this was causing duplicates
         
         // Add to history
         setAssetHistory((prev) => {
@@ -2889,10 +2933,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
           newItems.push(newItem)
         }
-      }
+        }
 
+      // Note: createCanvasItem already adds each item to the store via addItem,
+      // so we don't need to call setItems here - this was causing duplicates
       if (newItems.length > 0) {
-        setItems((prev) => [...prev, ...newItems])
         setGeneratePrompt('')
         setChatInput('')
       }
@@ -3895,6 +3940,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       anchorStrokeWidth={0}
                       anchorSize={12}
                       rotateEnabled={false}
+                      resizeEnabled={true}
                       enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
                       onTransform={(e) => {
                         // Visual update during transform - immediate feedback
@@ -4279,7 +4325,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         is_visible: true,
                       }, clerk)
                       
-                      setItems((prev) => [...prev, newItem])
+                      // Note: createCanvasItem already adds the item to the store via addItem,
+                      // so we don't need to call setItems here - this was causing duplicates
                     }}
                     className="group relative aspect-square rounded-lg border border-stone-200 overflow-hidden hover:border-stone-400 transition-colors bg-stone-50"
                     title={asset.name}

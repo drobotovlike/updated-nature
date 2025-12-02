@@ -304,6 +304,11 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
           onContextMenu(e, item.id)
         }
       }}
+      onTransform={(e) => {
+        // Immediate visual feedback during transform
+        const node = e.target
+        node.getLayer()?.batchDraw()
+      }}
       onTransformEnd={handleTransformEnd}
       visible={item.is_visible !== false}
       opacity={item.opacity || 1}
@@ -395,6 +400,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const maskLayerRef = useRef(null)
   const minimapCanvasRef = useRef(null)
   const transformerRef = useRef(null)
+  const transformUpdateTimeoutRef = useRef(null)
 
   // Early return if essential props are missing
   if (!projectId || !userId || !isSignedIn) {
@@ -675,7 +681,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     try {
       // First, try to verify project exists in database
       // Only verify if clerk is available and ready
-      if (isClerkReady && clerk && typeof clerk.getToken === 'function') {
+      if (isClerkReady && clerk) {
         const { getProject } = await import('../utils/projectManager')
         try {
           const dbProject = await getProject(userId, projectId, clerk)
@@ -692,7 +698,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             return
           }
 
-          if (navigator.onLine && clerk && typeof clerk.getToken === 'function' && syncQueueRef.current) {
+          if (navigator.onLine && clerk && syncQueueRef.current) {
             setError('Syncing project to cloud...')
 
             // Sync the project
@@ -757,14 +763,16 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         return
       }
 
-      // Verify clerk session is ready before proceeding
-      if (!clerk.session || typeof clerk.session.getToken !== 'function') {
-        console.error('Clerk session is not ready:', {
-          clerkLoaded: clerk.loaded,
-          hasSession: !!clerk.session,
-          sessionGetToken: typeof clerk.session?.getToken
-        })
-        setError('Authentication is not ready. Please wait a moment and try again.')
+      // Verify authentication is ready - use getAuthToken helper
+      try {
+        const token = await getAuthToken(clerk)
+        if (!token) {
+          setError('Authentication is not ready. Please wait a moment and try again.')
+          return
+        }
+      } catch (authError) {
+        console.error('Auth check error:', authError)
+        setError('Authentication error. Please refresh the page and sign in again.')
         return
       }
 
@@ -1101,6 +1109,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       transformerRef.current.getLayer()?.batchDraw()
     }
   }, [selectedItemId, items, blendMode])
+
+  // Cleanup transform update timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (transformUpdateTimeoutRef.current) {
+        clearTimeout(transformUpdateTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // Save history state - wrapper function for saveHistoryToDB
   const saveToHistory = useCallback(async (itemsToSave) => {
@@ -3879,7 +3896,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       anchorSize={12}
                       rotateEnabled={false}
                       enabledAnchors={['top-left', 'top-right', 'bottom-left', 'bottom-right']}
+                      onTransform={(e) => {
+                        // Visual update during transform - immediate feedback
+                        // No database update here, just visual
+                        const node = e.target
+                        node.getLayer()?.batchDraw()
+                      }}
                       onTransformEnd={(e) => {
+                        // Final update - save to database
                         const node = e.target
                         const selectedItem = items.find(item => item.id === selectedItemId)
                         if (selectedItem && node) {
@@ -3887,13 +3911,40 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                           const scaleY = node.scaleY()
                           node.scaleX(1)
                           node.scaleY(1)
-                          handleItemUpdate(selectedItemId, {
+                          
+                          // Throttle database updates - use requestIdleCallback or setTimeout
+                          // Update store immediately for visual feedback (non-blocking)
+                          updateItem(selectedItemId, {
                             x_position: node.x(),
                             y_position: node.y(),
                             width: Math.max(50, (selectedItem.width || 200) * scaleX),
                             height: Math.max(50, (selectedItem.height || 200) * scaleY),
                             rotation: node.rotation(),
                           })
+                          
+                          // Sync to database in background (non-blocking, debounced)
+                          if (userId && clerk) {
+                            // Clear any pending update
+                            if (transformUpdateTimeoutRef.current) {
+                              clearTimeout(transformUpdateTimeoutRef.current)
+                            }
+                            
+                            // Debounce database updates to avoid lag
+                            transformUpdateTimeoutRef.current = setTimeout(async () => {
+                              try {
+                                await apiUpdateCanvasItem(userId, selectedItemId, {
+                                  x_position: node.x(),
+                                  y_position: node.y(),
+                                  width: Math.max(50, (selectedItem.width || 200) * scaleX),
+                                  height: Math.max(50, (selectedItem.height || 200) * scaleY),
+                                  rotation: node.rotation(),
+                                }, clerk)
+                              } catch (error) {
+                                console.error('Failed to sync item update to database:', error)
+                              }
+                              transformUpdateTimeoutRef.current = null
+                            }, 300) // 300ms debounce for database updates
+                          }
                         }
                       }}
                     />

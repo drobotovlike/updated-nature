@@ -342,8 +342,8 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
             fill="#FFFFFF"
             stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
             strokeWidth={2 / zoom}
-            listening={false}
-            perfectDrawEnabled={false}
+                listening={false}
+                perfectDrawEnabled={false}
           />
           <Circle
             x={0}
@@ -352,9 +352,9 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
             fill="#FFFFFF"
             stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
             strokeWidth={2 / zoom}
-            listening={false}
-            perfectDrawEnabled={false}
-          />
+                listening={false}
+                perfectDrawEnabled={false}
+              />
           <Circle
             x={item.width || image.width}
             y={item.height || image.height}
@@ -362,9 +362,9 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
             fill="#FFFFFF"
             stroke={isMultiSelected ? "#3b82f6" : "#18181B"}
             strokeWidth={2 / zoom}
-            listening={false}
-            perfectDrawEnabled={false}
-          />
+                listening={false}
+                perfectDrawEnabled={false}
+              />
         </>
       )}
     </Group>
@@ -1316,7 +1316,242 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [selectedItem])
 
-  // Handle blend two images
+  // Helper: Convert image URL to base64
+  const imageToBase64 = useCallback(async (imageUrl) => {
+    try {
+      const response = await fetch(imageUrl)
+      const blob = await response.blob()
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const base64 = reader.result
+          // Remove data URL prefix if present
+          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64
+          resolve(base64Data)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(blob)
+      })
+    } catch (error) {
+      console.error('Error converting image to base64:', error)
+      throw error
+    }
+  }, [])
+
+  // Helper: Capture canvas composite with position data
+  const captureCanvasComposite = useCallback(async (roomItem, furnitureItems) => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        // Create a canvas element
+        const canvas = document.createElement('canvas')
+        const ctx = canvas.getContext('2d')
+        
+        // Set canvas size to room dimensions
+        canvas.width = roomItem.width || 1920
+        canvas.height = roomItem.height || 1080
+        
+        // Load and draw room image
+        const roomImg = new Image()
+        roomImg.crossOrigin = 'anonymous'
+        roomImg.onload = async () => {
+          ctx.drawImage(roomImg, 0, 0, canvas.width, canvas.height)
+          
+          // Draw each furniture piece at its position relative to room
+          const furniturePromises = furnitureItems.map(async (furniture) => {
+            return new Promise((resolveFurniture) => {
+              const furnitureImg = new Image()
+              furnitureImg.crossOrigin = 'anonymous'
+              furnitureImg.onload = () => {
+                // Calculate position relative to room
+                const x = furniture.x_position - roomItem.x_position
+                const y = furniture.y_position - roomItem.y_position
+                
+                // Apply rotation if needed
+                if (furniture.rotation) {
+                  ctx.save()
+                  const centerX = x + (furniture.width || 0) / 2
+                  const centerY = y + (furniture.height || 0) / 2
+                  ctx.translate(centerX, centerY)
+                  ctx.rotate((furniture.rotation * Math.PI) / 180)
+                  ctx.translate(-centerX, -centerY)
+                  ctx.drawImage(
+                    furnitureImg,
+                    x,
+                    y,
+                    furniture.width || furnitureImg.width,
+                    furniture.height || furnitureImg.height
+                  )
+                  ctx.restore()
+                } else {
+                  ctx.drawImage(
+                    furnitureImg,
+                    x,
+                    y,
+                    furniture.width || furnitureImg.width,
+                    furniture.height || furnitureImg.height
+                  )
+                }
+                resolveFurniture()
+              }
+              furnitureImg.onerror = () => {
+                console.warn('Failed to load furniture image:', furniture.image_url)
+                resolveFurniture() // Continue even if one image fails
+              }
+              furnitureImg.src = furniture.image_url
+            })
+          })
+          
+          await Promise.all(furniturePromises)
+          
+          // Convert canvas to base64
+          const base64 = canvas.toDataURL('image/png')
+          const base64Data = base64.split(',')[1]
+          resolve(base64Data)
+        }
+        
+        roomImg.onerror = () => {
+          reject(new Error('Failed to load room image'))
+        }
+        roomImg.src = roomItem.image_url
+      } catch (error) {
+        reject(error)
+      }
+    })
+  }, [])
+
+  // Handle blend in - Main workflow for blending furniture into room
+  const handleBlendIn = useCallback(async () => {
+    if (!userId || !projectId) {
+      setError('Missing user or project information. Please refresh the page.')
+      return
+    }
+
+    // Find room (background layer - usually the first item or largest)
+    const sortedItems = [...items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+    const roomItem = sortedItems[0] // Lowest z_index is background
+    
+    if (!roomItem) {
+      setError('Please add a room picture first.')
+      return
+    }
+
+    // Find all furniture pieces (items on top of room)
+    const furnitureItems = sortedItems.filter(item => 
+      item.id !== roomItem.id && 
+      (item.z_index || 0) > (roomItem.z_index || 0)
+    )
+
+    if (furnitureItems.length === 0) {
+      setError('Please add furniture pieces to blend into the room.')
+      return
+    }
+
+    try {
+      setIsGenerating(true)
+      setError('')
+
+      // Save originals to history for undo
+      const originals = [roomItem, ...furnitureItems]
+      await saveToHistory(originals)
+
+      const token = await getAuthToken(clerk)
+      if (!token) throw new Error('Authentication required')
+
+      // Convert room image to base64
+      const roomBase64 = await imageToBase64(roomItem.image_url)
+
+      // Capture composite image with furniture positioned
+      const compositeBase64 = await captureCanvasComposite(roomItem, furnitureItems)
+
+      // Build position description for AI
+      const positionDescriptions = furnitureItems.map((furniture, index) => {
+        const x = furniture.x_position - roomItem.x_position
+        const y = furniture.y_position - roomItem.y_position
+        const relativeX = (x / (roomItem.width || 1920)) * 100
+        const relativeY = (y / (roomItem.height || 1080)) * 100
+        return `Furniture ${index + 1} is positioned at ${Math.round(relativeX)}% from left and ${Math.round(relativeY)}% from top of the room image.`
+      }).join(' ')
+
+      // Call Gemini API with room + composite + position info
+      const response = await fetch('/api/nano-banana/visualize', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          roomBase64: roomBase64,
+          furnitureBase64: compositeBase64,
+          description: `Blend the furniture pieces into the room image realistically. ${positionDescriptions} Maintain the exact positions shown in the composite image. Add realistic lighting, shadows, and perspective. The furniture should look naturally placed in the room with proper scale and integration.`,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Blend failed' }))
+        throw new Error(errorData.error?.message || errorData.error || 'Failed to blend images')
+      }
+
+      const data = await response.json()
+      if (!data.imageUrl) {
+        throw new Error('No image returned from blend operation')
+      }
+
+      // Upload result if it's a data URL
+      let imageUrl = data.imageUrl
+      if (imageUrl.startsWith('data:')) {
+        const imgResponse = await fetch(imageUrl)
+        const blob = await imgResponse.blob()
+        const file = new File([blob], `blend-${Date.now()}.png`, { type: 'image/png' })
+        const uploadResult = await uploadFileToCloud(file, clerk)
+        imageUrl = uploadResult.url
+      }
+
+      // Get image dimensions
+      const img = new Image()
+      await new Promise((resolve, reject) => {
+        img.onload = resolve
+        img.onerror = reject
+        img.src = imageUrl
+      })
+
+      // Create new blended item at room position
+      const newItem = await createCanvasItem(userId, projectId, {
+        image_url: imageUrl,
+        x_position: roomItem.x_position,
+        y_position: roomItem.y_position,
+        width: img.width,
+        height: img.height,
+        name: `Blended: ${roomItem.name || 'Room'} + ${furnitureItems.length} furniture piece${furnitureItems.length > 1 ? 's' : ''}`,
+        z_index: roomItem.z_index || 0,
+        is_visible: true,
+      }, clerk)
+
+      // Remove originals and add blended result
+      const idsToRemove = originals.map(item => item.id)
+      for (const id of idsToRemove) {
+        await deleteCanvasItem(userId, id, clerk)
+      }
+
+      // Update items list
+      setItems((prev) => {
+        const filtered = prev.filter(item => !idsToRemove.includes(item.id))
+        return [...filtered, newItem]
+      })
+
+      // Clear selection
+      setSelectedItemId(null)
+      
+      // Clear any error messages - success is indicated by the result appearing on canvas
+      setError('')
+    } catch (error) {
+      console.error('Error blending in:', error)
+      setError(error.message || 'Failed to blend images. Please try again.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }, [userId, projectId, items, clerk, imageToBase64, captureCanvasComposite, createCanvasItem, deleteCanvasItem, saveToHistory])
+
+  // Handle blend two images (legacy - kept for backward compatibility)
   const handleBlend = useCallback(async (sourceId, targetId) => {
     if (!userId || !projectId || !sourceId || !targetId) return
 
@@ -2952,6 +3187,35 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z" />
           </svg>
         </button>
+
+        {/* Blend In Button - Only show when room + furniture exist */}
+        {(() => {
+          const sortedItems = [...items].sort((a, b) => (a.z_index || 0) - (b.z_index || 0))
+          const roomItem = sortedItems[0]
+          const furnitureItems = sortedItems.filter(item => 
+            item.id !== roomItem?.id && 
+            (item.z_index || 0) > (roomItem?.z_index || 0)
+          )
+          const canBlend = roomItem && furnitureItems.length > 0
+          
+          return canBlend ? (
+            <button
+              onClick={handleBlendIn}
+              disabled={isGenerating}
+              className="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+              title="Blend In - Blend furniture into room"
+            >
+              {isGenerating ? (
+                <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2v20" />
+                  <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                </svg>
+              )}
+            </button>
+          ) : null
+        })()}
 
         {/* AI/Chat Button */}
         <button

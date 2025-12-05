@@ -176,6 +176,53 @@ async function handler(req, res, userId) {
   } catch (error) {
     console.error('Error processing visualization:', error)
     console.error('Error stack:', error.stack)
+    
+    // Check for quota/rate limit errors (429)
+    if (error.code === 429 || 
+        error.status === 'RESOURCE_EXHAUSTED' || 
+        error.message?.includes('quota') ||
+        error.message?.includes('exceeded your current quota')) {
+      
+      // Extract retry delay from error details
+      let retryAfter = '22'
+      try {
+        if (error.details && Array.isArray(error.details)) {
+          const retryInfo = error.details.find(d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo')
+          if (retryInfo?.retryDelay) {
+            retryAfter = Math.ceil(parseFloat(retryInfo.retryDelay)).toString()
+          }
+        }
+        // Also check if error object has retryDelay directly
+        if (error.retryDelay) {
+          retryAfter = Math.ceil(parseFloat(error.retryDelay)).toString()
+        }
+      } catch (e) {
+        // Use default if parsing fails
+        console.warn('Could not parse retry delay:', e)
+      }
+      
+      return res.status(429).json({ 
+        error: { 
+          message: 'API quota exceeded. You have reached the free tier limit for Gemini API.',
+          code: 'QUOTA_EXCEEDED',
+          retryAfter: retryAfter,
+          details: 'Please wait before trying again, or upgrade your Google AI Studio plan for higher limits.',
+          helpUrl: 'https://ai.google.dev/gemini-api/docs/rate-limits',
+          usageUrl: 'https://ai.dev/usage?tab=rate-limit'
+        } 
+      })
+    }
+    
+    // Check for API key errors
+    if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+      return res.status(500).json({ 
+        error: { 
+          message: 'Gemini API key error. Please check your API key configuration.',
+          code: 'API_KEY_ERROR'
+        } 
+      })
+    }
+    
     return res.status(500).json({ 
       error: { 
         message: error.message || 'Failed to generate visualization',

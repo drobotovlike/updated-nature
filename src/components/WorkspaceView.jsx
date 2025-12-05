@@ -280,7 +280,15 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
         console.error('API error response:', errorText)
         try {
           const errorData = JSON.parse(errorText)
-          setError(errorData.error?.message || errorData.error || `API error: ${response.status}`)
+          const error = errorData.error || {}
+          
+          // Check for quota exceeded error (429)
+          if (response.status === 429 || error.code === 'QUOTA_EXCEEDED' || error.message?.includes('quota')) {
+            const retryAfter = error.retryAfter || '22'
+            setError(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing. Monitor usage: https://ai.dev/usage?tab=rate-limit`)
+          } else {
+            setError(error.message || error || `API error: ${response.status}`)
+          }
         } catch (e) {
           setError(`API error: ${response.status} - ${errorText}`)
         }
@@ -349,7 +357,14 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
     } catch (error) {
       console.error('Error calling Gemini API:', error)
       console.error('Error stack:', error.stack)
-      setError(`Failed to process image: ${error.message}. Please check console for details.`)
+      
+      // Check for quota errors in catch block as well
+      if (error.message?.includes('quota') || error.message?.includes('QUOTA_EXCEEDED') || error.code === 429) {
+        const retryAfter = error.retryAfter || '22'
+        setError(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+      } else {
+        setError(`Failed to process image: ${error.message || 'Unknown error'}. Please check console for details.`)
+      }
     } finally {
       setIsProcessing(false)
     }

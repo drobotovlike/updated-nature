@@ -2648,7 +2648,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }),
       })
 
-      if (!response.ok) throw new Error('Generation failed')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Generation failed' }))
+        const error = errorData.error || {}
+        
+        // Check for quota exceeded error (429)
+        if (response.status === 429 || error.code === 'QUOTA_EXCEEDED' || error.message?.includes('quota')) {
+          const retryAfter = error.retryAfter || '22'
+          throw new Error(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+        }
+        
+        throw new Error(error.message || error || 'Generation failed')
+      }
 
       const data = await response.json()
       if (data.imageUrl) {
@@ -2707,7 +2718,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }
     } catch (error) {
       console.error('Error generating to canvas:', error)
-      setError(error.message || 'Failed to generate image. Please try again.')
+      
+      // Check for quota errors
+      if (error.message?.includes('quota') || error.message?.includes('QUOTA_EXCEEDED') || error.code === 429) {
+        const retryAfter = error.retryAfter || '22'
+        setError(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+      } else {
+        setError(error.message || 'Failed to generate image. Please try again.')
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -2758,7 +2776,18 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         }),
       })
 
-      if (!response.ok) throw new Error('Generation failed')
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Generation failed' }))
+        const error = errorData.error || {}
+        
+        // Check for quota exceeded error (429)
+        if (response.status === 429 || error.code === 'QUOTA_EXCEEDED' || error.message?.includes('quota')) {
+          const retryAfter = error.retryAfter || '22'
+          throw new Error(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+        }
+        
+        throw new Error(error.message || error || 'Generation failed')
+      }
 
       const data = await response.json()
       if (data.imageUrl) {
@@ -2782,7 +2811,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       }
     } catch (error) {
       console.error('Error regenerating:', error)
-      setError(error.message || 'Failed to regenerate image. Please try again.')
+      
+      // Check for quota errors
+      if (error.message?.includes('quota') || error.message?.includes('QUOTA_EXCEEDED') || error.code === 429) {
+        const retryAfter = error.retryAfter || '22'
+        setError(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+      } else {
+        setError(error.message || 'Failed to regenerate image. Please try again.')
+      }
     } finally {
       setIsGenerating(false)
     }

@@ -244,32 +244,61 @@ async function generateWithGemini({ prompt, reference_image, reference_strength,
     contents = prompt
   }
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash-image",
-    contents: contents,
-  })
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: contents,
+    })
 
-  let imageUrl = null
-  let textResult = null
+    let imageUrl = null
+    let textResult = null
 
-  if (response.candidates && response.candidates[0]?.content?.parts) {
-    for (const part of response.candidates[0].content.parts) {
-      if (part.text) {
-        textResult = part.text
-      } else if (part.inlineData) {
-        const imageData = part.inlineData
-        if (imageData?.data) {
-          imageUrl = `data:${imageData.mimeType || 'image/png'};base64,${imageData.data}`
+    if (response.candidates && response.candidates[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.text) {
+          textResult = part.text
+        } else if (part.inlineData) {
+          const imageData = part.inlineData
+          if (imageData?.data) {
+            imageUrl = `data:${imageData.mimeType || 'image/png'};base64,${imageData.data}`
+          }
         }
       }
     }
-  }
 
-  if (!imageUrl && !textResult) {
-    throw new Error('No image or text generated from Gemini')
-  }
+    if (!imageUrl && !textResult) {
+      throw new Error('No image or text generated from Gemini')
+    }
 
-  return { imageUrl, text: textResult }
+    return { imageUrl, text: textResult }
+  } catch (error) {
+    // Handle quota/rate limit errors
+    if (error.code === 429 || 
+        error.status === 'RESOURCE_EXHAUSTED' || 
+        error.message?.includes('quota') ||
+        error.message?.includes('exceeded your current quota')) {
+      let retryAfter = '22'
+      try {
+        if (error.details && Array.isArray(error.details)) {
+          const retryInfo = error.details.find(d => d['@type'] === 'type.googleapis.com/google.rpc.RetryInfo')
+          if (retryInfo?.retryDelay) {
+            retryAfter = Math.ceil(parseFloat(retryInfo.retryDelay)).toString()
+          }
+        }
+        if (error.retryDelay) {
+          retryAfter = Math.ceil(parseFloat(error.retryDelay)).toString()
+        }
+      } catch (e) {
+        // Use default if parsing fails
+      }
+      
+      const quotaError = new Error(`QUOTA_EXCEEDED: API quota exceeded. Please wait ${retryAfter}s before retrying, or upgrade your Google AI Studio plan. Visit https://ai.google.dev/gemini-api/docs/rate-limits`)
+      quotaError.code = 'QUOTA_EXCEEDED'
+      quotaError.retryAfter = retryAfter
+      throw quotaError
+    }
+    throw error
+  }
 }
 
 // GPT Image handler (placeholder - requires OpenAI API key)

@@ -765,7 +765,15 @@ function StudioPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: 'Failed to generate visualization' }))
-        throw new Error(errorData.error || 'Failed to generate visualization')
+        const error = errorData.error || {}
+        
+        // Check for quota exceeded error (429)
+        if (response.status === 429 || error.code === 'QUOTA_EXCEEDED' || error.message?.includes('quota')) {
+          const retryAfter = error.retryAfter || '22'
+          throw new Error(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again, or upgrade your Google AI Studio plan at https://ai.google.dev/pricing`)
+        }
+        
+        throw new Error(error.message || error || 'Failed to generate visualization')
       }
 
       const data = await response.json()

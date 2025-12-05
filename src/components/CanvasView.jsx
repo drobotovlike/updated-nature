@@ -1709,9 +1709,30 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     } else if (action === 'mirror') {
       const item = items.find(item => item.id === itemId)
       if (item) {
-        // Toggle horizontal flip
+        // When flipping, we need to adjust the x position to maintain visual position
+        // Because Konva uses offsetX for flipping, the visual position changes
+        const itemWidth = item.width || 200
+        const currentX = item.x_position || 0
+        const newFlipState = !item.flip_horizontal
+        
+        // Calculate new x position to maintain visual position after flip
+        // In Konva: when flip_horizontal=true, offsetX=width shifts origin, so visual left edge = x_position - width
+        // To maintain visual position when flipping, we need to adjust x_position
+        let newX = currentX
+        if (newFlipState && !item.flip_horizontal) {
+          // Flipping from normal to flipped: visual left edge moves left by width
+          // To keep visual position, shift x_position right by width
+          newX = currentX + itemWidth
+        } else if (!newFlipState && item.flip_horizontal) {
+          // Flipping from flipped to normal: visual left edge moves right by width  
+          // To keep visual position, shift x_position left by width
+          newX = currentX - itemWidth
+        }
+        
+        // Toggle horizontal flip and update position
         handleItemUpdate(itemId, { 
-          flip_horizontal: !item.flip_horizontal 
+          flip_horizontal: newFlipState,
+          x_position: newX
         })
       }
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
@@ -3471,6 +3492,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           <div className="w-px h-6 bg-stone-200 mx-1" />
           <button
             onClick={() => {
+              handleContextMenuAction('remove-objects', contextMenuPosition.itemId)
+            }}
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Remove Objects"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+              <line x1="18" y1="9" x2="12" y2="15" />
+              <line x1="12" y1="9" x2="18" y2="15" />
+            </svg>
+          </button>
+          <button
+            onClick={() => {
               handleContextMenuAction('mirror', contextMenuPosition.itemId)
             }}
             className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
@@ -4082,8 +4116,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                       anchorCornerRadius={3}
                       rotateEnabled={false}
                       resizeEnabled={true}
-                      keepRatio={false}
+                      keepRatio={true}
                       // Enable all 8 handles like Miro (4 corners + 4 edges)
+                      // With aspect ratio locked, corner handles will maintain ratio
                       enabledAnchors={[
                         'top-left', 'top-center', 'top-right',
                         'middle-left', 'middle-right',
@@ -4105,6 +4140,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         if (!selectedItem || !node) return
                         
                         // Get the current scale values from the transform
+                        // With keepRatio=true, Konva automatically maintains aspect ratio, so scaleX = scaleY
                         const scaleX = node.scaleX()
                         const scaleY = node.scaleY()
                         
@@ -4112,10 +4148,13 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         const currentWidth = node.width()
                         const currentHeight = node.height()
                         
-                        // Calculate the actual new dimensions after scaling
-                        // The transformer applies scale to the node's width/height
-                        const newWidth = Math.max(50, Math.abs(currentWidth * scaleX))
-                        const newHeight = Math.max(50, Math.abs(currentHeight * scaleY))
+                        // With keepRatio enabled, scaleX and scaleY are the same
+                        // Use scaleX (or scaleY, they're equal) to maintain aspect ratio
+                        const scale = Math.abs(scaleX)
+                        
+                        // Calculate new dimensions maintaining aspect ratio
+                        const newWidth = Math.max(50, Math.abs(currentWidth * scale))
+                        const newHeight = Math.max(50, Math.abs(currentHeight * scale))
                         
                         // Get the new position (may have shifted during corner/edge resize)
                         const newX = node.x()
@@ -4123,6 +4162,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         
                         // Reset scale to 1:1 and update the actual width/height
                         // This is the standard Konva pattern for applying transforms
+                        // Aspect ratio is automatically maintained by keepRatio setting
                         node.scaleX(1)
                         node.scaleY(1)
                         node.width(newWidth)

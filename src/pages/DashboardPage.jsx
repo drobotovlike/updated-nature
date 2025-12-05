@@ -7,6 +7,7 @@ import WorkspaceView from '../components/WorkspaceView'
 import CanvasView from '../components/CanvasView'
 import AccountView from '../components/AccountView'
 import CanvasPreview from '../components/CanvasPreview'
+import AssetLibrary from '../components/AssetLibrary'
 
 export default function DashboardPage() {
   const { user, isLoaded: userLoaded } = useUser()
@@ -15,7 +16,7 @@ export default function DashboardPage() {
   const clerk = useClerk()
   const navigate = useNavigate()
 
-  // View state: 'projects' | 'workspace' | 'account' | 'my-projects'
+  // View state: 'projects' | 'workspace' | 'account' | 'my-projects' | 'assets'
   const [currentView, setCurrentView] = useState('projects')
   const [selectedProjectId, setSelectedProjectId] = useState(null)
   const [editingCreation, setEditingCreation] = useState(null)
@@ -548,17 +549,25 @@ export default function DashboardPage() {
               </svg>
               <span className="text-sm font-medium">Templates</span>
             </a>
-            <a
-              href="#"
-              className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
+            <button
+              onClick={() => {
+                setCurrentView('assets')
+                setSelectedProjectId(null)
+                setEditingCreation(null)
+                setSelectedSpaceId(null)
+              }}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-micro ease-apple ${currentView === 'assets'
+                  ? 'bg-surface-elevated text-text-primary'
+                  : 'hover:text-text-primary hover:bg-surface-elevated text-text-secondary'
+                }`}
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
                 <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
                 <line x1="12" y1="22.08" x2="12" y2="12" />
               </svg>
-              <span className="text-sm font-medium">Assets</span>
-            </a>
+              <span className="text-sm font-medium">My Assets</span>
+            </button>
             <a
               href="#"
               className="flex items-center gap-3 px-3 py-2.5 hover:text-text-primary hover:bg-surface-elevated rounded-lg transition-colors duration-micro ease-apple text-text-secondary"
@@ -1231,6 +1240,20 @@ export default function DashboardPage() {
           ) : currentView === 'account' ? (
             <div className="px-8 pb-12 pt-8">
               <AccountView />
+            </div>
+          ) : currentView === 'assets' ? (
+            <div className="px-8 pb-12 pt-8">
+              <div className="mb-8">
+                <h1 className="text-2xl font-semibold text-text-primary tracking-tight mb-1">My Assets</h1>
+                <p className="text-sm text-text-tertiary">All your uploaded and generated images</p>
+              </div>
+              <AssetLibrary 
+                onSelectAsset={(asset) => {
+                  // When asset is selected, could open it or allow adding to a project
+                  console.log('Asset selected:', asset)
+                }}
+                projectId={null}
+              />
             </div>
           ) : null}
         </div>

@@ -2711,6 +2711,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           ].slice(0, 10) // Keep only last 10
           return newHistory
         })
+
+        // Save generated image to asset library ("My assets")
+        try {
+          await addAssetToLibrary(
+            userId,
+            `Generated: ${prompt.substring(0, 50)}`,
+            imageUrl,
+            'image',
+            `AI-generated image from canvas: ${finalPrompt.substring(0, 100)}`,
+            clerk
+          )
+          console.log('Generated image saved to asset library')
+        } catch (assetError) {
+          // Don't fail generation if asset library save fails
+          console.warn('Failed to save generated image to asset library:', assetError)
+        }
         
         setShowGenerateModal(false)
         setGeneratePrompt('')
@@ -2808,6 +2824,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           prompt: prompt,
           description: `Model: ${selectedModel}${selectedStyle ? `, Style: ${selectedStyle.name}` : ''} `,
         })
+
+        // Save regenerated image to asset library ("My assets")
+        try {
+          await addAssetToLibrary(
+            userId,
+            `Regenerated: ${prompt.substring(0, 50)}`,
+            imageUrl,
+            'image',
+            `AI-regenerated image from canvas: ${prompt.substring(0, 100)}`,
+            clerk
+          )
+          console.log('Regenerated image saved to asset library')
+        } catch (assetError) {
+          // Don't fail regeneration if asset library save fails
+          console.warn('Failed to save regenerated image to asset library:', assetError)
+        }
       }
     } catch (error) {
       console.error('Error regenerating:', error)
@@ -2900,6 +2932,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           }, clerk)
 
           newItems.push(newItem)
+
+          // Save each variation to asset library ("My assets")
+          try {
+            await addAssetToLibrary(
+              userId,
+              `Variation ${i + 1}: ${prompt.substring(0, 50)}`,
+              imageUrl,
+              'image',
+              `AI-generated variation from canvas: ${variationPrompt.substring(0, 100)}`,
+              clerk
+            )
+            console.log(`Variation ${i + 1} saved to asset library`)
+          } catch (assetError) {
+            // Don't fail generation if asset library save fails
+            console.warn(`Failed to save variation ${i + 1} to asset library:`, assetError)
+          }
         }
         }
 
@@ -3156,7 +3204,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
 
         <div className="w-8 h-px bg-stone-200 my-1" />
 
-        {/* Layers/Assets Button */}
+        {/* Layers Button */}
         <button
           onClick={() => setShowLayersPanel(!showLayersPanel)}
           className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
@@ -3171,6 +3219,23 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             <rect x="14" y="3" width="7" height="7" rx="1" />
             <rect x="14" y="14" width="7" height="7" rx="1" />
             <rect x="3" y="14" width="7" height="7" rx="1" />
+          </svg>
+        </button>
+
+        {/* Assets Button - "My assets" folder */}
+        <button
+          onClick={() => setShowAssetLibrary(!showAssetLibrary)}
+          className={`w-10 h-10 rounded-lg flex items-center justify-center transition-colors ${
+            showAssetLibrary 
+              ? 'bg-stone-900 text-white' 
+              : 'bg-white border border-stone-200 hover:bg-stone-50 text-stone-700'
+          }`}
+          title="My Assets"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+            <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
+            <line x1="12" y1="22.08" x2="12" y2="12" />
           </svg>
         </button>
 
@@ -4173,7 +4238,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50" onClick={() => setShowAssetLibrary(false)}>
           <div className="bg-white rounded-2xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4 flex-shrink-0">
-              <h2 className="text-xl font-semibold">Asset Library</h2>
+              <h2 className="text-xl font-semibold">My Assets</h2>
               <button
                 onClick={() => setShowAssetLibrary(false)}
                 className="p-2 hover:bg-stone-100 rounded-lg transition-colors"

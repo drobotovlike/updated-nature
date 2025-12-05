@@ -35,7 +35,8 @@ export function useCanvasRealtime(projectId) {
    */
   const handleItemChange = useCallback((payload) => {
     // Ignore our own changes (they're already in the store)
-    // Check both created_by and user_id fields
+    // Check both created_by and user_id fields for INSERT/UPDATE
+    // For UPDATE, also check if the updated item already has our recent changes
     const isOurChange = 
       (payload.new?.created_by === userId || payload.new?.user_id === userId) ||
       (payload.old?.created_by === userId || payload.old?.user_id === userId)
@@ -43,6 +44,31 @@ export function useCanvasRealtime(projectId) {
     if (isOurChange) {
       console.log('Ignoring our own change in realtime:', payload.eventType)
       return
+    }
+
+    // For UPDATE events, check if local item has been edited (e.g., inpainting)
+    // to prevent overwriting optimistic updates or recent edits
+    if (payload.eventType === 'UPDATE') {
+      const updatedItem = payload.new
+      const currentItems = items
+      const localItem = currentItems.find(item => item.id === updatedItem.id)
+      
+      if (localItem) {
+        // If local item has edit metadata (from inpainting or other AI edits),
+        // always preserve the edited image_url to prevent reverting changes
+        if (localItem.metadata?.edit_type && localItem.metadata?.edited_at && localItem.image_url) {
+          // Check if the remote update would overwrite our edited image
+          if (updatedItem.image_url !== localItem.image_url) {
+            // The remote update has a different image_url - this could be reverting our edit
+            // Only allow this if the remote also has the same edit metadata (meaning it's our update coming back)
+            if (!updatedItem.metadata?.edit_type || updatedItem.metadata?.edited_at !== localItem.metadata?.edited_at) {
+              // This is not our update coming back - skip it to preserve the edit
+              console.log('Skipping realtime update that would overwrite local edit:', updatedItem.id)
+              return
+            }
+          }
+        }
+      }
     }
 
     console.log('Realtime item change from another user:', payload.eventType, payload)
@@ -69,9 +95,56 @@ export function useCanvasRealtime(projectId) {
           console.log('Item not found in store, skipping update:', updatedItem.id)
           return currentItems
         }
-        return currentItems.map((item) =>
-          item.id === updatedItem.id ? updatedItem : item
-        )
+        // Merge the update instead of replacing - preserve local optimistic updates
+        return currentItems.map((item) => {
+          if (item.id === updatedItem.id) {
+            // Check if local item has been edited (has edit metadata)
+            // If so, preserve the edited image_url to prevent reverting inpainting changes
+            if (item.metadata?.edit_type && item.metadata?.edited_at && item.image_url) {
+              // This item was recently edited (e.g., inpainting) - preserve the edited image_url
+              // Only allow overwriting if the remote update also has the same edit metadata
+              const remoteHasSameEdit = 
+                updatedItem.metadata?.edit_type === item.metadata?.edit_type &&
+                updatedItem.metadata?.edited_at === item.metadata?.edited_at &&
+                updatedItem.image_url === item.image_url
+              
+              if (!remoteHasSameEdit) {
+                // Remote doesn't have the same edit - preserve local edit
+                // Merge everything except image_url and edit metadata
+                const { image_url: localImageUrl, metadata: localMetadata, ...localRest } = item
+                const { image_url: remoteImageUrl, metadata: remoteMetadata, ...remoteRest } = updatedItem
+                
+                return {
+                  ...localRest,
+                  ...remoteRest,
+                  image_url: localImageUrl, // Preserve edited image
+                  metadata: {
+                    ...localMetadata,
+                    ...remoteMetadata,
+                    // Keep edit metadata
+                    edit_type: localMetadata.edit_type,
+                    edited_at: localMetadata.edited_at,
+                    original_image_url: localMetadata.original_image_url,
+                  },
+                }
+              }
+              // Remote has the same edit - safe to merge normally (this is our update coming back)
+            }
+            
+            // No recent edits - safe to merge normally
+            const mergedItem = { ...item, ...updatedItem }
+            
+            // Preserve local metadata if it exists
+            if (item.metadata && updatedItem.metadata) {
+              mergedItem.metadata = { ...item.metadata, ...updatedItem.metadata }
+            } else if (item.metadata) {
+              mergedItem.metadata = item.metadata
+            }
+            
+            return mergedItem
+          }
+          return item
+        })
       })
     } else if (payload.eventType === 'DELETE') {
       // Another user deleted an item

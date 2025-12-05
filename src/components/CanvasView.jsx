@@ -297,6 +297,10 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
         width={item.width || image.width}
         height={item.height || image.height}
         rotation={item.rotation || 0}
+        scaleX={item.flip_horizontal ? -1 : 1}
+        scaleY={item.flip_vertical ? -1 : 1}
+        offsetX={item.flip_horizontal ? (item.width || image.width) : 0}
+        offsetY={item.flip_vertical ? (item.height || image.height) : 0}
         filters={filters.length > 0 ? filters : undefined}
         brightness={brightness}
         contrast={contrast}
@@ -1695,6 +1699,15 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
     } else if (action === 'delete') {
       handleItemDelete(itemId)
+      setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
+    } else if (action === 'mirror') {
+      const item = items.find(item => item.id === itemId)
+      if (item) {
+        // Toggle horizontal flip
+        handleItemUpdate(itemId, { 
+          flip_horizontal: !item.flip_horizontal 
+        })
+      }
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
     } else if (action === 'download') {
       const item = items.find(item => item.id === itemId)
@@ -3408,6 +3421,22 @@ export default function CanvasView({ projectId, onBack, onSave }) {
             </svg>
           </button>
           <div className="w-px h-6 bg-stone-200 mx-1" />
+          <button
+            onClick={() => {
+              handleContextMenuAction('mirror', contextMenuPosition.itemId)
+            }}
+            className="w-10 h-10 rounded-lg bg-white border border-stone-200 hover:bg-stone-50 flex items-center justify-center transition-colors text-stone-700"
+            title="Mirror (Flip Horizontal)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 3v18" />
+              <path d="M8 7l4-4 4 4" />
+              <path d="M8 17l4 4 4-4" />
+              <path d="M3 12h18" />
+              <path d="M3 3l6 6-6 6V3z" />
+              <path d="M21 3l-6 6 6 6V3z" />
+            </svg>
+          </button>
           <button
             onClick={() => {
               handleContextMenuAction('delete', contextMenuPosition.itemId)

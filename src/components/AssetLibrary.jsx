@@ -13,6 +13,8 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
   const [availableTags, setAvailableTags] = useState([])
   const [loading, setLoading] = useState(true)
   const [uploadingAsset, setUploadingAsset] = useState(false)
+  const [uploadQueue, setUploadQueue] = useState([]) // Track multiple uploads
+  const [uploadProgress, setUploadProgress] = useState({}) // Track progress for each file
   const assetUploadInputRef = useRef(null)
 
   useEffect(() => {
@@ -71,10 +73,15 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
     }
   }
 
-  const handleAssetUpload = async (file) => {
+  const handleSingleAssetUpload = async (file) => {
     if (!file || !userId) return
 
-    setUploadingAsset(true)
+    const fileId = `${file.name}-${file.size}-${Date.now()}`
+    
+    // Add to upload queue
+    setUploadQueue(prev => [...prev, fileId])
+    setUploadProgress(prev => ({ ...prev, [fileId]: { status: 'uploading', fileName: file.name } }))
+
     try {
       const uploadResult = await uploadFileToCloud(file, clerk)
       const permanentUrl = uploadResult.url
@@ -82,6 +89,8 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
       if (!permanentUrl) {
         throw new Error('Upload succeeded but no URL returned')
       }
+
+      setUploadProgress(prev => ({ ...prev, [fileId]: { status: 'saving', fileName: file.name } }))
 
       await addAssetToLibrary(
         userId,
@@ -92,12 +101,75 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
         clerk
       )
 
-      loadAssets()
+      setUploadProgress(prev => ({ ...prev, [fileId]: { status: 'success', fileName: file.name } }))
+      
+      // Remove from queue after a brief delay
+      setTimeout(() => {
+        setUploadQueue(prev => prev.filter(id => id !== fileId))
+        setUploadProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[fileId]
+          return newProgress
+        })
+        
+        // Check if all uploads are done
+        setUploadQueue(currentQueue => {
+          if (currentQueue.length === 0) {
+            setUploadingAsset(false)
+            loadAssets()
+          }
+          return currentQueue
+        })
+      }, 1000)
     } catch (error) {
       console.error('Error uploading asset:', error)
-      alert('Failed to upload asset')
-    } finally {
-      setUploadingAsset(false)
+      setUploadProgress(prev => ({ ...prev, [fileId]: { status: 'error', fileName: file.name, error: error.message } }))
+      
+      // Remove from queue after showing error
+      setTimeout(() => {
+        setUploadQueue(prev => prev.filter(id => id !== fileId))
+        setUploadProgress(prev => {
+          const newProgress = { ...prev }
+          delete newProgress[fileId]
+          return newProgress
+        })
+        
+        // Check if all uploads are done
+        setUploadQueue(currentQueue => {
+          if (currentQueue.length === 0) {
+            setUploadingAsset(false)
+          }
+          return currentQueue
+        })
+      }, 3000)
+    }
+  }
+
+  const handleMultipleAssetUpload = async (files) => {
+    if (!files || files.length === 0 || !userId) return
+
+    // Filter only image files
+    const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+    
+    if (imageFiles.length === 0) {
+      alert('Please select image files only.')
+      return
+    }
+
+    // Limit to 10 files at a time
+    const filesToUpload = imageFiles.slice(0, 10)
+    
+    if (imageFiles.length > 10) {
+      alert(`You selected ${imageFiles.length} files. Only the first 10 will be uploaded.`)
+    }
+
+    setUploadingAsset(true)
+    
+    // Upload all files sequentially to avoid overwhelming the server
+    for (const file of filesToUpload) {
+      await handleSingleAssetUpload(file)
+      // Small delay between uploads to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 300))
     }
   }
 
@@ -137,7 +209,7 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
           {uploadingAsset ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-              <span>Uploading...</span>
+              <span>Uploading {uploadQueue.length} file{uploadQueue.length !== 1 ? 's' : ''}...</span>
             </>
           ) : (
             <>
@@ -146,7 +218,7 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
                 <polyline points="17 8 12 3 7 8" />
                 <line x1="12" y1="3" x2="12" y2="15" />
               </svg>
-              <span>Upload</span>
+              <span>Upload (up to 10)</span>
             </>
           )}
         </button>
@@ -156,15 +228,42 @@ export default function AssetLibrary({ onSelectAsset, projectId }) {
         ref={assetUploadInputRef}
         type="file"
         accept="image/*"
+        multiple
         className="hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) {
-            handleAssetUpload(file)
+          const files = e.target.files
+          if (files && files.length > 0) {
+            handleMultipleAssetUpload(files)
           }
           e.target.value = ''
         }}
       />
+
+      {/* Upload Progress Indicator */}
+      {uploadQueue.length > 0 && (
+        <div className="bg-stone-50 border border-stone-200 rounded-lg p-4 space-y-2">
+          <p className="text-sm font-medium text-stone-700 mb-2">
+            Uploading {uploadQueue.length} file{uploadQueue.length !== 1 ? 's' : ''}...
+          </p>
+          <div className="space-y-1 max-h-32 overflow-y-auto">
+            {Object.entries(uploadProgress).map(([fileId, progress]) => (
+              <div key={fileId} className="flex items-center justify-between text-xs">
+                <span className="text-stone-600 truncate flex-1">{progress.fileName}</span>
+                <span className={`ml-2 font-medium ${
+                  progress.status === 'success' ? 'text-green-600' :
+                  progress.status === 'error' ? 'text-red-600' :
+                  'text-stone-500'
+                }`}>
+                  {progress.status === 'uploading' && 'Uploading...'}
+                  {progress.status === 'saving' && 'Saving...'}
+                  {progress.status === 'success' && '✓ Done'}
+                  {progress.status === 'error' && '✗ Failed'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tags Filter */}
       {availableTags.length > 0 && (

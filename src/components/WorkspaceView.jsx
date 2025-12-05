@@ -3,6 +3,7 @@ import { useAuth, useClerk } from '@clerk/clerk-react'
 import { getProject, updateProject, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { getAuthToken } from '../utils/authToken'
+import { compressFile, getBase64Data } from '../utils/imageCompression'
 import AssetLibrary from './AssetLibrary'
 import ExportModal from './ExportModal'
 
@@ -89,16 +90,26 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
     }
   }, [assetPreviewUrl])
 
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = () => {
-        const base64 = reader.result.split(',')[1]
-        resolve(base64)
-      }
-      reader.onerror = reject
-      reader.readAsDataURL(file)
-    })
+  const fileToBase64 = async (file) => {
+    try {
+      // Compress image before converting to base64 (prevents 413 errors)
+      const compressedDataUrl = await compressFile(file, 2048, 2048, 0.85)
+      // Extract base64 data (without data URL prefix)
+      const base64 = await getBase64Data(compressedDataUrl)
+      return base64
+    } catch (error) {
+      console.error('Error compressing/converting file to base64:', error)
+      // Fallback to original conversion if compression fails
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = () => {
+          const base64 = reader.result.split(',')[1]
+          resolve(base64)
+        }
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
   }
 
   const handleRoomUpload = async (file) => {
@@ -276,6 +287,12 @@ export default function WorkspaceView({ projectId, onBack, onSave, initialCreati
       console.log('Response status:', response.status, response.statusText)
       
       if (!response.ok) {
+        // Handle 413 Payload Too Large error specifically
+        if (response.status === 413) {
+          setError('⚠️ Image files are too large. Please use smaller images (under 2MB each) or try compressing them before uploading.')
+          return
+        }
+        
         const errorText = await response.text()
         console.error('API error response:', errorText)
         try {

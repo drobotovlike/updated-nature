@@ -12,6 +12,7 @@ import { getCanvasData, saveCanvasState, createCanvasItem as apiCreateCanvasItem
 import { getProject, saveProject, getProjects, getAssets, addAssetToLibrary } from '../utils/projectManager'
 import { uploadFileToCloud } from '../utils/cloudProjectManager'
 import { saveHistoryToDB, loadHistoryFromDB } from '../utils/historyManager'
+import { compressImage, compressCanvas, getBase64Data } from '../utils/imageCompression'
 import Folder from './Folder'
 import ShareModal from './ShareModal'
 import ProjectMetadataForm from './ProjectMetadataForm'
@@ -1307,22 +1308,14 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [selectedItem])
 
-  // Helper: Convert image URL to base64
+  // Helper: Convert image URL to base64 with compression
   const imageToBase64 = useCallback(async (imageUrl) => {
     try {
-      const response = await fetch(imageUrl)
-      const blob = await response.blob()
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onloadend = () => {
-          const base64 = reader.result
-          // Remove data URL prefix if present
-          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64
-          resolve(base64Data)
-        }
-        reader.onerror = reject
-        reader.readAsDataURL(blob)
-      })
+      // Compress image first to reduce size (prevents 413 errors)
+      const compressedDataUrl = await compressImage(imageUrl, 2048, 2048, 0.85)
+      // Extract base64 data
+      const base64Data = await getBase64Data(compressedDataUrl)
+      return base64Data
     } catch (error) {
       console.error('Error converting image to base64:', error)
       throw error
@@ -1394,9 +1387,9 @@ export default function CanvasView({ projectId, onBack, onSave }) {
           
           await Promise.all(furniturePromises)
           
-          // Convert canvas to base64
-          const base64 = canvas.toDataURL('image/png')
-          const base64Data = base64.split(',')[1]
+          // Compress canvas before converting to base64 (prevents 413 errors)
+          const compressedDataUrl = await compressCanvas(canvas, 2048, 2048, 0.85)
+          const base64Data = await getBase64Data(compressedDataUrl)
           resolve(base64Data)
         }
         
@@ -1478,7 +1471,19 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       })
 
       if (!response.ok) {
+        // Handle 413 Payload Too Large error specifically
+        if (response.status === 413) {
+          throw new Error('⚠️ Image files are too large. Please use smaller images (under 2MB each) or try compressing them before uploading.')
+        }
+        
         const errorData = await response.json().catch(() => ({ error: 'Blend failed' }))
+        
+        // Check for quota errors
+        if (response.status === 429 || errorData.error?.code === 'QUOTA_EXCEEDED') {
+          const retryAfter = errorData.error?.retryAfter || '22'
+          throw new Error(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again.`)
+        }
+        
         throw new Error(errorData.error?.message || errorData.error || 'Failed to blend images')
       }
 

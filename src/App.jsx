@@ -7,6 +7,7 @@ import ScrollRoomAnimation from './components/ScrollRoomAnimation'
 import { saveProject, getProjects, addFileToProject, getSpaces } from './utils/projectManager'
 import { syncQueue } from './utils/syncQueue'
 import { migrateOldProjects } from './utils/migrateProjects'
+import { compressFile, getBase64Data } from './utils/imageCompression'
 
 // Lazy load pages for code splitting and faster initial load
 const PricingPage = lazy(() => import('./pages/PricingPage'))
@@ -618,13 +619,21 @@ function StudioPage() {
     input?.click()
   }
 
-  const fileToBase64 = (file) => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.readAsDataURL(file)
-      reader.onload = () => resolve(reader.result)
-      reader.onerror = (error) => reject(error)
-    })
+  const fileToBase64 = async (file) => {
+    try {
+      // Compress image before converting to base64 (prevents 413 errors)
+      const compressedDataUrl = await compressFile(file, 2048, 2048, 0.85)
+      return compressedDataUrl
+    } catch (error) {
+      console.error('Error compressing/converting file to base64:', error)
+      // Fallback to original conversion if compression fails
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.readAsDataURL(file)
+        reader.onload = () => resolve(reader.result)
+        reader.onerror = (error) => reject(error)
+      })
+    }
   }
 
   // Load saved projects
@@ -742,13 +751,17 @@ function StudioPage() {
     setError('')
     setResultUrl('')
     try {
-      // Convert files to base64
-      const furnitureBase64Data = await fileToBase64(furnitureFile)
-      const roomBase64Data = await fileToBase64(roomFile)
+      // Convert files to base64 with compression
+      const furnitureBase64DataUrl = await fileToBase64(furnitureFile)
+      const roomBase64DataUrl = await fileToBase64(roomFile)
       
-      // Store base64 for project saving
-      setFurnitureBase64(furnitureBase64Data)
-      setRoomBase64(roomBase64Data)
+      // Extract base64 data (without data URL prefix) for API
+      const furnitureBase64Data = await getBase64Data(furnitureBase64DataUrl)
+      const roomBase64Data = await getBase64Data(roomBase64DataUrl)
+      
+      // Store full data URLs for project saving
+      setFurnitureBase64(furnitureBase64DataUrl)
+      setRoomBase64(roomBase64DataUrl)
 
       const response = await fetch('/api/nano-banana/visualize', {
         method: 'POST',
@@ -764,6 +777,11 @@ function StudioPage() {
       })
 
       if (!response.ok) {
+        // Handle 413 Payload Too Large error specifically
+        if (response.status === 413) {
+          throw new Error('⚠️ Image files are too large. Please use smaller images (under 2MB each) or try compressing them before uploading.')
+        }
+        
         const errorData = await response.json().catch(() => ({ error: 'Failed to generate visualization' }))
         const error = errorData.error || {}
         

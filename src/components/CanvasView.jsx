@@ -52,36 +52,42 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
     if (!stage || !maskLayer) return
 
     const handleMouseDown = (e) => {
-      // Only draw if clicking on the stage or empty area
-      if (e.target === stage || e.target.getParent()?.name() === 'mask-layer') {
-        isDrawingRef.current = true
-        const pos = stage.getPointerPosition()
-        if (!pos) return
+      // Allow drawing on the stage or the target item
+      // Don't block drawing - we'll check bounds instead
+      isDrawingRef.current = true
+      const pos = stage.getPointerPosition()
+      if (!pos) return
 
-        // Convert to item local coordinates
-        const itemX = (pos.x - stage.x()) / stage.scaleX() - item.x_position
-        const itemY = (pos.y - stage.y()) / stage.scaleY() - item.y_position
+      // Convert to world coordinates (absolute position on canvas)
+      const worldX = (pos.x - stage.x()) / stage.scaleX()
+      const worldY = (pos.y - stage.y()) / stage.scaleY()
 
-        // Check if click is within item bounds
-        if (itemX < 0 || itemX > (item.width || 400) || itemY < 0 || itemY > (item.height || 400)) {
-          return
-        }
+      // Convert to item local coordinates for bounds check
+      const itemX = worldX - item.x_position
+      const itemY = worldY - item.y_position
 
-        pointsRef.current = [[itemX, itemY]]
-
-        // Create new line for this stroke
-        const line = new Konva.Line({
-          points: [itemX, itemY],
-          stroke: 'rgba(255, 0, 0, 0.6)',
-          strokeWidth: brushSize / zoom,
-          lineCap: 'round',
-          lineJoin: 'round',
-          globalCompositeOperation: 'source-over',
-        })
-
-        maskLayer.add(line)
-        pathRef.current = line
+      // Check if click is within item bounds
+      if (itemX < 0 || itemX > (item.width || 400) || itemY < 0 || itemY > (item.height || 400)) {
+        isDrawingRef.current = false
+        return
       }
+
+      // Use absolute coordinates for the line (so it's positioned correctly on the mask layer)
+      pointsRef.current = [[worldX, worldY]]
+
+      // Create new line for this stroke - use absolute world coordinates
+      const line = new Konva.Line({
+        points: [worldX, worldY],
+        stroke: 'rgba(255, 0, 0, 0.6)',
+        strokeWidth: brushSize / zoom,
+        lineCap: 'round',
+        lineJoin: 'round',
+        globalCompositeOperation: 'source-over',
+      })
+
+      maskLayer.add(line)
+      pathRef.current = line
+      maskLayer.batchDraw()
     }
 
     const handleMouseMove = (e) => {
@@ -90,15 +96,21 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
       const pos = stage.getPointerPosition()
       if (!pos || !pathRef.current) return
 
-      const itemX = (pos.x - stage.x()) / stage.scaleX() - item.x_position
-      const itemY = (pos.y - stage.y()) / stage.scaleY() - item.y_position
+      // Convert to world coordinates (absolute position on canvas)
+      const worldX = (pos.x - stage.x()) / stage.scaleX()
+      const worldY = (pos.y - stage.y()) / stage.scaleY()
 
-      // Check bounds
-      if (itemX < 0 || itemX > (item.width || 400) || itemY < 0 || itemY > (item.height || 400)) {
+      // Convert to item local coordinates for bounds check
+      const itemX = worldX - item.x_position
+      const itemY = worldY - item.y_position
+
+      // Check bounds - but allow drawing even slightly outside for smoother strokes
+      if (itemX < -10 || itemX > (item.width || 400) + 10 || itemY < -10 || itemY > (item.height || 400) + 10) {
         return
       }
 
-      pointsRef.current.push([itemX, itemY])
+      // Use absolute coordinates
+      pointsRef.current.push([worldX, worldY])
       pathRef.current.points(pointsRef.current.flat())
       maskLayer.batchDraw()
     }
@@ -129,6 +141,7 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
         ctx.fillRect(0, 0, itemWidth, itemHeight)
 
         // Draw mask strokes in black
+        // Convert absolute coordinates to item-local coordinates
         const shapes = maskLayer.getChildren()
         shapes.forEach((shape) => {
           if (shape instanceof Konva.Line) {
@@ -139,10 +152,14 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
             ctx.beginPath()
             const points = shape.points()
             for (let i = 0; i < points.length; i += 2) {
+              // Convert absolute coordinates to item-local coordinates
+              const localX = points[i] - item.x_position
+              const localY = points[i + 1] - item.y_position
+              
               if (i === 0) {
-                ctx.moveTo(points[i], points[i + 1])
+                ctx.moveTo(localX, localY)
               } else {
-                ctx.lineTo(points[i], points[i + 1])
+                ctx.lineTo(localX, localY)
               }
             }
             ctx.stroke()
@@ -197,7 +214,7 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
 }
 
 // Canvas Item Component - PERFORMANCE OPTIMIZED
-function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, onItemClick, showMeasurements, zoom, blendMode, transformerRef }) {
+function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onDelete, onContextMenu, onItemClick, showMeasurements, zoom, blendMode, eraserMode, eraserTargetId, transformerRef }) {
   const [image] = useImage(item.image_url)
   const [isDragging, setIsDragging] = useState(false)
   const shapeRef = useRef(null)
@@ -266,10 +283,14 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
       id={`item-${item.id}`}
       x={item.x_position}
       y={item.y_position}
-      draggable={!item.is_locked}
+      draggable={!item.is_locked && !(eraserMode && eraserTargetId === item.id)}
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
       onClick={(e) => {
+        // Skip item interactions when in eraser mode for the target item to allow mask drawing
+        if (eraserMode && eraserTargetId === item.id) {
+          return // Let mask drawing handle the event
+        }
         onSelect(e, e.evt.shiftKey)
         // Show context menu on click
         if (onItemClick) {
@@ -277,12 +298,17 @@ function CanvasItem({ item, isSelected, isMultiSelected, onSelect, onUpdate, onD
         }
       }}
       onTap={(e) => {
+        // Skip item interactions when in eraser mode for the target item to allow mask drawing
+        if (eraserMode && eraserTargetId === item.id) {
+          return // Let mask drawing handle the event
+        }
         onSelect(e, e.evt.shiftKey)
         // Show context menu on tap
         if (onItemClick) {
           onItemClick(e, item.id)
         }
       }}
+      listening={!(eraserMode && eraserTargetId === item.id)}
       onContextMenu={(e) => {
         e.evt.preventDefault()
         if (onContextMenu) {
@@ -3967,7 +3993,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 ref={stageRef}
                 width={canvasWidth}
                 height={canvasHeight}
-                draggable={!outpaintMode && !dimensionMode && !textMode}
+                draggable={!outpaintMode && !dimensionMode && !textMode && !eraserMode}
                 onDrag={handleStageDrag}
                 onDragEnd={handleStageDragEnd}
                 onWheel={handleWheel}
@@ -4084,6 +4110,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                         showMeasurements={settings.showMeasurements}
                         zoom={camera.zoom}
                         blendMode={blendMode}
+                        eraserMode={eraserMode}
+                        eraserTargetId={eraserTargetId}
                       />
                     ))
                   })()}
@@ -4229,9 +4257,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                 )}
 
                 {/* Mask Drawing Layer - Only visible in eraser mode */}
-                {eraserMode && eraserTargetId && (
-                  <Layer ref={maskLayerRef} name="mask-layer" listening={false} />
-                )}
+                {eraserMode && eraserTargetId && (() => {
+                  const targetItem = items.find(item => item.id === eraserTargetId)
+                  if (!targetItem) return null
+                  
+                  return (
+                    <Layer ref={maskLayerRef} name="mask-layer" listening={true}>
+                      {/* Transparent overlay rectangle to capture mouse events over the item */}
+                      <Rect
+                        x={targetItem.x_position}
+                        y={targetItem.y_position}
+                        width={targetItem.width || 400}
+                        height={targetItem.height || 400}
+                        fill="transparent"
+                        listening={true}
+                        perfectDrawEnabled={false}
+                        hitGraphEnabled={true}
+                      />
+                    </Layer>
+                  )
+                })()}
 
                 {/* Dimension Lines Layer */}
                 {dimensionMode && (

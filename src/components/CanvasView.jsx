@@ -186,8 +186,11 @@ function MaskDrawingOverlay({ item, stageRef, maskLayerRef, onMaskComplete, onCa
         />
         <span className="text-sm text-stone-700 font-mono w-12 text-right">{brushSize}px</span>
       </div>
-      <div className="mt-2 text-xs text-stone-500">
-        Press <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Enter</kbd> to apply, <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Esc</kbd> to cancel
+      <div className="mt-2 text-xs text-stone-500 space-y-1">
+        <p>Paint over objects you want to remove</p>
+        <p>
+          Press <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Enter</kbd> to remove objects, <kbd className="px-1.5 py-0.5 bg-stone-100 border border-stone-300 rounded text-xs">Esc</kbd> to cancel
+        </p>
       </div>
     </div>
   )
@@ -462,6 +465,8 @@ export default function CanvasView({ projectId, onBack, onSave }) {
   const [maskCanvas, setMaskCanvas] = useState(null) // Canvas for drawing mask
   const [isDrawingMask, setIsDrawingMask] = useState(false)
   const [maskPath, setMaskPath] = useState([]) // Store brush strokes
+  const [eraserBrushSize, setEraserBrushSize] = useState(30) // Brush size for eraser/mask drawing
+  const [removalType, setRemovalType] = useState('objects') // Type of removal: 'objects', 'people', 'pets', 'clutter'
 
   // Outpaint/Dimension/Text Mode State
   const [outpaintMode, setOutpaintMode] = useState(false)
@@ -1654,11 +1659,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setBlendSourceId(itemId)
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
       setError('Blend mode: Click on another image to blend with this one')
-    } else if (action === 'erase') {
+    } else if (action === 'erase' || action === 'remove-objects') {
       setEraserMode(true)
       setEraserTargetId(itemId)
+      setRemovalType(action === 'remove-objects' ? 'objects' : 'objects')
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
-      setError('Eraser mode: Paint over the area you want to erase/fill. Press Enter when done.')
+      setError('Paint over objects to remove. Press Enter when done, or Esc to cancel.')
     } else if (action === 'removeBg') {
       handleRemoveBackground(itemId)
       setContextMenuPosition({ x: 0, y: 0, visible: false, itemId: null })
@@ -1982,49 +1988,74 @@ export default function CanvasView({ projectId, onBack, onSave }) {
     }
   }, [userId, projectId, items, handleItemUpdate, clerk])
 
-  // Handle inpainting with mask
+  // Handle inpainting with mask - AI-powered object removal
   const handleInpaint = useCallback(async (itemId, maskDataUrl) => {
     if (!userId || !projectId || !itemId) return
 
     const targetItem = items.find(item => item.id === itemId)
     if (!targetItem) {
-      setError('Could not find image to inpaint.')
+      setError('Could not find image to edit.')
       return
     }
 
     try {
       setIsGenerating(true)
+      setError('')
 
       const token = await getAuthToken(clerk)
       if (!token) throw new Error('Authentication required')
 
-      // Call inpainting API
-      const response = await fetch('/api/image-processing', {
+      // Convert image and mask to base64 for API
+      const imageBase64 = await imageToBase64(targetItem.image_url)
+      
+      // Extract base64 data from mask data URL
+      const maskBase64 = maskDataUrl.includes(',') 
+        ? maskDataUrl.split(',')[1] 
+        : maskDataUrl
+
+      // Call new inpainting API endpoint
+      const response = await fetch('/api/nano-banana/inpaint', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          operation: 'inpaint',
-          base_image_url: targetItem.image_url,
-          mask_image_url: maskDataUrl, // Base64 data URL of the mask
-          prompt: 'fill the erased area seamlessly', // Optional prompt for generation
+          imageBase64: imageBase64,
+          maskBase64: maskBase64,
+          removalType: removalType, // 'objects', 'people', 'pets', 'clutter', 'furniture'
         }),
       })
 
-      if (!response.ok) throw new Error('Inpaint failed')
+      if (!response.ok) {
+        // Handle 413 Payload Too Large error specifically
+        if (response.status === 413) {
+          throw new Error('⚠️ Image file is too large. Please use a smaller image (under 2MB) or try compressing it before uploading.')
+        }
+        
+        const errorData = await response.json().catch(() => ({ error: 'Object removal failed' }))
+        const error = errorData.error || {}
+        
+        // Check for quota errors
+        if (response.status === 429 || error.code === 'QUOTA_EXCEEDED') {
+          const retryAfter = error.retryAfter || '22'
+          throw new Error(`⚠️ API Quota Exceeded: You've reached the free tier limit for Gemini API. Please wait ${retryAfter} seconds before trying again.`)
+        }
+        
+        throw new Error(error.message || error || 'Failed to remove objects. Please try again.')
+      }
 
-      // Stream the result (for now, just get the final image)
       const data = await response.json()
-      if (!data.image_url) throw new Error('No image returned from inpaint')
+      if (!data.imageUrl) {
+        throw new Error('No image returned from object removal operation')
+      }
 
-      // Upload if needed
-      let imageUrl = data.image_url
+      // Upload result if it's a data URL
+      let imageUrl = data.imageUrl
       if (imageUrl.startsWith('data:')) {
         const imgResponse = await fetch(imageUrl)
         const blob = await imgResponse.blob()
-        const file = new File([blob], `inpaint - ${Date.now()}.png`, { type: 'image/png' })
+        const file = new File([blob], `object-removed-${Date.now()}.png`, { type: 'image/png' })
         const uploadResult = await uploadFileToCloud(file, clerk)
         imageUrl = uploadResult.url
       }
@@ -2037,7 +2068,7 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         img.src = imageUrl
       })
 
-      // Update the item with the inpainted result
+      // Update the item with the edited result
       // Keep original as backup in metadata
       await handleItemUpdate(itemId, {
         image_url: imageUrl,
@@ -2046,9 +2077,26 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         metadata: {
           ...(targetItem.metadata || {}),
           original_image_url: targetItem.image_url, // Backup original
-          inpainted_at: new Date().toISOString(),
+          edited_at: new Date().toISOString(),
+          edit_type: 'object_removal',
         },
       })
+
+      // Save generated image to asset library ("My assets")
+      try {
+        await addAssetToLibrary(
+          userId,
+          `Object removed: ${targetItem.name || 'Edited image'}`,
+          imageUrl,
+          'image',
+          `AI-edited image with objects removed`,
+          clerk
+        )
+        console.log('Edited image saved to asset library')
+      } catch (assetError) {
+        // Don't fail the operation if asset library save fails
+        console.warn('Failed to save edited image to asset library:', assetError)
+      }
 
       // Clear eraser mode
       setEraserMode(false)
@@ -2057,12 +2105,12 @@ export default function CanvasView({ projectId, onBack, onSave }) {
       setMaskPath([])
       setError('')
     } catch (error) {
-      console.error('Error inpainting:', error)
-      setError('Failed to inpaint image. Please try again.')
+      console.error('Error removing objects:', error)
+      setError(error.message || 'Failed to remove objects. Please try again.')
     } finally {
       setIsGenerating(false)
     }
-  }, [userId, projectId, items, handleItemUpdate, clerk])
+  }, [userId, projectId, items, clerk, handleItemUpdate, removalType, imageToBase64, addAssetToLibrary])
 
   // Create loop handler
   const handleCreateLoop = useCallback(async (itemId) => {
@@ -3485,11 +3533,11 @@ export default function CanvasView({ projectId, onBack, onSave }) {
         </div>
       )}
 
-      {/* Eraser Mode Indicator */}
+      {/* Remove Objects Mode Indicator */}
       {eraserMode && eraserTargetId && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-orange-50 border border-orange-200 rounded-lg px-4 py-2 shadow-lg">
           <p className="text-sm text-orange-700">
-            Eraser mode: Paint over the area to erase/fill. Press <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Enter</kbd> to apply, <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Esc</kbd> to cancel
+            Remove Objects mode: Paint over unwanted objects, people, pets, or clutter. Press <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Enter</kbd> to remove, <kbd className="px-1.5 py-0.5 bg-white border border-orange-300 rounded text-xs">Esc</kbd> to cancel
             <button
               onClick={() => {
                 setEraserMode(false)
@@ -3758,6 +3806,24 @@ export default function CanvasView({ projectId, onBack, onSave }) {
                   <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                 </svg>
                 Move to Back
+              </button>
+              <div className="border-t border-[#F1EBE4] my-1" />
+              <button
+                onClick={() => {
+                  setEraserMode(true)
+                  setEraserTargetId(selectedItemId)
+                  setRemovalType('objects')
+                  setPopupMenuPosition({ x: 0, y: 0, visible: false })
+                  setError('Paint over objects to remove. Press Enter when done, or Esc to cancel.')
+                }}
+                className="w-full px-4 py-2 text-left text-sm text-[#2C2C2C] hover:bg-[#F1EBE4] flex items-center gap-2 transition-colors font-medium"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z" />
+                  <line x1="18" y1="9" x2="12" y2="15" />
+                  <line x1="12" y1="9" x2="18" y2="15" />
+                </svg>
+                Remove Objects
               </button>
               <div className="border-t border-[#F1EBE4] my-1" />
               <button

@@ -1,6 +1,7 @@
 // Image Editing API - Consolidates retouch and upscale
 // Supports multiple image editing operations
 import { requireAuth } from '../_utils/auth.js'
+import { withRateLimit, standardLimiter } from '../_utils/rateLimit.js'
 
 async function handler(req, res, userId) {
   // userId is verified and safe to use
@@ -36,8 +37,12 @@ async function handler(req, res, userId) {
   }
 }
 
-// Export with authentication middleware
-export default requireAuth(handler)
+// Export with authentication and rate limiting
+export default requireAuth((req, res, userId) =>
+  withRateLimit(standardLimiter, (limitedReq, limitedRes) =>
+    handler(limitedReq, limitedRes, userId)
+  )(req, res)
+)
 
 // Upscale handler
 async function handleUpscale(req, res, image_url, params) {

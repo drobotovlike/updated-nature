@@ -1,19 +1,12 @@
 /**
  * Clerk Authentication Middleware
- * 
- * PROPERLY verifies Clerk session tokens using @clerk/backend
- * with signature verification against Clerk's public keys.
- * 
- * Usage:
- *   import { requireAuth } from '../utils/auth'
- *   
- *   export default requireAuth(async (req, res, userId) => {
- *     // userId is verified and safe to use
- *     // Your handler code here
- *   })
+ *
+ * Verifies Clerk session tokens using @clerk/backend with
+ * signature verification against Clerk's public keys.
  */
 
 import { verifyToken } from '@clerk/backend'
+import { isDevelopment } from './env.js'
 
 /**
  * Verifies Clerk session token with proper signature verification
@@ -22,28 +15,33 @@ import { verifyToken } from '@clerk/backend'
  * @returns {Promise<{userId: string} | null>}
  */
 async function verifyClerkToken(authHeader) {
-  // DEBUG: Check environment (remove in production later)
   if (!process.env.CLERK_SECRET_KEY) {
     console.error('❌ CLERK_SECRET_KEY is missing in environment variables!')
-  } else {
-    // Log partial key for verification (safe to log first few chars)
-    console.log('✅ CLERK_SECRET_KEY is present:', process.env.CLERK_SECRET_KEY.substring(0, 7) + '...')
+  } else if (isDevelopment()) {
+    // Only log the presence of the key in development, never any part of its value
+    console.log('✅ CLERK_SECRET_KEY is present in environment')
   }
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('❌ No valid Authorization header found')
+    if (isDevelopment()) {
+      console.log('❌ No valid Authorization header found')
+    }
     return null
   }
 
   const token = authHeader.replace('Bearer ', '').trim()
   
   if (!token) {
-    console.log('❌ Token is empty')
+    if (isDevelopment()) {
+      console.log('❌ Token is empty')
+    }
     return null
   }
 
   try {
-    console.log('🔍 Verifying token...')
+    if (isDevelopment()) {
+      console.log('🔍 Verifying token...')
+    }
     // Verify the token signature using Clerk's public keys
     const verified = await verifyToken(token, {
       secretKey: process.env.CLERK_SECRET_KEY,
@@ -57,8 +55,10 @@ async function verifyClerkToken(authHeader) {
       console.error('❌ Token verified but no user ID found')
       return null
     }
-    
-    console.log('✅ Token verified for user:', userId)
+
+    if (isDevelopment()) {
+      console.log('✅ Token verified for user')
+    }
     return { userId }
   } catch (error) {
     console.error('❌ JWT verification failed:', error.message)

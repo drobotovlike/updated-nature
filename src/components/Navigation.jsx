@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react'
 
 // Prefetch page components on hover for faster navigation
@@ -18,6 +18,7 @@ const prefetchPage = (path) => {
 export default function Navigation() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const location = useLocation()
+  const navigate = useNavigate()
   const { isSignedIn } = useAuth()
   const { user } = useUser()
 
@@ -70,13 +71,23 @@ export default function Navigation() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-4">
-          <button className="hidden md:flex p-2 hover:bg-stone-200/50 rounded-full transition-colors text-stone-600 hover:text-stone-900">
+          <button
+            type="button"
+            aria-label="Search help and documentation"
+            onClick={() => navigate('/help')}
+            className="hidden md:flex p-2 hover:bg-stone-200/50 rounded-full transition-colors text-stone-600 hover:text-stone-900"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
           </button>
-          <button className="p-2 hover:bg-stone-200/50 rounded-full transition-colors text-stone-600 hover:text-stone-900 relative">
+          <button
+            type="button"
+            aria-label="Contact support"
+            onClick={() => (window.location.href = 'mailto:hello@ature.studio')}
+            className="p-2 hover:bg-stone-200/50 rounded-full transition-colors text-stone-600 hover:text-stone-900 relative"
+          >
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
               <polyline points="3.27 6.96 12 12.01 20.73 6.96" />

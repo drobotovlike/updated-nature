@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../_utils/auth.js'
 import { getSupabaseConfig } from '../_utils/env.js'
 import { logger } from '../_utils/logger.js'
+import { withRateLimit, strictLimiter } from '../_utils/rateLimit.js'
 
 // Get Supabase configuration
 const config = getSupabaseConfig()
@@ -213,8 +214,12 @@ async function handler(req, res, userId) {
   }
 }
 
-// Export with authentication middleware
-export default requireAuth(handler)
+// Export with authentication and strict rate limiting (expensive AI endpoint)
+export default requireAuth((req, res, userId) =>
+  withRateLimit(strictLimiter, (limitedReq, limitedRes) =>
+    handler(limitedReq, limitedRes, userId)
+  )(req, res)
+)
 
 // Gemini handler (existing implementation)
 async function generateWithGemini({ prompt, reference_image, reference_strength, aspect_ratio, quality, seed }) {

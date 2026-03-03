@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { requireAuth } from '../_utils/auth.js'
+import { withRateLimit, strictLimiter } from '../_utils/rateLimit.js'
 
 async function handler(req, res, userId) {
   // Set CORS headers
@@ -112,10 +113,17 @@ async function handler(req, res, userId) {
 
     if (!imageUrl && !textResult) {
       console.error('No image or text found in response')
+      if (process.env.NODE_ENV !== 'production') {
+        return res.status(500).json({ 
+          error: {
+            message: 'No image generated. The API response did not contain expected data.',
+            details: 'Response structure: ' + JSON.stringify(response).substring(0, 500)
+          }
+        })
+      }
       return res.status(500).json({ 
         error: {
-          message: 'No image generated. The API response did not contain expected data.',
-          details: 'Response structure: ' + JSON.stringify(response).substring(0, 500)
+          message: 'No image generated. The API response did not contain expected data.'
         }
       })
     }
@@ -193,6 +201,10 @@ async function handler(req, res, userId) {
   }
 }
 
-// Export with authentication middleware
-export default requireAuth(handler)
+// Export with authentication and strict rate limiting (expensive AI endpoint)
+export default requireAuth((req, res, userId) =>
+  withRateLimit(strictLimiter, (limitedReq, limitedRes) =>
+    handler(limitedReq, limitedRes, userId)
+  )(req, res)
+)
 

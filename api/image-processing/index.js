@@ -1,4 +1,5 @@
 import { requireAuth } from '../_utils/auth.js'
+import { withRateLimit, strictLimiter } from '../_utils/rateLimit.js'
 
 async function handler(req, res, userId) {
   // userId is verified and safe to use
@@ -39,8 +40,12 @@ async function handler(req, res, userId) {
   }
 }
 
-// Export with authentication middleware
-export default requireAuth(handler)
+// Export with authentication and strict rate limiting (expensive image operations)
+export default requireAuth((req, res, userId) =>
+  withRateLimit(strictLimiter, (limitedReq, limitedRes) =>
+    handler(limitedReq, limitedRes, userId)
+  )(req, res)
+)
 
 // Blend handler
 async function handleBlend(req, res) {

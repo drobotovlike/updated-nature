@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 import { requireAuth } from '../_utils/auth.js'
 import { getSupabaseConfig } from '../_utils/env.js'
 import { logger } from '../_utils/logger.js'
+import { withRateLimit, standardLimiter } from '../_utils/rateLimit.js'
 
 // Get Supabase configuration
 const config = getSupabaseConfig()
@@ -37,6 +38,15 @@ async function handler(req, res, userId) {
 
     // Convert base64 to buffer
     const fileBuffer = Buffer.from(fileBase64, 'base64')
+
+    // Basic server-side size guardrail (10MB)
+    const MAX_BYTES = 10 * 1024 * 1024
+    if (fileBuffer.length > MAX_BYTES) {
+      return res.status(413).json({
+        error: 'File too large',
+        message: 'Maximum upload size is 10MB. Please use a smaller file or compress it before uploading.',
+      })
+    }
     
     // Generate unique file name
     const fileExtension = fileName.split('.').pop() || 'jpg'
@@ -94,5 +104,9 @@ async function handler(req, res, userId) {
   }
 }
 
-// Export with authentication middleware
-export default requireAuth(handler)
+// Export with authentication and rate limiting
+export default requireAuth((req, res, userId) =>
+  withRateLimit(standardLimiter, (limitedReq, limitedRes) =>
+    handler(limitedReq, limitedRes, userId)
+  )(req, res)
+)

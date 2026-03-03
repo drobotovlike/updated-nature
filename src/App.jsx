@@ -1611,7 +1611,14 @@ function App() {
     <Routes>
       <Route path="/" element={<HomePage />} />
       <Route path="/dashboard" element={<DashboardPageWrapper />} />
-      <Route path="/studio" element={<StudioPage />} />
+      <Route
+        path="/studio"
+        element={
+          <ProtectedRoute>
+            <StudioPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/share/:token" element={<SharedViewWrapper />} />
       <Route path="/pricing" element={<PricingPageWrapper />} />
       <Route path="/blog" element={<BlogPageWrapper />} />

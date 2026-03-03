@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { requireAuth } from '../_utils/auth.js'
+import { withRateLimit, strictLimiter } from '../_utils/rateLimit.js'
 
 async function handler(req, res, userId) {
   // Set CORS headers
@@ -97,10 +98,12 @@ async function handler(req, res, userId) {
       contents: contents,
     })
 
-    // Log the response structure for debugging
-    console.log('Response structure:', JSON.stringify(response, null, 2))
-    console.log('Response type:', typeof response)
-    console.log('Response keys:', Object.keys(response || {}))
+    // Log the response structure for debugging in development only
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Response structure:', JSON.stringify(response, null, 2))
+      console.log('Response type:', typeof response)
+      console.log('Response keys:', Object.keys(response || {}))
+    }
 
     // Extract the generated image from response
     // According to docs: response.candidates[0].content.parts contains the result
@@ -109,24 +112,36 @@ async function handler(req, res, userId) {
 
     // Check different possible response structures
     if (response.candidates && response.candidates[0]?.content?.parts) {
-      console.log('Found candidates structure')
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Found candidates structure')
+      }
       for (const part of response.candidates[0].content.parts) {
-        console.log('Part:', Object.keys(part || {}))
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('Part:', Object.keys(part || {}))
+        }
         if (part.text) {
           textResult = part.text
-          console.log('Found text:', textResult.substring(0, 100))
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Found text:', textResult.substring(0, 100))
+          }
         } else if (part.inlineData) {
-          console.log('Found inlineData')
+          if (process.env.NODE_ENV !== 'production') {
+            console.log('Found inlineData')
+          }
           const imageData = part.inlineData
           if (imageData?.data) {
             imageUrl = `data:${imageData.mimeType || 'image/png'};base64,${imageData.data}`
-            console.log('Image URL created, length:', imageUrl.length)
+            if (process.env.NODE_ENV !== 'production') {
+              console.log('Image URL created, length:', imageUrl.length)
+            }
           }
         }
       }
     } else if (response.parts) {
       // Alternative structure: response.parts directly
-      console.log('Found parts structure directly')
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Found parts structure directly')
+      }
       for (const part of response.parts) {
         if (part.text) {
           textResult = part.text
@@ -139,16 +154,22 @@ async function handler(req, res, userId) {
       }
     } else if (response.text) {
       // Response might have text directly
-      console.log('Found text directly on response')
+      if (process.env.NODE_ENV !== 'production') {
+        console.log('Found text directly on response')
+      }
       textResult = response.text
     }
 
-    console.log('Final imageUrl:', imageUrl ? 'Found' : 'Not found')
-    console.log('Final textResult:', textResult ? textResult.substring(0, 100) : 'Not found')
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('Final imageUrl:', imageUrl ? 'Found' : 'Not found')
+      console.log('Final textResult:', textResult ? textResult.substring(0, 100) : 'Not found')
+    }
 
     if (!imageUrl && !textResult) {
       console.error('No image or text found in response')
-      console.error('Full response:', JSON.stringify(response, null, 2))
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Full response:', JSON.stringify(response, null, 2))
+      }
       return res.status(500).json({ 
         error: {
           message: 'No image or text generated. The API response did not contain expected data.',

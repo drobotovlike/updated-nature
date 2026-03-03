@@ -180,7 +180,7 @@ export default function AIChatBar({
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 w-full max-w-2xl px-4">
-      <form onSubmit={handleSubmit} className="group/composer w-full">
+      <form onSubmit={handleSubmit} className="group/composer w-full space-y-2">
         <input
           ref={fileInputRef}
           type="file"
@@ -191,7 +191,7 @@ export default function AIChatBar({
         />
         <div
           className={cn(
-            "w-full mx-auto bg-transparent dark:bg-muted/50 cursor-text overflow-clip bg-clip-padding p-2.5 shadow-lg border border-border transition-all duration-200",
+            "w-full mx-auto cursor-text overflow-clip bg-clip-padding p-2.5 shadow-xl border border-stone-200/80 bg-white/95 backdrop-blur-xl transition-all duration-200",
             {
               "rounded-3xl grid grid-cols-1 grid-rows-[auto_1fr_auto]": isExpanded,
               "rounded-[28px] grid grid-cols-[auto_1fr_auto] grid-rows-[auto_1fr_auto]": !isExpanded,
@@ -220,7 +220,7 @@ export default function AIChatBar({
                 onChange={handleTextareaChange}
                 onKeyDown={handleKeyDown}
                 placeholder={placeholder}
-                className="min-h-0 resize-none rounded-none border-0 p-0 text-base placeholder:text-muted-foreground focus-visible:ring-0 focus-visible:ring-offset-0 scrollbar-thin dark:bg-transparent bg-transparent w-full"
+                className="min-h-0 resize-none rounded-none border-0 p-0 text-base placeholder:text-stone-400 focus-visible:ring-0 focus-visible:ring-offset-0 scrollbar-thin dark:bg-transparent bg-transparent w-full"
                 rows={1}
                 disabled={isLoading}
               />
@@ -282,7 +282,7 @@ export default function AIChatBar({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 rounded-full hover:bg-accent"
+                className="h-9 w-9 rounded-full hover:bg-stone-100"
               >
                 <IconMicrophone className="size-5 text-muted-foreground" />
               </Button>
@@ -290,20 +290,28 @@ export default function AIChatBar({
                 type="button"
                 variant="ghost"
                 size="sm"
-                className="h-9 w-9 rounded-full hover:bg-accent relative"
+                className="h-9 w-9 rounded-full hover:bg-stone-100 relative"
               >
                 <IconWaveSine className="size-5 text-muted-foreground" />
               </Button>
-              {message.trim() && !isLoading && (
-                <Button
-                  type="submit"
-                  size="sm"
-                  className="h-9 w-9 rounded-full"
-                  variant="primary"
-                >
-                  <IconSend className="size-5" />
-                </Button>
-              )}
+              <Button
+                type="submit"
+                size="sm"
+                className={cn(
+                  "h-9 px-4 rounded-full flex items-center gap-1.5 text-xs font-semibold tracking-wide transition-colors",
+                  message.trim() && !isLoading
+                    ? "bg-stone-900 text-white hover:bg-stone-800"
+                    : "bg-stone-200 text-stone-500 cursor-not-allowed"
+                )}
+                disabled={!message.trim() || isLoading}
+              >
+                {isLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <IconSend className="size-4" />
+                )}
+                <span className="hidden sm:inline">Send</span>
+              </Button>
               {isLoading && (
                 <Button
                   type="button"
@@ -317,6 +325,10 @@ export default function AIChatBar({
               )}
             </div>
           </div>
+        </div>
+        <div className="flex items-center justify-between px-1 text-[11px] text-stone-400">
+          <span>Press Enter to send • Shift+Enter for new line</span>
+          <span className="hidden sm:inline">/ opens commands • Attach images from the + menu</span>
         </div>
       </form>
     </div>

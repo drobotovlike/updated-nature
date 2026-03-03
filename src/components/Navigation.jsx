@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useUser, useAuth, UserButton } from '@clerk/clerk-react'
+import BubbleMenu from './BubbleMenu'
 
 // Prefetch page components on hover for faster navigation
 const prefetchPage = (path) => {
@@ -22,13 +23,42 @@ export default function Navigation() {
   const { isSignedIn } = useAuth()
   const { user } = useUser()
 
-  const navLinks = [
-    { path: '/', label: 'Home' },
-    { path: '/dashboard', label: 'Studio' },
-    { path: '/pricing', label: 'Pricing' },
-    { path: '/blog', label: 'Blog' },
-    { path: '/about', label: 'About' },
-    { path: '/help', label: 'Help' },
+  const navItems = [
+    {
+      label: 'home',
+      href: '/',
+      ariaLabel: 'Home',
+      rotation: -8,
+      hoverStyles: { bgColor: '#000000', textColor: '#ffffff' },
+    },
+    {
+      label: 'studio',
+      href: '/dashboard',
+      ariaLabel: 'Studio',
+      rotation: 6,
+      hoverStyles: { bgColor: '#3b82f6', textColor: '#ffffff' },
+    },
+    {
+      label: 'pricing',
+      href: '/pricing',
+      ariaLabel: 'Pricing',
+      rotation: -4,
+      hoverStyles: { bgColor: '#f59e0b', textColor: '#111827' },
+    },
+    {
+      label: 'blog',
+      href: '/blog',
+      ariaLabel: 'Blog',
+      rotation: 8,
+      hoverStyles: { bgColor: '#10b981', textColor: '#ffffff' },
+    },
+    {
+      label: 'help',
+      href: '/help',
+      ariaLabel: 'Help',
+      rotation: -6,
+      hoverStyles: { bgColor: '#8b5cf6', textColor: '#ffffff' },
+    },
   ]
 
   return (
@@ -46,22 +76,16 @@ export default function Navigation() {
           </div>
         </button>
 
-        {/* Desktop Navigation Links */}
+        {/* Desktop Navigation - Bubble Menu */}
         <div className="hidden md:flex items-center gap-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.path}
-              to={link.path}
-              onMouseEnter={() => prefetchPage(link.path)}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                location.pathname === link.path
-                  ? 'text-stone-900 bg-stone-100'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-50'
-              }`}
-            >
-              {link.label}
-            </Link>
-          ))}
+          <BubbleMenu
+            logo={<span className="text-xs font-bold tracking-tight">AT</span>}
+            items={navItems}
+            menuAriaLabel="Main navigation"
+            menuBg="#f5f3f0"
+            menuContentColor="#111111"
+            useFixedPosition={false}
+          />
         </div>
 
         {/* Center: Brand */}
